@@ -1,39 +1,118 @@
-function handleAuth(response) {
-    // 1. 解碼 Google 回傳的 JWT 憑證
-    const payload = JSON.parse(atob(response.credential.split('.')[1]));
-    const userEmail = payload.email;
-    console.log("登入嘗試：", userEmail); // 偵錯用：可在瀏覽器 F12 查看
-
-    // 2. 權限檢查 (請確保您的 Email 在此清單中)
-    const allowedEmails = ["cl.lee.olin@gmail.com"]; // 依據您的圖片設定
-    const isAllowed = allowedEmails.includes(userEmail);
-
-    if (isAllowed) {
-        // 成功登入後的動作
-        const authScreen = document.getElementById('auth-screen');
-        const firstTab = document.querySelector('.tab');
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>惇陽 AI 實驗室 - 工具平台</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root { --p-blue: #0f172a; --accent: #2563eb; --nav-bg: #ffffff; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; margin: 0; background: #f8fafc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        if (authScreen) authScreen.style.display = 'none';
+        /* 驗證遮罩層 */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--p-blue); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; transition: opacity 0.5s; }
         
-        // 3. 觸發顯示第一個工具 (例如 map.html)
-        if (firstTab) {
-            switchTool(firstTab, 'map.html');
+        /* 頂部標籤列 */
+        nav { background: var(--nav-bg); display: flex; overflow-x: auto; border-bottom: 1px solid #e2e8f0; padding: 8px 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        nav::-webkit-scrollbar { display: none; } 
+        
+        .tab { padding: 10px 18px; cursor: pointer; border-radius: 20px; white-space: nowrap; color: #64748b; font-size: 14px; font-weight: bold; margin: 0 4px; transition: 0.2s; border: 1px solid transparent; }
+        .tab.active { background: #eff6ff; color: var(--accent); border: 1px solid #dbeafe; }
+
+        /* 工具顯示區 */
+        #content-area { flex-grow: 1; position: relative; width: 100%; background: #fff; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .error-msg { color: #ef4444; margin-top: 10px; font-size: 14px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <h2 style="letter-spacing: 2px;">惇陽 AI 實驗室</h2>
+        <p style="opacity: 0.7; font-size: 14px; margin-bottom: 30px;">設計A組內部平台 (需授權登入)</p>
+        
+        <div id="g_id_onload"
+             data-client_id="992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com"
+             data-callback="handleAuth">
+        </div>
+        <div class="g_id_signin" data-type="standard" data-shape="pill"></div>
+        <div id="err-log" class="error-msg">帳號不在授權名單內，請聯繫管理員。</div>
+    </div>
+
+    <nav id="nav-tabs">
+        <div class="tab active" onclick="switchTool(this, 'map.html')">🗺️ 3D地圖</div>
+        <div class="tab" onclick="switchTool(this, 'doc.html')">📄 公文助手</div>
+        <div class="tab" onclick="switchTool(this, 'calc.html')">🧮 換算器</div>
+        <div class="tab" onclick="switchTool(this, 'tree.html')">🌳 修樹工單</div>
+        <div class="tab" onclick="switchTool(this, 'green.html')">🌿 綠化工單</div>
+    </nav>
+
+    <div id="content-area">
+        <iframe id="tool-frame" name="tool-frame" src=""></iframe>
+    </div>
+
+    <script>
+        // --- 權限名單設定 ---
+        const allowedEmails = [
+            "cl.lee.olin@gmail.com", // 您的 Email
+            // 可以在此增加其他成員的 Email
+        ];
+
+        // --- 登入回傳處理 ---
+        function handleAuth(response) {
+            try {
+                // 解析 Google 回傳的資訊 (JWT)
+                const base64Url = response.credential.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const payload = JSON.parse(window.atob(base64));
+                const userEmail = payload.email;
+
+                console.log("嘗試登入者:", userEmail);
+
+                // 驗證 Email (檢查是否在名單內或屬於公司網域)
+                const isAuthorized = allowedEmails.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw");
+
+                if (isAuthorized) {
+                    console.log("驗證成功，進入系統");
+                    const authScreen = document.getElementById('auth-screen');
+                    authScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        authScreen.style.display = 'none';
+                        // 成功後自動載入第一個分頁
+                        switchTool(document.querySelector('.tab'), 'map.html');
+                    }, 500);
+                } else {
+                    console.error("授權失敗");
+                    document.getElementById('err-log').style.display = 'block';
+                    document.getElementById('err-log').innerText = "未授權帳號: " + userEmail;
+                }
+            } catch (error) {
+                console.error("登入程序發生錯誤:", error);
+                alert("驗證程序出錯，請刷新頁面重試。");
+            }
         }
-    } else {
-        alert("未經授權的帳號：" + userEmail);
-    }
-}
 
-function switchTool(el, fileName) {
-    // 切換標籤 active 樣式
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    
-    // 取得 iframe 並更新來源
-    const frame = document.getElementById('tool-frame');
-    if (frame) {
-        // 重要：在 GitHub Pages 中使用相對路徑加載同目錄下的檔案
-        frame.src = "./" + fileName; 
-        console.log("正在切換工具至：", fileName);
-    }
-}
+        // --- 分頁切換功能 ---
+        function switchTool(el, fileName) {
+            if (!el || !fileName) return;
+
+            // 1. 更新標籤樣式
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            
+            // 2. 更新 iframe 網址 (增加 ./ 確保 GitHub 相對路徑正確)
+            const frame = document.getElementById('tool-frame');
+            const targetUrl = "./" + fileName;
+            
+            console.log("切換至:", targetUrl);
+            frame.src = targetUrl;
+        }
+
+        // 偵錯輔助：如果 5 秒後沒反應，提示使用者
+        window.onload = function() {
+            console.log("系統已就緒，等待 Google SDK 載入...");
+        };
+    </script>
+</body>
+</html>
