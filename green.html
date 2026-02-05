@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>植栽選取工具 - 專業排序版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body { background: #f0f2f5; margin: 0; padding: 0; font-family: 'Microsoft JhengHei', sans-serif; }
+        .header { position: sticky; top: 0; background: #f0f2f5; padding: 15px; z-index: 100; border-bottom: 1px solid #ddd; }
+        #search { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #dfe6e9; box-sizing: border-box; font-size: 16px; outline: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .container { max-width: 800px; margin: 0 auto; padding: 10px; padding-bottom: 220px; }
+        .item-card { background: #fff; border-radius: 10px; padding: 15px; margin-bottom: 15px; border-left: 6px solid #1A5276; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .item-title { font-size: 15px; font-weight: bold; color: #333; }
+        .item-spec { font-size: 12px; color: #1A5276; margin-top: 4px; background: #eef2f5; padding: 2px 6px; border-radius: 4px; display: inline-block; }
+        .plants-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
+        .plant-btn { padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; text-align: center; cursor: pointer; background: #fff; transition: 0.2s; }
+        .plant-btn.active { background: #27AE60; color: white; border-color: #27AE60; }
+        #selection-panel { position: fixed; bottom: 0; left: 0; right: 0; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); padding: 15px 20px; z-index: 200; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #27AE60; padding-bottom: 5px; }
+        .selected-items-box { max-height: 100px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .selected-tag { background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 15px; font-size: 11px; border: 1px solid #27AE60; }
+        .btn-export { background: #27AE60; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        #status { text-align: center; padding: 20px; font-size: 14px; color: #1A5276; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="max-width:800px; margin:0 auto;">
+        <input type="text" id="search" placeholder="🔍 分次篩選：輸入關鍵字 (例如: A1, 楓香...)" oninput="render()">
+    </div>
+</div>
+
+<div class="container">
+    <div id="status">正在同步雲端資料庫...</div>
+    <div id="item-list"></div>
+</div>
+
+<div id="selection-panel" style="display:none;">
+    <div class="panel-header">
+        <span style="font-weight:bold; color:#1A5276;">📋 待匯出項目 (<span id="count">0</span>)</span>
+        <button onclick="clearAll()" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline; font-size:12px;">全部清除</button>
+    </div>
+    <div id="selected-items-box" class="selected-items-box"></div>
+    <button class="btn-export" onclick="exportToCSV()">📊 依項次順序產生 CSV</button>
+</div>
+
+<script>
+    const SS_ID = "1uuRdwy7-kNwE6sNiByxU7wcQthnEd2TBY8-8gS1N1e4";
+    let projectData = [];
+    let cart = []; 
+
+    function loadSpreadsheetData() {
+        const cbName = "callback_data";
+        window[cbName] = (json) => {
+            if (json.table) {
+                projectData = json.table.rows.map((row, idx) => {
+                    const get = (i) => (row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
+                    const plantStr = String(get(8)).trim();
+                    return {
+                        id: idx + 2,
+                        process: get(0), itemNum: get(1),
+                        name: get(2), unit: get(3), price: get(4),
+                        species: get(5), class: get(6), group: get(7),
+                        plants: plantStr ? plantStr.split('、') : [get(2)],
+                        searchKey: (get(2) + get(5) + get(6) + get(7) + plantStr).toLowerCase()
+                    };
+                }).filter(p => p.name && p.name !== "工項名稱");
+                document.getElementById('status').innerText = `已成功連線：雲端資料共 ${projectData.length} 筆`;
+                render();
+            }
+        };
+        const script = document.createElement('script');
+        script.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent("總表")}`;
+        document.body.appendChild(script);
+    }
+
+    function render() {
+        const query = document.getElementById('search').value.toLowerCase().trim();
+        const listEl = document.getElementById('item-list');
+        listEl.innerHTML = '';
+        const filtered = projectData.filter(p => p.searchKey.includes(query));
+        filtered.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            const plantsHtml = item.plants.map(p => {
+                const uid = `${item.id}-${p}`;
+                const isActive = cart.some(c => c.uid === uid);
+                return `<div class="plant-btn ${isActive ? 'active' : ''}" onclick="toggleSelect(this, ${item.id}, '${p}')">${p}</div>`;
+            }).join('');
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between;">
+                    <div class="item-title">${item.name}</div>
+                    <div style="font-size:14px; color:#E67E22; font-weight:bold;">$${item.price} / ${item.unit}</div>
+                </div>
+                <div class="item-spec">${item.process} | ${item.itemNum} | ${item.species}</div>
+                <div class="plants-grid">${plantsHtml}</div>`;
+            listEl.appendChild(card);
+        });
+    }
+
+    function toggleSelect(el, rowId, plantName) {
+        const uid = `${rowId}-${plantName}`;
+        const index = cart.findIndex(c => c.uid === uid);
+        if (index > -1) {
+            cart.splice(index, 1);
+            el.classList.remove('active');
+        } else {
+            const item = projectData.find(p => p.id === rowId);
+            cart.push({ 
+                uid, process: item.process, itemNum: item.itemNum, 
+                plantName: plantName, // 單獨記錄植栽名稱方便排序
+                fullName: `${plantName}，${item.name}`, 
+                unit: item.unit, price: item.price 
+            });
+            el.classList.add('active');
+        }
+        updatePanel();
+    }
+
+    function updatePanel() {
+        const panel = document.getElementById('selection-panel');
+        const box = document.getElementById('selected-items-box');
+        document.getElementById('count').innerText = cart.length;
+        panel.style.display = cart.length > 0 ? 'block' : 'none';
+        box.innerHTML = cart.map(c => `<span class="selected-tag">${c.plantName}</span>`).join('');
+    }
+
+    function clearAll() { cart = []; updatePanel(); render(); }
+
+    function exportToCSV() {
+        if (cart.length === 0) return;
+
+        // 核心邏輯：依照「工序」與「項次」進行穩定排序
+        const sortedCart = [...cart].sort((a, b) => {
+            // 先比工序
+            if (a.process !== b.process) return a.process.localeCompare(b.process, undefined, {numeric: true});
+            // 再比項次
+            return a.itemNum.localeCompare(b.itemNum, undefined, {numeric: true});
+        });
+
+        let csv = "\ufeff工序,項次,工項名稱(含植栽),單位,單價\n";
+        csv += sortedCart.map(c => `"${c.process}","${c.itemNum}","${c.fullName}","${c.unit}","${c.price}"`).join("\n");
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `植栽選取報表_${new Date().getTime()}.csv`;
+        link.click();
+    }
+
+    loadSpreadsheetData();
+</script>
+</body>
+</html>

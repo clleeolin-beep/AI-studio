@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>惇陽 AI 實驗室 - 工具平台</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root { --p-blue: #0f172a; --accent: #2563eb; --nav-bg: #ffffff; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; margin: 0; background: #f8fafc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* 驗證遮罩 */
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--p-blue); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; }
+        
+        /* 標籤導覽列 - 手機全幅優化 */
+        nav { background: var(--nav-bg); display: flex; overflow-x: auto; border-bottom: 1px solid #e2e8f0; padding: 8px 5px; -webkit-overflow-scrolling: touch; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        nav::-webkit-scrollbar { display: none; } /* 隱藏捲軸保持美觀 */
+        
+        .tab { padding: 10px 18px; cursor: pointer; border-radius: 20px; white-space: nowrap; color: #64748b; font-size: 14px; font-weight: bold; margin: 0 4px; transition: 0.2s; border: 1px solid transparent; }
+        .tab.active { background: #eff6ff; color: var(--accent); border: 1px solid #dbeafe; }
+
+        /* 全幅工具容器 */
+        #content-area { flex-grow: 1; position: relative; width: 100%; }
+        iframe { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; }
+        
+        .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #cbd5e1; z-index: -1; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <h2 style="letter-spacing: 2px;">惇陽 AI 實驗室</h2>
+        <p style="opacity: 0.7; font-size: 14px; margin-bottom: 30px;">設計A組內部平台 (需授權登入)</p>
+        <div id="g_id_onload"
+             data-client_id="992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com"
+             data-callback="handleAuth">
+        </div>
+        <div class="g_id_signin" data-type="standard" data-shape="pill"></div>
+    </div>
+
+    <nav id="nav-tabs">
+        <div class="tab active" onclick="switchTool(this, 'map.html')">🗺️ 3D地圖</div>
+        <div class="tab" onclick="switchTool(this, 'doc.html')">📄 公文助手</div>
+        <div class="tab" onclick="switchTool(this, 'calc.html')">🧮 換算器</div>
+        <div class="tab" onclick="switchTool(this, 'tree.html')">🌳 修樹工單</div>
+        <div class="tab" onclick="switchTool(this, 'green.html')">🌿 綠化工單</div>
+    </nav>
+
+    <div id="content-area">
+        <div class="loading-spinner">載入中...</div>
+        <iframe id="tool-frame" src=""></iframe>
+    </div>
+
+    <script>
+        // 設定權限白名單：只有這裡列出的 Email 能進入
+        const allowedEmails = [
+            "您的帳號@gmail.com", 
+            "計畫成員A@gmail.com"
+            // 提示：也可以判斷 email.endsWith("@您的公司網域.com")
+        ];
+
+        function handleAuth(response) {
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const email = payload.email;
+
+            if (allowedEmails.includes(email) || email.endsWith("@dunyang.com.tw")) { // 請依實際網域修改
+                document.getElementById('auth-screen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('auth-screen').style.display = 'none';
+                    switchTool(document.querySelector('.tab'), 'map.html');
+                }, 500);
+            } else {
+                alert("存取拒絕：您的帳號 " + email + " 未在授權名單內。");
+            }
+        }
+
+        function switchTool(el, fileName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            
+            // 這裡指向您儲存庫中對應的工具 HTML 檔名
+            document.getElementById('tool-frame').src = fileName;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>公文智能助手 - 惇陽工程顧問</title>
+    <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f7f6; padding: 20px; color: #333; }
+        .container { max-width: 950px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
+        .upload-section { background: #eef2f7; padding: 15px; border: 2px dashed #3498db; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .mode-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .mode-btn { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; background: #fff; font-weight: bold; transition: 0.3s; }
+        .mode-btn.active { background: #3498db; color: white; border-color: #3498db; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        .level-container { margin-bottom: 15px; border-left: 4px solid #2c3e50; padding-left: 15px; background: #fafafa; padding: 10px; border-radius: 0 8px 8px 0; }
+        .sub-level-box { margin-left: 20px; margin-top: 10px; border-left: 2px dashed #3498db; padding-left: 10px; }
+        .sub-sub-container { margin-left: 30px; margin-top: 5px; }
+        .item-row { display: flex; gap: 8px; margin-bottom: 5px; align-items: center; }
+        .btn-l1 { background: #2c3e50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-bottom: 15px; width: 100%; }
+        .btn-l2 { background: #3498db; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin: 5px 0;}
+        .btn-l3 { background: #7f8c8d; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .btn-del { background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .generate-btn { background-color: #27ae60; color: white; padding: 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 20px; width: 100%; margin-top: 20px; font-weight: bold; }
+        .output-area { margin-top: 30px; padding: 25px; background: #fffbe6; border: 1px solid #ffe58f; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>🏛️ 公文智能助手 <span style="font-size: 0.5em; color: #666;">惇陽工程顧問 - 情境整合強化版</span></h2>
+    </div>
+
+    <div class="upload-section">
+        <label>📸 AI 文號辨識 (重新辨識請再次上傳檔案)</label>
+        <input type="file" id="fileInput" accept="image/*,application/pdf" onclick="this.value=null">
+        <div id="loader" style="display:none; color:#d35400; font-weight:bold; margin-top:10px;">⚙️ 正在精準分析文號中...</div>
+    </div>
+
+    <label>發文對象模式</label>
+    <div class="mode-selector">
+        <button class="mode-btn active" id="modeUp" onclick="setMode('up', this)">對上級 (機關)</button>
+        <button class="mode-btn" id="modeEqual" onclick="setMode('equal', this)">對平級 (平行單位)</button>
+        <button class="mode-btn" id="modeDown" onclick="setMode('down', this)">對下級 (廠商)</button>
+    </div>
+
+    <div class="form-group">
+        <label>常用情境快選</label>
+        <select id="scenarioSelect" onchange="applyScenario()">
+            <option value="">-- 手動關鍵字撰寫 --</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>工程名稱</label>
+        <input type="text" id="projectName" value="中和區錦和運動公園整體規劃改善工程">
+    </div>
+    
+    <div style="display:flex; gap:10px;" class="form-group">
+        <div style="flex:1">
+            <label>受文單位</label>
+            <input type="text" id="recipient" placeholder="例如：新北市政府中和區公所">
+        </div>
+        <div style="flex:1">
+            <label>副本單位</label>
+            <input type="text" id="ccRecipient" placeholder="例如：施工廠商、本司">
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px;" class="form-group">
+        <div style="flex:1">
+            <label>來文字號 (辨識自動提取)</label>
+            <input type="text" id="refNum" placeholder="辨識結果將在此顯示">
+        </div>
+        <div style="flex:1">
+            <label>公文主旨關鍵字</label>
+            <input type="text" id="subjectInp" placeholder="例如：報請開工備查">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>說明內容階層編輯 ( 一、 → (一) → 1. )</label>
+        <div id="l1-root"></div>
+        <button class="btn-l1" onclick="addL1()">＋ 增加說明大項 (一、二、三...)</button>
+    </div>
+
+    <button class="generate-btn" onclick="generateDoc()">🛠️ 產生正式公文全文</button>
+
+    <div id="outputArea" class="output-area">
+        <div id="finalResult" style="white-space: pre-wrap; background: white; padding: 25px; border: 1px solid #ddd; font-size: 17px; line-height:1.8; color: #000;"></div>
+        <button style="background:#3498db; color:white; border:none; padding:12px; width:100%; cursor:pointer; margin-top:15px; font-size:16px; border-radius:4px;" onclick="copyContent()">📋 複製公文全文</button>
+    </div>
+</div>
+
+<script>
+    let currentMode = 'up';
+    const chineseNums = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+
+    const scenarios = {
+        up: [
+            { title: "提報監造月報", sub: "115年x月份監造月報案", data: [{ l1: "檢附旨揭工程本月份監造月報計1式3份。", l2: [{ l2: "內容包含施工進度彙整、品質抽查及勞安巡查紀錄。", l3: ["實際進度：xx.xx%", "預定進度：xx.xx%"] }] }] },
+            { title: "申請估驗計價", sub: "第x期估驗計價審核案", data: [{ l1: "施工廠商已依約完成本階段施作內容，經核實符合計價條件。", l2: [{ l2: "本期申報金額：新台幣XXX元整。", l3: ["檢附估驗明細表及相關佐證照片"] }] }] },
+            { title: "提報開工備查", sub: "本工程報請開工備查案", data: [{ l1: "施工廠商已完成開工前各項準備工作，擬自115年x月x日正式開工。", l2: [{ l2: "檢附開工報告、人員編組表及勞安保險單。", l3: [] }] }] },
+            { title: "計畫書核定備查", sub: "施工(品質)計畫書審查完畢備查案", data: [{ l1: "旨揭計畫書經本司審查，相關內容已符合契約規範要求。", l2: [{ l2: "擬予同意核備。", l3: [] }] }] },
+            { title: "提報契約變更", sub: "辦理第x次契約變更提報案", data: [{ l1: "因應現場實際地質狀況與設計不符，擬辦理工程內容調整。", l2: [{ l2: "檢附變更設計圖說、工程數量對照表。", l3: ["增加經費：約XXX元", "不影響總工期"] }] }] }
+        ],
+        equal: [
+            { title: "管線遷移協調", sub: "管線妨礙施工辦理遷移協調案", data: [{ l1: "經現場勘查，施工範圍內發現管線與設計位置衝突。", l2: [{ l2: "請 貴單位配合辦理遷移作業。", l3: ["衝突地點：K0+XXX處", "管線類型：電信/電力"] }] }] },
+            { title: "施工影響告知", sub: "施工期間交通維持與配合事項", data: [{ l1: "旨揭工程將於近日進入路口交維期，請配合公告。", l2: [{ l2: "預計影響區間：XX路段。", l3: ["影響時間：22:00-06:00"] }] }] }
+        ],
+        down: [
+            { title: "限期改善缺失", sub: "現場安全缺失限期改善通知案", data: [{ l1: "本司於現場巡查發現下列缺失，請 貴司於3日內改善：", l2: [{ l2: "安衛防護不周。", l3: ["施工圍籬倒塌", "交通錐間距過大"] }, { l2: "品質作業不符規範。", l3: ["模板鋼筋間距不足", "混凝土澆置紀錄不全"] }] }] },
+            { title: "追趕進度通知", sub: "工程進度落後請研擬趕工計畫案", data: [{ l1: "截至115年x月x日止，預定進度xx%，實際進度xx%，落後達x%。", l2: [{ l2: "請 貴司檢討落後原因，並於一週內提報趕工計畫。", l3: ["增加施工機具、人力投入", "調整施工作業順序"] }] }] },
+            { title: "暫停施工通知", sub: "特定區域暫停施工通知", data: [{ l1: "因發生重大安全疑慮，現場應立即停止作業。", l2: [{ l2: "缺失未改善完成前，嚴禁強行施工。", l3: ["受影響區段：XXXX"] }] }] }
+        ]
+    };
+
+    document.getElementById('fileInput').addEventListener('change', async function() {
+        const file = this.files[0]; if (!file) return;
+        const loader = document.getElementById('loader'); const refNumInp = document.getElementById('refNum');
+        loader.style.display = 'block'; loader.innerText = "⚙️ 正在精準分析文號中..."; refNumInp.value = ""; 
+        
+        try {
+            let text = "";
+            if (file.type === "application/pdf") {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const page = await pdf.getPage(1);
+                const content = await page.getTextContent();
+                text = content.items.map(s => s.str).join('');
+            } else {
+                const result = await Tesseract.recognize(file, 'chi_tra'); text = result.data.text;
+            }
+
+            let cleanText = text.replace(/[\s：:：]/g, '');
+            const commonTerms = { "殯域": "殯墓", "北市殯域": "北市殯墓", "殯域字": "殯墓字" };
+            for (let [wrong, right] of Object.entries(commonTerms)) { cleanText = cleanText.replace(new RegExp(wrong, 'g'), right); }
+
+            const match = cleanText.match(/[\u4e00-\u9fa5]+字第\d+號/);
+            if(match) {
+                let finalNum = match[0];
+                if (finalNum.includes("發文字號")) finalNum = finalNum.split("發文字號")[1];
+                refNumInp.value = finalNum;
+                loader.innerHTML = `<span style="color:#27ae60;">✅ 辨識成功：${finalNum}</span>`;
+            } else { loader.innerHTML = `⚠️ 未偵測到標準文號格式，請手動校正。`; }
+        } catch (e) { loader.innerText = "❌ 辨識出錯。"; }
+    });
+
+    function addL1(text = "") {
+        const root = document.getElementById('l1-root');
+        const div = document.createElement('div');
+        div.className = 'level-container';
+        div.innerHTML = `
+            <div class="item-row"><span class="l1-label" style="font-weight:bold"></span><input type="text" class="l1-input" value="${text}"><button class="btn-del" onclick="this.parentElement.parentElement.remove(); updateAllLabels();">刪除</button></div>
+            <div class="sub-container"></div>
+            <button class="btn-l2" style="margin-left:25px" onclick="addL2(this)">＋ 增加中項 (一)</button>
+        `;
+        root.appendChild(div);
+        updateAllLabels();
+        return div;
+    }
+
+    function addL2(btn, text = "") {
+        const container = btn.previousElementSibling;
+        const div = document.createElement('div');
+        div.className = 'sub-level-box';
+        div.innerHTML = `
+            <div class="item-row"><span class="l2-label"></span><input type="text" class="l2-input" value="${text}"><button class="btn-del" onclick="this.parentElement.parentElement.remove(); updateAllLabels();">刪除</button></div>
+            <div class="sub-sub-container"></div>
+            <button class="btn-l3" style="margin-left:35px" onclick="addL3(this)">＋ 增加細項 1.</button>
+        `;
+        container.appendChild(div);
+        updateAllLabels();
+        return div;
+    }
+
+    function addL3(btn, text = "") {
+        const container = btn.previousElementSibling;
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.innerHTML = `<span class="l3-label"></span><input type="text" class="l3-input" value="${text}"><button class="btn-del" onclick="this.parentElement.remove(); updateAllLabels();">刪除</button>`;
+        container.appendChild(div);
+        updateAllLabels();
+        return div;
+    }
+
+    function updateAllLabels() {
+        document.querySelectorAll('.level-container').forEach((l1, i) => {
+            l1.querySelector('.l1-label').innerText = `${chineseNums[i]}、`;
+            l1.querySelectorAll('.sub-level-box').forEach((l2, j) => {
+                l2.querySelector('.l2-label').innerText = `(${chineseNums[j]})`;
+                l2.querySelectorAll('.l3-input').forEach((l3, k) => { l3.previousElementSibling.innerText = `${k+1}.`; });
+            });
+        });
+    }
+
+    function setMode(mode, btn) {
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const select = document.getElementById('scenarioSelect');
+        select.innerHTML = '<option value="">-- 手動關鍵字撰寫 --</option>';
+        scenarios[mode].forEach((s, i) => select.innerHTML += `<option value="${i}">${s.title}</option>`);
+    }
+
+    function applyScenario() {
+        const idx = document.getElementById('scenarioSelect').value;
+        if (idx === "") return;
+        const s = scenarios[currentMode][idx];
+        document.getElementById('subjectInp').value = s.sub;
+        document.getElementById('l1-root').innerHTML = ""; 
+        s.data.forEach(d1 => {
+            const l1Div = addL1(d1.l1);
+            if(d1.l2) d1.l2.forEach(d2 => {
+                const l2Div = addL2(l1Div.querySelector('.btn-l2'), d2.l2);
+                if(d2.l3) d2.l3.forEach(d3 => addL3(l2Div.querySelector('.btn-l3'), d3));
+            });
+        });
+    }
+
+    function generateDoc() {
+        const proj = document.getElementById('projectName').value;
+        const recipient = document.getElementById('recipient').value || "受文者單位";
+        const ccRecipient = document.getElementById('ccRecipient').value || "無";
+        const ref = document.getElementById('refNum').value;
+        const subK = document.getElementById('subjectInp').value;
+        const year = new Date().getFullYear()-1911;
+        const dateStr = `${year}年${new Date().getMonth()+1}月${new Date().getDate()}日`;
+        
+        let bodyText = "";
+        document.querySelectorAll('.level-container').forEach((l1, i) => {
+            const val = l1.querySelector('.l1-input').value;
+            if(val) {
+                bodyText += `\n${chineseNums[i]}、${val}`;
+                l1.querySelectorAll('.sub-level-box').forEach((l2, j) => {
+                    const val2 = l2.querySelector('.l2-input').value;
+                    if(val2) {
+                        bodyText += `\n    (${chineseNums[j]})${val2}`;
+                        l2.querySelectorAll('.l3-input').forEach((l3, k) => { if(l3.value) bodyText += `\n        ${k+1}.${l3.value}`; });
+                    }
+                });
+            }
+        });
+
+        const subject = (currentMode === 'up') ? `有關「${proj}」${subK}案，報請 鑒核。` : `有關「${proj}」${subK}案，請 查照。`;
+        
+        const res = `發文者：惇陽工程顧問有限公司
+發文日期：中華民國 ${dateStr}
+發文字號：惇陽監字第${year}0001號
+速別：普通件
+密等及解密條件或保密期限：普通
+附件：如主旨
+
+受文者：${recipient}
+
+主旨：${subject}
+
+說明：${ref ? '\n一、復 貴單位'+ref+'辦理。' : ''}${bodyText}
+
+正本：${recipient}
+副本：${ccRecipient}`;
+
+        document.getElementById('finalResult').innerText = res;
+        document.getElementById('outputArea').style.display = 'block';
+    }
+
+    function copyContent() {
+        navigator.clipboard.writeText(document.getElementById('finalResult').innerText);
+        alert('已複製到剪貼簿！');
+    }
+
+    setMode('up', document.getElementById('modeUp'));
+    addL1();
+</script>
+</body>
+</html>
