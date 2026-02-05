@@ -55,39 +55,31 @@
     <script>
         // --- 權限名單設定 ---
         const allowedEmails = [
-            "cl.lee.olin@gmail.com", // 您的 Email
-            // 可以在此增加其他成員的 Email
-            "0757troph@gmail.com",
-            "Roserain0516@gmail.com",
-            "cccrj0929@gmail.com",
-            "hank881016@gmail.com",
-            "twjackal@gmail.com",
-            "lucis.willow@gmail.com",
-            "daphnetang111@gmail.com",
-            "jangpp7@gmail.com",
-            "kenwu880316@gmail.com",
-            "g520g7@gmail.com",
-            "adad154154@gmail.com",
-            "wu.yingu@gmail.com",
-            "MaoYuanWeng19901210@gmail.com",
-            "juby90884@gmail.com",
-            "paida19595@gmail.com",
-            "tsaisujing@gmail.com",
+            "cl.lee.olin@gmail.com",
+    "0757troph@gmail.com","Roserain0516@gmail.com","cccrj0929@gmail.com",
+    "hank881016@gmail.com","twjackal@gmail.com","lucis.willow@gmail.com",
+    "daphnetang111@gmail.com","jangpp7@gmail.com","kenwu880316@gmail.com",
+    "g520g7@gmail.com","adad154154@gmail.com","wu.yingu@gmail.com",
+    "maoyuanweng19901210@gmail.com","juby90884@gmail.com","paida19595@gmail.com",
+    "tsaisujing@gmail.com"                     
         ];
 
-        // --- 登入回傳處理 ---
+// --- 登入回傳處理 ---
         function handleAuth(response) {
             try {
                 // 解析 Google 回傳的資訊 (JWT)
                 const base64Url = response.credential.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const payload = JSON.parse(window.atob(base64));
-                const userEmail = payload.email;
+                
+                // 【重點 1】將登入者的 Email 轉為小寫
+                const userEmail = payload.email.toLowerCase();
 
                 console.log("嘗試登入者:", userEmail);
 
-                // 驗證 Email (檢查是否在名單內或屬於公司網域)
-                const isAuthorized = allowedEmails.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw");
+                // 【重點 2】將名單內的 Email 全部轉為小寫再進行比對
+                const isAuthorized = allowedEmails.map(e => e.toLowerCase()).includes(userEmail) || 
+                                     userEmail.endsWith("@dunyang.com.tw");
 
                 if (isAuthorized) {
                     console.log("驗證成功，進入系統");
@@ -95,7 +87,6 @@
                     authScreen.style.opacity = '0';
                     setTimeout(() => {
                         authScreen.style.display = 'none';
-                        // 成功後自動載入第一個分頁
                         switchTool(document.querySelector('.tab'), 'map.html');
                     }, 500);
                 } else {
@@ -132,4 +123,5 @@
     </script>
 </body>
 </html>
+
 
