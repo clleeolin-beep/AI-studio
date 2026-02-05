@@ -1,0 +1,461 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>施工流程圖生成器 (箭頭精準貼合版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root { --primary: #1a5276; --accent: #2980b9; --bg: #eef2f5; --hp-color: #e74c3c; --card-bg: #ffffff; }
+        
+        body { 
+            font-family: "BiauKai", "DFKai-SB", "標楷體", serif; 
+            margin: 0; padding: 0; 
+            background: var(--bg); 
+            height: 100vh; 
+            display: flex; flex-direction: column; overflow: hidden; 
+        }
+
+        /* 頂部導航 */
+        .header-wrapper { background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
+        .header-content { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; height: 50px; font-family: "Microsoft JhengHei", sans-serif; }
+        h2 { margin: 0; font-size: 18px; color: var(--primary); }
+        .controls { display: flex; gap: 10px; align-items: center; }
+        select { padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-family: "Microsoft JhengHei"; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; font-family: "Microsoft JhengHei"; }
+        .btn-word { background: #27ae60; }
+        .btn-word:hover { background: #219150; }
+
+        /* 主內容區 */
+        .main-wrapper { flex: 1; display: flex; justify-content: center; padding: 20px; overflow: hidden; }
+        .main-card { display: flex; width: 100%; max-width: 1380px; background: var(--card-bg); border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e1e4e8; }
+
+        /* 左側表單 */
+        .form-panel { width: 30%; background: #fdfdfd; border-right: 1px solid #eee; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; font-family: "Microsoft JhengHei"; }
+        
+        /* 右側預覽 */
+        .preview-panel { width: 70%; background: #e0e5ec; overflow: auto; padding: 40px; display: flex; flex-direction: column; align-items: center; position: relative; }
+
+        /* --- V12 排版引擎 (箭頭修正) --- */
+        .flowchart-container { 
+            display: flex; flex-direction: column; align-items: stretch; position: relative; 
+            width: 15.7cm; min-height: 23cm; background: #fff; padding: 1cm 0.5cm; 
+            box-shadow: 0 0 15px rgba(0,0,0,0.1); box-sizing: border-box; 
+        }
+
+        .height-limit-line { position: absolute; top: 23cm; left: 0; width: 100%; border-bottom: 2px dashed red; pointer-events: none; z-index: 10; }
+        .height-limit-line::after { content: "⚠️ 23cm 高度限制線"; position: absolute; right: 0; top: -20px; color: red; font-size: 12px; font-family: sans-serif; background: rgba(255,255,255,0.8); }
+        
+        .flow-row { display: flex; align-items: stretch; min-height: 80px; width: 100%; margin-bottom: 0px; }
+        
+        /* 左欄 (主流程) */
+        .node-col { 
+            width: 4.5cm; position: relative; 
+            display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; 
+            flex-shrink: 0; 
+        }
+
+        /* V12: 新增 Wrapper 讓箭頭緊貼方塊 */
+        .node-wrapper {
+            position: relative;
+            z-index: 2; /* 高於線條 */
+        }
+        
+        /* 節點方塊 */
+        .node-box { 
+            width: 3.5cm; padding: 10px 5px; background: #fff; border: 1.5px solid #000; 
+            text-align: center; font-family: "BiauKai", "DFKai-SB", "標楷體", serif; 
+            font-size: 12pt; font-weight: bold; position: relative; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .node-box.oval { border-radius: 50%; height: 1.2cm; width: 2.5cm; padding: 5px; }
+        .node-box.rect { border-radius: 0; min-height: 1.2cm; }
+        
+        .hp-star { color: red; margin-right: 4px; font-size: 14pt; vertical-align: middle; }
+
+        /* 貫穿線 (背景) */
+        .v-line { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; background: #000; z-index: 1; }
+        .line-full { top: 0; bottom: 0; }
+        .line-start { top: 50%; bottom: 0; }
+        .line-end { top: 0; bottom: 50%; }
+
+        /* V12: 箭頭 (絕對定位於 Wrapper 頂部) */
+        .arrow-down { 
+            width: 0; height: 0; 
+            border-left: 5px solid transparent; 
+            border-right: 5px solid transparent; 
+            border-top: 10px solid #000; 
+            position: absolute; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            bottom: 100%; /* 貼齊方塊上緣 */
+            z-index: 3; 
+            margin-bottom: -1px; /* 微調修補縫隙 */
+        }
+
+        /* 右欄 (細項) */
+        .detail-col { flex: 1; display: flex; align-items: center; position: relative; padding-left: 0; }
+        .h-connector { width: 1cm; height: 1px; border-top: 1.5px dashed #000; flex-shrink: 0; }
+        .detail-box { 
+            border: 1.5px dashed #000; padding: 8px 12px; background: #fff; 
+            font-family: "BiauKai", "DFKai-SB", "標楷體", serif; font-size: 12pt; 
+            line-height: 1.5; text-align: left; width: fit-content; max-width: 9.5cm; min-width: 2cm;
+        }
+
+        .edit-input { border: none; border-bottom: 1px dashed #ccc; background: transparent; font-family: "Microsoft JhengHei"; font-size: 14px; width: 100%; padding: 2px; }
+        .edit-input:focus { outline: none; border-bottom: 2px solid var(--accent); background: #fff; }
+
+        .group-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; margin-top: 15px; border-radius: 5px 5px 0 0; border-left: 5px solid var(--primary); border: 1px solid #eee; border-left-width: 5px; }
+        .group-header.hp { border-left-color: var(--hp-color); }
+        .item-list { border: 1px solid #eee; border-top: none; padding: 10px; margin-bottom: 5px; background: #fff; border-radius: 0 0 5px 5px; }
+        .check-row { display: flex; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #f9f9f9; }
+        .std-text { display: block; font-size: 12px; color: #999; margin-top: 2px; padding-left: 5px; font-family: "Microsoft JhengHei"; }
+        .btn-toggle { background: none; border: 1px solid #ccc; color: #666; padding: 2px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; font-family: "Microsoft JhengHei"; }
+
+        @media (max-width: 768px) {
+            .main-card { flex-direction: column; }
+            .form-panel, .preview-panel { width: 100%; height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header-wrapper">
+    <div class="header-content">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <h2>🏗️ 施工計畫流程製作工具</h2>
+            <span id="status" style="font-size:12px; color:#888;">連線中...</span>
+        </div>
+        <div class="controls">
+            <select id="minorSelect" onchange="loadForm()"></select>
+            <button class="btn btn-word" onclick="exportToWord()">
+                📥 匯出 Word (A4格式)
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="main-wrapper">
+    <div class="main-card">
+        <div class="form-panel" id="formContainer">
+            <div style="text-align:center; color:#999; margin-top:50px;">資料讀取中...</div>
+        </div>
+        <div class="preview-panel">
+            <h4 style="margin:0 0 10px 0; color:#555; font-family:'Microsoft JhengHei';">流程圖預覽 (寬度 15.7cm)</h4>
+            <div id="flowchart-canvas" class="flowchart-container">
+                <div class="height-limit-line"></div>
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SS_ID = "1tCW1yzvBnzoQv2mAcLhAWcKOTe8mrOkyavWHaXRii3U"; 
+    const SHEET_NAME = "工作表1"; 
+
+    let rawData = [];
+    
+    document.addEventListener("DOMContentLoaded", function() {
+        loadGoogleSheet();
+    });
+
+    function loadGoogleSheet() {
+        const cbName = "callback_loader";
+        window[cbName] = (json) => {
+            if (json.table) {
+                rawData = json.table.rows.map((row, idx) => {
+                    const get = (i) => (row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
+                    return {
+                        id: idx,
+                        minor: get(1),
+                        hp: get(2).includes('HP'),
+                        process: get(4),
+                        item: get(5),
+                        standard: get(6)
+                    };
+                }).filter(r => r.process && r.process !== "施工流程" && r.minor);
+
+                initMenu();
+                document.getElementById('status').innerText = "就緒";
+            }
+        };
+        const script = document.createElement('script');
+        script.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(SHEET_NAME)}`;
+        document.body.appendChild(script);
+    }
+
+    function initMenu() {
+        const minors = [...new Set(rawData.map(r => r.minor))];
+        const select = document.getElementById('minorSelect');
+        select.innerHTML = '';
+        minors.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.innerText = m;
+            select.appendChild(opt);
+        });
+        if(minors.length > 0) loadForm();
+    }
+
+    function loadForm() {
+        const selectedMinor = document.getElementById('minorSelect').value;
+        const currentItems = rawData.filter(r => r.minor === selectedMinor);
+        
+        const groups = {};
+        currentItems.forEach(r => {
+            if (!groups[r.process]) groups[r.process] = { hp: r.hp, items: [] };
+            if (r.item) groups[r.process].items.push(r);
+        });
+
+        const container = document.getElementById('formContainer');
+        container.innerHTML = '';
+
+        Object.keys(groups).forEach((procName, idx) => {
+            const grp = groups[procName];
+            const div = document.createElement('div');
+            
+            let itemsHtml = grp.items.map((it, i) => `
+                <div class="check-row">
+                    <input type="checkbox" id="chk_${it.id}" value="${it.id}" checked onchange="updatePreview()">
+                    <div style="width:100%">
+                        <input type="text" class="edit-input" id="txt_${it.id}" value="${it.item}" oninput="updatePreview()">
+                        <span class="std-text">${it.standard || ''}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            if(grp.items.length === 0) {
+                 itemsHtml = `<div class="check-row" style="display:none;">
+                    <input type="checkbox" id="chk_proc_${idx}" value="PROC_${procName}" checked onchange="updatePreview()">
+                 </div><div style="color:#aaa; font-size:12px; font-family:'Microsoft JhengHei'">無檢查細項</div>`;
+            }
+
+            div.innerHTML = `
+                <div class="group-header ${grp.hp ? 'hp' : ''}">
+                    <span class="group-title" style="font-family:'Microsoft JhengHei'">${idx+1}. ${procName}</span>
+                    <button class="btn-toggle" onclick="toggleGroup(this)">全選</button>
+                </div>
+                <div class="item-list">${itemsHtml}</div>
+            `;
+            container.appendChild(div);
+        });
+        updatePreview();
+    }
+
+    function toggleGroup(btn) {
+        const list = btn.parentElement.nextElementSibling;
+        const checks = list.querySelectorAll('input[type="checkbox"]');
+        const isAllChecked = Array.from(checks).every(c => c.checked);
+        checks.forEach(c => c.checked = !isAllChecked);
+        updatePreview();
+    }
+
+    function updatePreview() {
+        const canvas = document.getElementById('flowchart-canvas');
+        const limitLine = canvas.querySelector('.height-limit-line');
+        canvas.innerHTML = ''; 
+        if(limitLine) canvas.appendChild(limitLine);
+
+        const checkedBoxes = document.querySelectorAll('#formContainer input[type="checkbox"]:checked');
+        const checkedIds = new Set(Array.from(checkedBoxes).map(cb => cb.value));
+        const selectedMinor = document.getElementById('minorSelect').value;
+        const currentItems = rawData.filter(r => r.minor === selectedMinor);
+
+        const flowMap = new Map();
+        currentItems.forEach(row => {
+            const isChecked = checkedIds.has(String(row.id));
+            const isProcChecked = checkedIds.has(`PROC_${row.process}`);
+            
+            if (isChecked || isProcChecked) {
+                if (!flowMap.has(row.process)) {
+                    flowMap.set(row.process, { name: row.process, isHp: row.hp, items: [] });
+                }
+                if (isChecked && row.item) {
+                    const inputEl = document.getElementById(`txt_${row.id}`);
+                    const displayText = inputEl ? inputEl.value : row.item;
+                    flowMap.get(row.process).items.push(displayText);
+                }
+            }
+        });
+
+        if (flowMap.size === 0) return;
+
+        canvas.appendChild(createRow('Start', '準備', false, [], 'line-start'));
+
+        const flowArray = Array.from(flowMap.values());
+        flowArray.forEach((val, index) => {
+            const row = createRow('Process', val.name, val.isHp, val.items, 'line-full');
+            canvas.appendChild(row);
+        });
+
+        const endRow = createRow('End', '完成', false, [], 'line-end');
+        canvas.appendChild(endRow);
+    }
+
+    function createRow(type, text, isHp, items, lineType) {
+        const row = document.createElement('div');
+        row.className = 'flow-row';
+
+        const leftCol = document.createElement('div');
+        leftCol.className = 'node-col';
+
+        // 線條背景
+        const line = document.createElement('div');
+        line.className = `v-line ${lineType}`;
+        leftCol.appendChild(line);
+
+        // Wrapper 綁定箭頭與方塊
+        const wrapper = document.createElement('div');
+        wrapper.className = 'node-wrapper';
+
+        if (type === 'Process' || type === 'End') {
+            const arrow = document.createElement('div');
+            arrow.className = 'arrow-down';
+            wrapper.appendChild(arrow);
+        }
+
+        const box = document.createElement('div');
+        box.className = type === 'Process' ? 'node-box rect' : 'node-box oval';
+        box.innerHTML = (isHp ? '<span class="hp-star">★</span>' : '') + text;
+        wrapper.appendChild(box);
+        leftCol.appendChild(wrapper);
+
+        row.appendChild(leftCol);
+
+        const rightCol = document.createElement('div');
+        rightCol.className = 'detail-col';
+
+        if (type === 'Process' && items && items.length > 0) {
+            const connector = document.createElement('div');
+            connector.className = 'h-connector';
+            rightCol.appendChild(connector);
+
+            const detailBox = document.createElement('div');
+            detailBox.className = 'detail-box';
+            detailBox.innerHTML = items.map((it, i) => `${i+1}. ${it}`).join('<br>');
+            rightCol.appendChild(detailBox);
+        }
+
+        row.appendChild(rightCol);
+        return row;
+    }
+
+    function exportToWord() {
+        const element = document.getElementById('flowchart-canvas');
+        if (!element || element.innerText.trim() === '') { alert("請先產生流程圖"); return; }
+        
+        const limitLine = element.querySelector('.height-limit-line');
+        if(limitLine) limitLine.style.display = 'none';
+
+        const btn = document.querySelector('.btn-word');
+        const originalText = btn.innerText;
+        btn.innerText = "生成中...";
+
+        html2canvas(element, { scale: 3, backgroundColor: "#ffffff" }).then(canvas => {
+            const imgData = canvas.toDataURL("image/png");
+            generateDoc(imgData);
+            if(limitLine) limitLine.style.display = 'block';
+            btn.innerText = originalText;
+        }).catch(err => {
+            console.error(err);
+            alert("圖片生成失敗");
+            if(limitLine) limitLine.style.display = 'block';
+            btn.innerText = originalText;
+        });
+    }
+
+   function generateDoc(imgData) {
+        const selectedMinor = document.getElementById('minorSelect').value;
+        let tableRows = '';
+        let count = 0;
+        const sections = document.querySelectorAll('.form-panel > div'); 
+        
+        sections.forEach(sec => {
+            const titleEl = sec.querySelector('.group-title');
+            if(!titleEl) return;
+            const title = titleEl.innerText;
+            const checks = sec.querySelectorAll('input[type="checkbox"]:checked');
+            checks.forEach(chk => {
+                if(chk.parentElement.style.display === 'none') return;
+                count++;
+                const inputEl = document.getElementById(`txt_${chk.value}`);
+                const itemName = inputEl ? inputEl.value : "";
+                const stdEl = inputEl.nextElementSibling;
+                const standard = stdEl ? stdEl.innerText : '';
+                tableRows += `<tr><td>${count}</td><td>${title}</td><td>${itemName}</td><td>${standard}</td><td>□ 合格  □ 不合格</td></tr>`;
+            });
+        });
+
+        // 模擬 Word 樣式與功能變數結構
+        const htmlContent = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <meta charset="utf-8">
+                <style>
+                    @font-face { font-family: "標楷體"; panose-1:2 1 6 9 6 1 1 1 1 1; }
+                    p.W-FigureName { 
+                        text-align:center; 
+                        font-family:"標楷體"; 
+                        font-size:12pt; 
+                        font-weight:bold;
+                        margin-top:6pt;
+                        margin-bottom:12pt;
+                    }
+                    body { font-family: "標楷體", serif; }
+                    table.MsoNormalTable { width: 100%; border-collapse: collapse; }
+                    .invisible-table { width: 100%; border: none; border-collapse: collapse; }
+                    .invisible-table td { border: none; padding: 0; text-align: center; }
+                    
+                    /* 查驗表樣式 */
+                    .check-table { border: 0.5pt solid windowtext; width: 100%; border-collapse: collapse; font-size: 12pt; }
+                    .check-table th, .check-table td { border: 0.5pt solid windowtext; padding: 5pt; }
+                    .check-table th { background: #F2F2F2; text-align: center; }
+                </style>
+            </head>
+            <body>
+                <table class="invisible-table">
+                    <tr>
+                        <td>
+                            <img src="${imgData}" style="width:15.7cm;" />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p class="W-FigureName">
+                                圖 <span style='mso-field-code:" STYLEREF 1 \\\\s "'>7</span>-<span style='mso-field-code:" SEQ 圖 \\\\* ARABIC "'>1</span> 
+                                ${selectedMinor}施工抽查流程圖
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+                <br style="page-break-after:always;" />
+
+                <h3>二、查驗項目表</h3>
+                <table class="check-table">
+                    <thead>
+                        <tr>
+                            <th width="8%">項次</th>
+                            <th width="22%">流程步驟</th>
+                            <th width="25%">檢查項目</th>
+                            <th width="30%">查驗標準</th>
+                            <th width="15%">結果</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${selectedMinor}_施工抽查紀錄表_${new Date().getTime()}.doc`;
+        link.click();
+    }
+</script>
+
+</body>
+</html>
