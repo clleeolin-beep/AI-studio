@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>惇陽行程篩選系統</title>
+    <title>惇陽行程管理系統</title>
     <style>
         :root { --wine-red: #800020; --sidebar-bg: #ffffff; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Microsoft JhengHei', sans-serif; display: flex; overflow: hidden; }
@@ -18,55 +18,61 @@
             padding: 20px 15px;
             box-sizing: border-box;
             flex-shrink: 0;
-            z-index: 100;
+            overflow-y: auto;
         }
 
-        .sidebar-title { color: var(--wine-red); font-weight: bold; margin-bottom: 20px; font-size: 18px; border-bottom: 2px solid var(--wine-red); padding-bottom: 8px; }
+        .sidebar-title { color: var(--wine-red); font-weight: bold; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid var(--wine-red); padding-bottom: 8px; }
+        
+        /* 搜尋框 */
         .search-box { margin-bottom: 20px; }
         .search-box input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; outline: none; }
         .search-box input:focus { border-color: var(--wine-red); }
 
-        /* 學長姐快捷鍵 */
-        .manager-group { display: flex; flex-direction: column; gap: 10px; }
-        .manager-btn { 
-            padding: 12px; 
-            background: #fff; 
-            border: 1px solid #e2e8f0; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            text-align: center; 
-            transition: all 0.2s; 
-            color: #334155; 
-            font-size: 15px; 
-            font-weight: 500;
-        }
-        .manager-btn:hover { background: #fff1f2; border-color: var(--wine-red); color: var(--wine-red); }
-        .manager-btn.active { background: var(--wine-red); color: white; border-color: var(--wine-red); box-shadow: 0 4px 6px rgba(128, 0, 32, 0.15); }
+        /* 按鈕群組標題 */
+        .group-label { font-size: 12px; color: #94a3b8; margin: 10px 0 5px 0; font-weight: bold; }
 
-        /* 日曆區域全幅顯示 */
+        /* 按鈕樣式 */
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .filter-btn { 
+            padding: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; 
+            cursor: pointer; text-align: center; transition: all 0.2s; color: #334155; font-size: 14px; font-weight: 500;
+        }
+        .filter-btn:hover { background: #fff1f2; border-color: var(--wine-red); color: var(--wine-red); }
+        .filter-btn.active { background: var(--wine-red); color: white; border-color: var(--wine-red); box-shadow: 0 4px 6px rgba(128, 0, 32, 0.15); }
+
+        /* 全幅日曆區域 */
         .main-content { flex-grow: 1; height: 100%; position: relative; background: #fff; }
         iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
         
-        .reset-btn { font-size: 13px; color: #94a3b8; background: none; border: none; cursor: pointer; margin-top: auto; text-decoration: underline; padding: 20px 0; }
+        .reset-link { font-size: 13px; color: #94a3b8; cursor: pointer; text-decoration: underline; text-align: center; padding: 15px 0; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
         <div class="sidebar-title">行程篩選</div>
+        
         <div class="search-box">
-            <input type="text" id="calSearch" placeholder="搜尋關鍵字後按 Enter" onkeypress="if(event.key === 'Enter') handleSearch()">
+            <input type="text" id="calSearch" placeholder="搜尋關鍵字後按 Enter" onkeypress="if(event.key==='Enter') handleSearch()">
         </div>
 
-        <div class="manager-group">
-            <button class="manager-btn" onclick="applyFilter('素菁', this)">素菁學姊</button>
-            <button class="manager-btn" onclick="applyFilter('賢正', this)">賢正學長</button>
-            <button class="manager-btn" onclick="applyFilter('潔敏', this)">潔敏學姊</button>
-            <button class="manager-btn" onclick="applyFilter('詩珊', this)">詩珊學姊</button>
-            <button class="manager-btn" onclick="applyFilter('旭華', this)">旭華學長</button>
-            <button class="manager-btn" onclick="applyFilter('宗霖', this)">宗霖學長</button>
+        <div class="group-label">學長姐行程</div>
+        <div class="btn-group">
+            <button class="filter-btn" onclick="applyFilter('素菁', this)">素菁學姊</button>
+            <button class="filter-btn" onclick="applyFilter('賢正', this)">賢正學長</button>
+            <button class="filter-btn" onclick="applyFilter('潔敏', this)">潔敏學姊</button>
+            <button class="filter-btn" onclick="applyFilter('詩珊', this)">詩珊學姊</button>
+            <button class="filter-btn" onclick="applyFilter('旭華', this)">旭華學長</button>
+            <button class="filter-btn" onclick="applyFilter('宗霖', this)">宗霖學長</button>
         </div>
-        <button class="reset-btn" onclick="applyFilter('', null)">顯示全部行程</button>
+
+        <div class="group-label">分類行程</div>
+        <div class="btn-group">
+            <button class="filter-btn" onclick="applyFilter('公假', this)">💼 公假</button>
+            <button class="filter-btn" onclick="applyFilter('會議', this)">📅 會議</button>
+        </div>
+
+        <div class="reset-link" onclick="applyFilter('', null)">顯示全部行程</div>
     </div>
 
     <div class="main-content">
@@ -76,47 +82,52 @@
     <script>
         const CAL_ID = 'l7tc3ugm2jetlhr9frfpdplqlc@group.calendar.google.com';
         
-        function updateCalendar(query = '') {
+        // 核心載入函數：利用隨機數防止瀏覽器快取舊的篩選結果
+        function updateCalendar(keyword = '') {
             const frame = document.getElementById('calendar-frame');
-            // 基礎設定：酒紅色配色、台北時區
-            let url = "https://calendar.google.com/calendar/embed?src=" + encodeURIComponent(CAL_ID);
-            url += "&ctz=Asia%2FTaipei&wkst=1&bgcolor=%23ffffff&color=%23800020&showTitle=0&showNav=1&showPrint=0&showTabs=1&showCalendars=0";
-            
-            if (query) {
-                // q 參數是 Google 行事曆內部的關鍵字搜尋
-                url += "&q=" + encodeURIComponent(query);
+            let baseUrl = "https://calendar.google.com/calendar/embed";
+            let params = new URLSearchParams({
+                src: CAL_ID,
+                ctz: 'Asia/Taipei',
+                wkst: 1,
+                bgcolor: '#ffffff',
+                color: '#800020',
+                showTitle: 0,
+                showNav: 1,
+                showPrint: 0,
+                showTabs: 1,
+                showCalendars: 0,
+                mode: 'MONTH'
+            });
+
+            if (keyword) {
+                params.append('q', keyword);
             }
             
-            // 加入隨機參數防止快取舊結果
-            url += "&cache=" + new Date().getTime();
+            // 加入時間戳強制重刷
+            params.append('t', new Date().getTime());
+
+            const finalUrl = `${baseUrl}?${params.toString()}`;
             
-            // 使用 location.replace 確保 Iframe 刷新
-            frame.src = url;
+            // 使用 location.replace 是目前 Iframe 篩選最穩定的做法
+            frame.contentWindow.location.replace(finalUrl);
         }
 
-        // 處理學長姐快捷鍵點擊
         function applyFilter(keyword, btn) {
-            // 切換按鈕樣式
-            document.querySelectorAll('.manager-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             if (btn) btn.classList.add('active');
             
-            // 同步文字到搜尋框
             document.getElementById('calSearch').value = keyword;
-            
-            // 更新日曆
             updateCalendar(keyword);
         }
 
-        // 處理搜尋框 Enter
         function handleSearch() {
             const keyword = document.getElementById('calSearch').value;
-            // 清除按鈕選取狀態
-            document.querySelectorAll('.manager-btn').forEach(b => b.classList.remove('active'));
-            
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             updateCalendar(keyword);
         }
 
-        // 網頁開啟時初始化顯示全部
+        // 初始化
         window.onload = () => updateCalendar();
     </script>
 </body>
