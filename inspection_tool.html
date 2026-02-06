@@ -367,22 +367,32 @@
             btn.innerText = originalText;
         });
     }
+// 在 <head> 中更換這組連結，確保順序正確
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+// <script src="https://unpkg.com/docxtemplater@3.37.2/build/docxtemplater.js"></script>
+// <script src="https://unpkg.com/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
+
 async function generateDoc(imgData) {
     const selectedMinor = document.getElementById('minorSelect').value;
-    const status = document.getElementById('status');
-    status.innerText = "調用範本中...";
+    const btn = document.querySelector('.btn-word');
+    const originalText = btn.innerText;
+    
+    btn.innerText = "調用範本中...";
 
     try {
-        // 1. 讀取範本檔案 (請確保與 html 同目錄)
+        // 1. 讀取伺服器目錄下的範本 (請確認檔案已上傳至與 HTML 同一目錄)
         const response = await fetch('./施工抽查流程圖範例.docx');
-        if (!response.ok) throw new Error("找不到範本檔案，請確認已放置於伺服器。");
+        if (!response.ok) throw new Error("找不到範本檔案，請確認檔案已放置於伺服器。");
         const templateBuffer = await response.arrayBuffer();
 
-        // 2. 收集表單數據
+        // 2. 收集查驗項目數據
         const tableData = [];
         let count = 0;
         document.querySelectorAll('.form-panel > div').forEach(sec => {
-            const title = sec.querySelector('.group-title')?.innerText || "";
+            const titleEl = sec.querySelector('.group-title');
+            if(!titleEl) return;
+            const title = titleEl.innerText;
             const checks = sec.querySelectorAll('input[type="checkbox"]:checked');
             checks.forEach(chk => {
                 if (chk.parentElement.style.display === 'none') return;
@@ -392,34 +402,32 @@ async function generateDoc(imgData) {
                     no: count,
                     proc: title,
                     item: inputEl ? inputEl.value : "",
-                    std: inputEl?.nextElementSibling?.innerText || "",
-                    res: "□合格 □不合格"
+                    std: inputEl?.nextElementSibling?.innerText || ""
                 });
             });
         });
 
-        // 3. 配置圖片模組 (關鍵：處理流程圖圖片)
-        const opts = {
-            getImage(tagValue) {
-                // 將 Base64 轉為二進位
+        // 3. 配置圖片模組 (強制圖片寬度為 15.7cm，約 593 像素)
+        const imageOptions = {
+            centered: true,
+            getImage: function(tagValue) {
                 return Uint8Array.from(atob(tagValue.split(",")[1]), c => c.charCodeAt(0));
             },
-            getSize() {
-                // 強制限制圖片寬度 15.7cm (約 593 像素)
-                return [593, 800]; 
+            getSize: function() {
+                return [593, 800]; // 寬度固定為 15.7cm
             }
         };
-        const imageModule = new ImageModule(opts);
+        const imageModule = new window.ImageModule(imageOptions);
 
-        // 4. 使用 PizZip 與 docxtemplater (注意此處調用 window 物件)
-        const zip = new PizZip(templateBuffer);
+        // 4. 使用 PizZip 與 Docxtemplater (明確使用 window 物件調用)
+        const zip = new window.PizZip(templateBuffer);
         const doc = new window.docxtemplater(zip, {
             modules: [imageModule],
             paragraphLoop: true,
             linebreaks: true,
         });
 
-        // 5. 將變數注入 (flowchart 標籤對應範本內的圖片標籤)
+        // 5. 渲染數據 (此舉會保留原始檔案的增益集與 W 樣式)
         doc.render({
             minor: selectedMinor,
             flowchart: imgData, 
@@ -432,17 +440,18 @@ async function generateDoc(imgData) {
             mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
 
-        // 7. 下載
+        // 7. 下載檔案
         saveAs(out, `${selectedMinor}_施工抽查紀錄表.docx`);
-        status.innerText = "成功匯出 (已保留增益集)";
+        btn.innerText = originalText;
 
     } catch (error) {
         console.error(error);
-        alert("匯出失敗：" + error.message);
-        status.innerText = "發生錯誤";
+        alert("生成失敗：" + error.message);
+        btn.innerText = originalText;
     }
 }
 </script>
 </body>
 </html>
+
 
