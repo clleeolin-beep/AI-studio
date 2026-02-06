@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>施工流程圖生成器 (箭頭精準貼合版)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.2/docxtemplater.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://unpkg.com/docxtemplater@3.37.2/build/docxtemplater.js"></script>
+<script src="https://unpkg.com/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
     <style>
         :root { --primary: #1a5276; --accent: #2980b9; --bg: #eef2f5; --hp-color: #e74c3c; --card-bg: #ffffff; }
         
@@ -372,15 +370,15 @@
 async function generateDoc(imgData) {
     const selectedMinor = document.getElementById('minorSelect').value;
     const status = document.getElementById('status');
-    status.innerText = "正在調用範本...";
+    status.innerText = "調用範本中...";
 
     try {
-        // 1. 讀取與範例一模一樣的 docx 檔案 (確保路徑正確)
+        // 1. 讀取範本檔案 (請確保與 html 同目錄)
         const response = await fetch('./施工抽查流程圖範例.docx');
-        if (!response.ok) throw new Error("找不到範本檔案，請確認檔案已放置於伺服器目錄。");
+        if (!response.ok) throw new Error("找不到範本檔案，請確認已放置於伺服器。");
         const templateBuffer = await response.arrayBuffer();
 
-        // 2. 收集網頁表單中勾選的查驗資料
+        // 2. 收集表單數據
         const tableData = [];
         let count = 0;
         document.querySelectorAll('.form-panel > div').forEach(sec => {
@@ -400,29 +398,43 @@ async function generateDoc(imgData) {
             });
         });
 
-        // 3. 使用 PizZip 與 docxtemplater 處理 Word 二進位流
+        // 3. 配置圖片模組 (關鍵：處理流程圖圖片)
+        const opts = {
+            getImage(tagValue) {
+                // 將 Base64 轉為二進位
+                return Uint8Array.from(atob(tagValue.split(",")[1]), c => c.charCodeAt(0));
+            },
+            getSize() {
+                // 強制限制圖片寬度 15.7cm (約 593 像素)
+                return [593, 800]; 
+            }
+        };
+        const imageModule = new ImageModule(opts);
+
+        // 4. 使用 PizZip 與 docxtemplater (注意此處調用 window 物件)
         const zip = new PizZip(templateBuffer);
         const doc = new window.docxtemplater(zip, {
+            modules: [imageModule],
             paragraphLoop: true,
             linebreaks: true,
         });
 
-        // 4. 將變數注入範本 (這會保留原始檔案的所有 Custom UI 與樣式)
-        doc.setData({
+        // 5. 將變數注入 (flowchart 標籤對應範本內的圖片標籤)
+        doc.render({
             minor: selectedMinor,
+            flowchart: imgData, 
             table: tableData
         });
 
-        // 5. 渲染並匯出
-        doc.render();
+        // 6. 產出二進位檔案
         const out = doc.getZip().generate({
             type: "blob",
             mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         });
 
-        // 6. 下載檔案
+        // 7. 下載
         saveAs(out, `${selectedMinor}_施工抽查紀錄表.docx`);
-        status.innerText = "匯出完成 (已保留增益集)";
+        status.innerText = "成功匯出 (已保留增益集)";
 
     } catch (error) {
         console.error(error);
@@ -433,3 +445,4 @@ async function generateDoc(imgData) {
 </script>
 </body>
 </html>
+
