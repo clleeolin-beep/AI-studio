@@ -1,0 +1,247 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>惇陽 AI 實驗室 - 同仁操作教程 (介面強化版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #0f172a; color: #f1f5f9; margin: 0; overflow: hidden; }
+        .slide { display: none; height: 100vh; width: 100vw; padding: 3rem 4rem; box-sizing: border-box; }
+        .slide.active { display: flex; flex-direction: column; justify-content: center; }
+        .card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 1rem; padding: 1.2rem; }
+        
+        /* 模擬視窗 UI 樣式 */
+        .mock-window { background: #1e293b; border-radius: 0.75rem; border: 1px solid #334155; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+        .window-header { background: #334155; padding: 8px 12px; display: flex; gap: 6px; align-items: center; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .window-content { background: #f8fafc; height: 280px; position: relative; overflow: hidden; color: #334155; }
+        
+        .nav-btn { position: fixed; bottom: 2rem; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); padding: 0.75rem 1.5rem; border-radius: 9999px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.2); z-index: 100; transition: 0.3s; }
+        .nav-btn:hover { background: #38bdf8; color: #0f172a; }
+        .progress-bar { position: fixed; top: 0; left: 0; height: 4px; background: #38bdf8; transition: width 0.3s; z-index: 1000; }
+        .step-num { background: #38bdf8; color: #0f172a; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 8px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="slide active">
+    <div class="text-center">
+        <h1 class="text-5xl font-bold mb-6">AI 實驗室：工具平台操作教程</h1>
+        <p class="text-2xl text-blue-400 mb-12 tracking-widest">提升效率、數據整合、自動化作業</p>
+        <div class="h-1 w-24 bg-blue-500 mx-auto mb-8"></div>
+        <p class="text-gray-400">適用對象：設計 A 組及各級計畫同仁</p>
+    </div>
+</div>
+
+<div class="slide">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-blue-500 pl-6">第一步：授權登入介面</h2>
+    <div class="grid grid-cols-2 gap-10">
+        <div class="space-y-4">
+            <div class="card">
+                <p class="mb-3 text-sm"><span class="step-num">1</span><b>身分驗證：</b> 進入系統首頁會自動彈出藍色遮罩。</p>
+                <p class="text-sm"><span class="step-num">2</span><b>點擊登入：</b> 點擊下方的 Google Sign-in 按鈕。</p>
+            </div>
+            <div class="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30 text-xs">
+                <p class="italic text-blue-300">💡 這是基於 Google Identity Services (GSI) 的安全機制。</p>
+            </div>
+        </div>
+        <div class="mock-window">
+            <div class="window-header">
+                <div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div>
+                <span class="text-[10px] text-gray-400 ml-2">Auth Screen</span>
+            </div>
+            <div class="window-content bg-slate-900 flex flex-col items-center justify-center text-white">
+                <h3 class="text-lg font-bold mb-4">惇陽 AI 實驗室</h3>
+                <div class="w-40 h-10 bg-white rounded-full flex items-center justify-center text-gray-700 text-xs font-bold shadow-lg">
+                    <i class="fab fa-google mr-2 text-blue-500"></i> Sign in with Google
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-blue-500 pl-6">介面演示：🗺️ 3D 實績地圖</h2>
+    <div class="grid grid-cols-2 gap-10">
+        <div class="mock-window">
+            <div class="window-header">
+                <div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div>
+                <span class="text-[10px] text-gray-400 ml-2">Map Perspective</span>
+            </div>
+            <div class="window-content bg-gray-200">
+                <div class="absolute left-0 top-0 w-24 h-full bg-white border-r text-[8px] p-2 space-y-2">
+                    <div class="font-bold border-b">空間篩選</div>
+                    <div class="bg-blue-100 p-1 rounded text-blue-600">📐 繪製區域</div>
+                    <div class="font-bold border-b mt-2">屬性篩選</div>
+                    <div class="h-2 bg-gray-200 rounded"></div>
+                </div>
+                <div class="flex items-center justify-center h-full">
+                    <i class="fas fa-map-marker-alt text-red-500 text-2xl animate-bounce"></i>
+                    <div class="ml-2 bg-white p-2 rounded shadow-md text-[8px]">
+                        <b>115 南港案</b><br>工程名稱：南港綠化...
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card flex flex-col justify-center">
+            <h3 class="text-xl font-bold mb-4 text-blue-300">操作重點</h3>
+            <ul class="space-y-3 text-sm text-gray-300">
+                <li><i class="fas fa-check text-blue-500 mr-2"></i><b>側邊欄：</b> 進行縣市、經費與年份過濾。</li>
+                <li><i class="fas fa-check text-blue-500 mr-2"></i><b>彈窗：</b> 點擊標點可顯示照片與詳細契約內容。</li>
+                <li><i class="fas fa-check text-blue-500 mr-2"></i><b>匯出：</b> 底部按鈕可直接產出篩選後的 CSV。</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="slide">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-blue-500 pl-6">介面演示：📄 公文智能助手</h2>
+    <div class="grid grid-cols-2 gap-10">
+        <div class="card flex flex-col justify-center">
+            <h3 class="text-xl font-bold mb-4 text-green-400">操作流程</h3>
+            <p class="text-sm mb-4">系統會自動執行 Tesseract OCR 辨識，如下圖所示：</p>
+            <div class="space-y-2 text-xs">
+                <div class="flex items-center"><span class="step-num">1</span> 上傳公文影像或 PDF</div>
+                <div class="flex items-center"><span class="step-num">2</span> 系統自動提取「XX字第115...號」</div>
+                <div class="flex items-center"><span class="step-num">3</span> 點擊模板生成正式公文全文</div>
+            </div>
+        </div>
+        <div class="mock-window">
+            <div class="window-header">
+                <div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div>
+                <span class="text-[10px] text-gray-400 ml-2">Doc Assistant UI</span>
+            </div>
+            <div class="window-content p-4 text-[10px] space-y-3">
+                <div class="border-2 border-dashed border-blue-400 p-2 text-center text-blue-500">📸 上傳區 (辨識中...)</div>
+                <div class="space-y-1">
+                    <label class="font-bold">來文字號：</label>
+                    <input class="w-full border p-1 rounded bg-yellow-50" value="新北中工字第1150001號">
+                </div>
+                <div class="h-20 bg-gray-100 p-2 border border-yellow-200">
+                    主旨：有關「中和區錦和運動公園...」...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-blue-500 pl-6">介面演示：🌳 工單選取工具</h2>
+    <div class="flex gap-8">
+        <div class="mock-window flex-1">
+            <div class="window-header">
+                <div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div>
+                <span class="text-[10px] text-gray-400 ml-2">Selection Tool</span>
+            </div>
+            <div class="window-content p-2">
+                <div class="bg-gray-200 p-2 rounded mb-2 text-[10px]">🔍 搜尋關鍵字...</div>
+                <div class="space-y-1">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-2 text-[9px] flex justify-between">
+                        <span>楓香 (15cm)</span> <span class="text-blue-600">已選取</span>
+                    </div>
+                    <div class="bg-white border-l-4 border-gray-300 p-2 text-[9px] flex justify-between">
+                        <span>樟樹 (20cm)</span> <span class="text-gray-400">未選取</span>
+                    </div>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full bg-white border-t p-2 text-center">
+                    <div class="bg-green-600 text-white rounded p-1 text-[8px] font-bold">📊 依項次順序產生 CSV</div>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1 space-y-4">
+            <div class="card">
+                <h4 class="font-bold text-blue-300 mb-2">自動排序技術</h4>
+                <p class="text-xs text-gray-400">系統內部會將選取的項目依照「工序」與「項次」自動重排，無需在 Excel 手動移動行次。</p>
+            </div>
+            <div class="card">
+                <h4 class="font-bold text-green-300 mb-2">同步雲端</h4>
+                <p class="text-xs text-gray-400">數據來源為 Google Sheets，若單價變動，網頁介面會於重新載入時同步更新。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-blue-500 pl-6 text-orange-400">介面演示：🏗️ 施工流程生成</h2>
+    <div class="grid grid-cols-2 gap-10">
+        <div class="card flex flex-col justify-center">
+            <h3 class="text-xl font-bold mb-4">自動化 Word 報表</h3>
+            <p class="text-sm text-gray-400 mb-4">這是目前最複雜的自動化工具：</p>
+            <ul class="space-y-2 text-xs">
+                <li><span class="step-num">A</span> 勾選左側表單工項。</li>
+                <li><span class="step-num">B</span> 右側即時渲染 Canvas 流程圖。</li>
+                <li><span class="step-num">C</span> 點擊匯出，後端 docxtemplater 會自動填入範本。</li>
+            </ul>
+        </div>
+        <div class="mock-window">
+            <div class="window-header">
+                <div class="dot bg-red-500"></div><div class="dot bg-yellow-500"></div><div class="dot bg-green-500"></div>
+                <span class="text-[10px] text-gray-400 ml-2">Flowchart Preview</span>
+            </div>
+            <div class="window-content bg-white p-4 flex flex-col items-center">
+                <div class="w-16 h-8 border border-black text-[6px] flex items-center justify-center rounded-full mb-2">開始</div>
+                <i class="fas fa-arrow-down text-[8px] mb-2"></i>
+                <div class="flex gap-2 items-center">
+                    <div class="w-20 h-8 border border-black text-[6px] flex items-center justify-center">★ 基礎開挖</div>
+                    <div class="w-20 h-8 border border-dashed border-gray-400 text-[5px] p-1">1. 查驗開挖深度...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide">
+    <div class="text-center">
+        <h2 class="text-6xl font-bold mb-8 text-blue-400">Q&A</h2>
+        <p class="text-xl mb-12">遇到介面操作或資料問題？</p>
+        <div class="flex justify-center">
+            <div class="card p-8 w-80 border-2 border-blue-500/50 shadow-2xl shadow-blue-500/10">
+                <p class="font-bold text-2xl mb-4 text-white">宗霖</p>
+                <div class="space-y-3 text-sm text-gray-300">
+                    <p class="flex items-center justify-center gap-2">
+                        <i class="fas fa-tools text-blue-400"></i> 技術、程式故障排除
+                    </p>
+                    <p class="flex items-center justify-center gap-2">
+                        <i class="fas fa-database text-green-400"></i> 資料校對、功能建議
+                    </p>
+                </div>
+                <div class="mt-6 pt-6 border-t border-slate-700">
+                    <p class="text-xs text-slate-500 italic">AI 實驗室核心開發與維運</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="nav-btn left-8" onclick="changeSlide(-1)"><i class="fas fa-chevron-left mr-2"></i> 上一頁</div>
+<div class="nav-btn right-8" onclick="changeSlide(1)">下一頁 <i class="fas fa-chevron-right ml-2"></i></div>
+
+<script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    
+    function showSlide(index) {
+        slides.forEach(s => s.classList.remove('active'));
+        if (index >= slides.length) currentSlide = 0;
+        else if (index < 0) currentSlide = slides.length - 1;
+        else currentSlide = index;
+        slides[currentSlide].classList.add('active');
+        document.getElementById('progressBar').style.width = ((currentSlide + 1) / slides.length * 100) + '%';
+    }
+
+    function changeSlide(dir) { showSlide(currentSlide + dir); }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ') changeSlide(1);
+        if (e.key === 'ArrowLeft') changeSlide(-1);
+    });
+    
+    showSlide(0);
+</script>
+</body>
+</html>
