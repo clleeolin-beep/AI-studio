@@ -2,192 +2,191 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>施工流程圖生成器 (修正版)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://unpkg.com/docxtemplater@3.37.2/build/docxtemplater.js"></script>
-    <script src="https://unpkg.com/docxtemplater-image-module-free@1.1.1/build/imagemodule.js"></script>
+    <title>施工表單生成器 (V35 無格式精準版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <style>
-        :root { --primary: #1a5276; --accent: #2980b9; --bg: #eef2f5; --hp-color: #e74c3c; --card-bg: #ffffff; }
-        body { font-family: "Microsoft JhengHei", "BiauKai", "標楷體", serif; margin: 0; padding: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .header-wrapper { background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
-        .header-content { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; height: 50px; }
-        h2 { margin: 0; font-size: 18px; color: var(--primary); }
-        .controls { display: flex; gap: 10px; align-items: center; }
-        select { padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-family: "Microsoft JhengHei"; }
-        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; }
-        .btn-word { background: #27ae60; }
-        .main-wrapper { flex: 1; display: flex; justify-content: center; padding: 20px; overflow: hidden; }
-        .main-card { display: flex; width: 100%; max-width: 1380px; background: var(--card-bg); border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e1e4e8; }
-        .form-panel { width: 30%; background: #fdfdfd; border-right: 1px solid #eee; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
-        .preview-panel { width: 70%; background: #e0e5ec; overflow: auto; padding: 40px; display: flex; flex-direction: column; align-items: center; position: relative; }
-        .flowchart-container { display: flex; flex-direction: column; align-items: stretch; position: relative; width: 15.7cm; min-height: 23cm; background: #fff; padding: 1cm 0.5cm; box-shadow: 0 0 15px rgba(0,0,0,0.1); box-sizing: border-box; }
-        .height-limit-line { position: absolute; top: 23cm; left: 0; width: 100%; border-bottom: 2px dashed red; pointer-events: none; z-index: 10; }
-        .flow-row { display: flex; align-items: stretch; min-height: 80px; width: 100%; }
-        .node-col { width: 4.5cm; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; flex-shrink: 0; }
-        .node-wrapper { position: relative; z-index: 2; }
-        .node-box { width: 3.5cm; padding: 10px 5px; background: #fff; border: 1.5px solid #000; text-align: center; font-family: "標楷體", serif; font-size: 12pt; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; }
-        .node-box.oval { border-radius: 50%; height: 1.2cm; width: 2.5cm; }
-        .v-line { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; background: #000; z-index: 1; }
-        .line-full { top: 0; bottom: 0; }
-        .line-start { top: 50%; bottom: 0; }
-        .line-end { top: 0; bottom: 50%; }
-        .arrow-down { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 10px solid #000; position: absolute; left: 50%; transform: translateX(-50%); bottom: 100%; z-index: 3; margin-bottom: -1px; }
-        .detail-col { flex: 1; display: flex; align-items: center; position: relative; }
-        .h-connector { width: 1cm; height: 1px; border-top: 1.5px dashed #000; flex-shrink: 0; }
-        .detail-box { border: 1.5px dashed #000; padding: 8px 12px; background: #fff; font-family: "標楷體", serif; font-size: 12pt; line-height: 1.5; text-align: left; width: fit-content; max-width: 9.5cm; white-space: pre-wrap; }
-        .edit-input { border: none; border-bottom: 1px dashed #ccc; background: transparent; width: 100%; padding: 2px; }
-        .group-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; margin-top: 15px; border-radius: 5px 5px 0 0; border-left: 5px solid var(--primary); }
+        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; }
+        body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .header { background: #fff; padding: 10px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .main { flex: 1; display: flex; padding: 20px; gap: 20px; overflow: hidden; }
+        .form-panel { width: 380px; background: #fff; padding: 20px; overflow-y: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); flex-shrink: 0; }
+        .preview-panel { flex: 1; background: #95a5a6; padding: 30px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
+
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: var(--primary); }
+        .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn-group { display: flex; gap: 8px; }
+        .btn { padding: 8px 12px; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-green { background: var(--accent); } .btn-blue { background: var(--blue); } .btn-orange { background: var(--orange); }
+
+        .flowchart-container { 
+            width: 15.7cm; background: #fff; padding: 40px 30px; box-sizing: border-box; 
+            display: flex; flex-direction: column; align-items: stretch;
+            font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+        .flow-row { display: flex; width: 100%; align-items: center; position: relative; min-height: 55px; }
+        .node-col { width: 140px; position: relative; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; align-self: stretch; }
+        .v-line { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; background: #000; z-index: 1; top: 0; bottom: 0; }
+        .line-start { top: 50% !important; } .line-end { bottom: 50% !important; }
+        .node-wrapper { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 5px 0; }
+        .node-box { width: 110px; padding: 6px 2px; border: 1.5px solid #000; text-align: center; background: #fff; font-weight: bold; font-size: 14pt; box-sizing: border-box; }
+        .node-box.oval { border-radius: 40px; }
+        .arrow-head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 10px solid #000; margin-bottom: -1px; background: #fff; }
+        .detail-col { flex: 1; display: flex; align-items: center; max-width: calc(15.7cm - 170px); align-self: stretch; }
+        .h-line { width: 25px; border-top: 1.5px dashed #000; flex-shrink: 0; }
+        .detail-box { border: 1.5px dashed #000; padding: 6px 10px; font-size: 12px; background: #fff; line-height: 1.3; display: inline-block; max-width: 100%; white-space: normal; word-break: break-all; text-align: left; }
     </style>
 </head>
 <body>
 
-<div class="header-wrapper">
-    <div class="header-content">
-        <h2>🏗️ 施工計畫流程製作工具</h2>
-        <div class="controls">
-            <select id="minorSelect" onchange="loadForm()"></select>
-            <button class="btn btn-word" onclick="exportToWord()">📥 匯出 Word</button>
-        </div>
+<div class="header">
+    <h3 style="margin:0;">🏗️ 施工表單生成器 (V35 無格式版)</h3>
+    <div class="btn-group">
+        <button class="btn btn-blue" onclick="exportFlow()">📥 流程圖</button>
+        <button class="btn btn-green" onclick="exportStandard()">📋 標準表</button>
+        <button class="btn btn-orange" onclick="exportRecord()">📝 紀錄表</button>
     </div>
 </div>
 
-<div class="main-wrapper">
-    <div class="main-card">
-        <div class="form-panel" id="formContainer">載入中...</div>
-        <div class="preview-panel">
-            <div id="flowchart-canvas" class="flowchart-container">
-                <div class="height-limit-line"></div>
-            </div>
+<div class="main">
+    <div class="form-panel">
+        <div class="input-group">
+            <label>工程名稱：</label>
+            <input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程">
         </div>
+        <div class="input-group">
+            <label>分項工程選擇：</label>
+            <select id="minorSelect" onchange="loadForm()"></select>
+        </div>
+        <hr>
+        <div id="formContainer">正在讀取資料...</div>
+    </div>
+    <div class="preview-panel">
+        <div id="flowchart-canvas" class="flowchart-container"></div>
     </div>
 </div>
 
 <script>
-    const SS_ID = "1tCW1yzvBnzoQv2mAcLhAWcKOTe8mrOkyavWHaXRii3U"; 
-    const SHEET_NAME = "工作表1"; 
+    const SS_ID = "1tCW1yzvBnzoQv2mAcLhAWcKOTe8mrOkyavWHaXRii3U";
     let rawData = [];
-    
-    document.addEventListener("DOMContentLoaded", loadGoogleSheet);
 
-    function loadGoogleSheet() {
-        const cbName = "callback_loader";
-        window[cbName] = (json) => {
-            if (json.table) {
-                rawData = json.table.rows.map((row, idx) => {
-                    const get = (i) => (row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
-                    return { id: idx, minor: get(1), hp: get(2).includes('HP'), process: get(4), item: get(5), standard: get(6) };
-                }).filter(r => r.process && r.process !== "施工流程" && r.minor);
-                initMenu();
-            }
+    document.addEventListener("DOMContentLoaded", () => {
+        window.loader = (json) => {
+            if (!json.table) return;
+            rawData = json.table.rows.map(r => ({
+                stage: r.c[3]?.v || "", minor: r.c[1]?.v || "", node: r.c[4]?.v || "",
+                item: r.c[5]?.v || "", std: r.c[6]?.v || "", timing: r.c[7]?.v || "",
+                method: r.c[8]?.v || "", freq: r.c[9]?.v || "", failProc: r.c[10]?.v || ""
+            })).filter(r => r.node && r.node !== "施工流程");
+            const minors = [...new Set(rawData.map(r => r.minor))];
+            document.getElementById('minorSelect').innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
+            loadForm();
         };
-        const script = document.createElement('script');
-        script.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(SHEET_NAME)}`;
-        document.body.appendChild(script);
-    }
-
-    function initMenu() {
-        const minors = [...new Set(rawData.map(r => r.minor))];
-        const select = document.getElementById('minorSelect');
-        select.innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
-        if(minors.length > 0) loadForm();
-    }
+        const s = document.createElement('script');
+        s.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:loader`;
+        document.body.appendChild(s);
+    });
 
     function loadForm() {
-        const selectedMinor = document.getElementById('minorSelect').value;
-        const currentItems = rawData.filter(r => r.minor === selectedMinor);
+        const sel = document.getElementById('minorSelect').value;
         const groups = {};
-        currentItems.forEach(r => {
-            if (!groups[r.process]) groups[r.process] = { hp: r.hp, items: [] };
-            if (r.item) groups[r.process].items.push(r);
+        rawData.filter(r => r.minor === sel).forEach(r => {
+            if (!groups[r.node]) groups[r.node] = [];
+            if (r.item) groups[r.node].push(r);
         });
-
-        const container = document.getElementById('formContainer');
-        container.innerHTML = Object.keys(groups).map((procName, idx) => {
-            const grp = groups[procName];
-            const itemsHtml = grp.items.map(it => `
-                <div class="check-row">
-                    <input type="checkbox" id="chk_${it.id}" value="${it.id}" checked onchange="updatePreview()">
-                    <div style="width:100%">
-                        <input type="text" class="edit-input" id="txt_${it.id}" value="${it.item}" oninput="updatePreview()">
-                        <span class="std-text" style="font-size:12px;color:#999">${it.standard || ''}</span>
-                    </div>
-                </div>`).join('');
-            return `<div class="group-header"><span>${idx+1}. ${procName}</span></div><div class="item-list">${itemsHtml || '無細項'}</div>`;
-        }).join('');
+        document.getElementById('formContainer').innerHTML = Object.keys(groups).map(node => `
+            <div class="group-item">
+                <strong style="color:var(--primary); font-size:14px;">${node}</strong>
+                ${groups[node].map(r => `<label style="display:flex; align-items:start; gap:5px; font-size:12px; margin-top:4px;"><input type="checkbox" class="chk" data-info='${JSON.stringify(r).replace(/'/g, "&apos;")}' checked onchange="updatePreview()"><span>${r.item}</span></label>`).join('')}
+            </div>
+        `).join('');
         updatePreview();
     }
 
-    function updatePreview() {
-        const canvas = document.getElementById('flowchart-canvas');
-        canvas.innerHTML = '<div class="height-limit-line"></div>';
-        const checkedIds = new Set(Array.from(document.querySelectorAll('#formContainer input[type="checkbox"]:checked')).map(cb => cb.value));
-        const selectedMinor = document.getElementById('minorSelect').value;
-        const flowMap = new Map();
-
-        rawData.filter(r => r.minor === selectedMinor).forEach(row => {
-            if (checkedIds.has(String(row.id)) || (row.process && !row.item)) {
-                if (!flowMap.has(row.process)) flowMap.set(row.process, { name: row.process, isHp: row.hp, items: [] });
-                if (checkedIds.has(String(row.id)) && row.item) {
-                    const input = document.getElementById(`txt_${row.id}`);
-                    flowMap.get(row.process).items.push(input ? input.value : row.item);
-                }
-            }
-        });
-
-        if (flowMap.size === 0) return;
-        canvas.appendChild(createRow('Start', '準備', false, [], 'line-start'));
-        flowMap.forEach(val => canvas.appendChild(createRow('Process', val.name, val.isHp, val.items, 'line-full')));
-        canvas.appendChild(createRow('End', '完成', false, [], 'line-end'));
-    }
-
-    function createRow(type, text, isHp, items, lineType) {
+    function createRow(txt, items, lineCls, shape, forceArrow = false) {
         const row = document.createElement('div'); row.className = 'flow-row';
-        row.innerHTML = `<div class="node-col"><div class="v-line ${lineType}"></div><div class="node-wrapper">${(type!=='Start')?'<div class="arrow-down"></div>':''}<div class="node-box ${type==='Process'?'rect':'oval'}">${text}</div></div></div><div class="detail-col">${(items.length)?'<div class="h-connector"></div><div class="detail-box">'+items.map((it,i)=>`${i+1}. ${it}`).join('<br>')+'</div>':''}</div>`;
+        const hasArrow = (lineCls !== 'line-start' || forceArrow);
+        let detailHtml = items.length ? `<div class="h-line"></div><div class="detail-box">${items.map((it, i) => `${i + 1}.${it}`).join('<br>')}</div>` : '';
+        row.innerHTML = `<div class="node-col"><div class="v-line ${lineCls}"></div><div class="node-wrapper">${hasArrow ? '<div class="arrow-head"></div>' : '<div style="height:10px;"></div>'}<div class="node-box ${shape}">${txt}</div></div></div><div class="detail-col">${detailHtml}</div>`;
         return row;
     }
 
-    function exportToWord() {
-        const element = document.getElementById('flowchart-canvas');
-        html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
-            generateDoc(canvas.toDataURL("image/png"), canvas.width, canvas.height);
+    function updatePreview() {
+        const canvas = document.getElementById('flowchart-canvas'); canvas.innerHTML = '';
+        const chks = Array.from(document.querySelectorAll('.chk:checked'));
+        const flow = new Map();
+        chks.forEach(c => {
+            const data = JSON.parse(c.dataset.info);
+            if(!flow.has(data.node)) flow.set(data.node, []);
+            flow.get(data.node).push(data.item);
         });
+        if(flow.size === 0) return;
+        canvas.appendChild(createRow("準備", [], "line-start", "oval"));
+        flow.forEach((items, node) => canvas.appendChild(createRow(node, items, "v-line", "rect")));
+        canvas.appendChild(createRow("完成", [], "line-end", "oval"));
     }
 
-    async function generateDoc(imgData, imgW, imgH) {
-        try {
-            const response = await fetch('./施工抽查流程圖範例.docx');
-            if (!response.ok) throw new Error("範本讀取失敗");
-            const zip = new PizZip(await response.arrayBuffer());
+    async function exportFlow() {
+        const canvas = document.getElementById('flowchart-canvas');
+        const img = await html2canvas(canvas, { scale: 3, useCORS: true });
+        const selMinor = document.getElementById('minorSelect').value;
+        const html = `<html><body style="font-family:標楷體; text-align:center;"><h2>施工抽查紀錄表 (流程圖)</h2><img src="${img.toDataURL()}" width="590"><p>圖 7-1 ${selMinor} 施工抽查流程圖</p></body></html>`;
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工流程圖.doc`);
+    }
 
-            // 修正：正確取得 ImageModule 與 Docxtemplater
-            const ImageModule = window.ImageModule || window.DocxtemplaterImageModule;
-            const Docxtemplater = window.docxtemplater;
+    function exportStandard() {
+        const selMinor = document.getElementById('minorSelect').value;
+        const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
 
-            const opts = {
-                centered: true,
-                getImage: v => Uint8Array.from(atob(v.split(",")[1]), c => c.charCodeAt(0)),
-                getSize: () => [593, 593 * (imgH / imgW)]
-            };
+        let currentStage = ''; let currentNode = ''; let tableRows = '';
+        selectedItems.forEach((r, i) => {
+            let stageTd = ''; let nodeTd = '';
+            if (r.stage !== currentStage) {
+                stageTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage).length}" style="border:1px solid black; text-align:center;">${r.stage}</td>`;
+                currentStage = r.stage;
+            }
+            if (r.node !== currentNode) {
+                nodeTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage && x.node === r.node).length}" style="border:1px solid black; text-align:center;">${r.node}</td>`;
+                currentNode = r.node;
+            }
+            tableRows += `<tr>${stageTd}${nodeTd}<td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; text-align:center;">${r.timing.includes('施工中') ? '<span style="color:red;">＊</span>' : ''}${r.timing}</td><td style="border:1px solid black; text-align:center;">${r.method}</td><td style="border:1px solid black; text-align:center;">${r.freq}</td><td style="border:1px solid black; text-align:center;">${r.failProc}</td><td style="border:1px solid black; text-align:center;">施工抽查紀錄</td><td style="border:1px solid black;"></td></tr>`;
+        });
 
-            const doc = new Docxtemplater(zip, { 
-                modules: [new ImageModule(opts)],
-                paragraphLoop: true,
-                linebreaks: true 
-            });
+        const html = `<html><head><meta charset='utf-8'><style>@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 10pt; }</style></head>
+            <body><div class="Section2"><h2 align="center">表 7-5 ${selMinor} 施工抽查標準表</h2><table><tr><th colspan="10" style="border:1px solid black; font-size:12pt; padding:8px; text-align:center;">混凝土工程施工品質抽查標準</th></tr><tr style="font-weight:bold;"><th>施工階段</th><th>施工流程</th><th>管理項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th></tr>${tableRows}</table><p style="color:red; font-size:10pt;">＊為檢驗停留點(或註明：抽查時機內除標註為「不定期」外，餘皆為檢驗停留點)</p></div></body></html>`;
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工抽查標準表.doc`);
+    }
 
-            const tableData = [];
-            document.querySelectorAll('.item-list input[type="checkbox"]:checked').forEach((chk, i) => {
-                const input = document.getElementById(`txt_${chk.value}`);
-                tableData.push({ no: i + 1, item: input.value, std: input.nextElementSibling?.innerText || "" });
-            });
+    function exportRecord() {
+        const pName = document.getElementById('projName').value;
+        const selMinor = document.getElementById('minorSelect').value;
+        const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
 
-            doc.render({ minor: document.getElementById('minorSelect').value, flowchart: imgData, table: tableData });
-            saveAs(doc.getZip().generate({ type: "blob" }), "施工抽查紀錄表.docx");
-        } catch (e) { alert("錯誤: " + e.message); }
+        let currentStage = ''; let currentNode = ''; let tableRows = '';
+        selectedItems.forEach((r, i) => {
+            let stageTd = ''; let nodeTd = '';
+            if (r.stage !== currentStage) {
+                stageTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage).length}" style="border:1px solid black; text-align:center; font-weight:bold;">${r.stage}</td>`;
+                currentStage = r.stage;
+            }
+            if (r.node !== currentNode) {
+                nodeTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage && x.node === r.node).length}" style="border:1px solid black; text-align:center;">${r.node}</td>`;
+                currentNode = r.node;
+            }
+            tableRows += `<tr>${stageTd}${nodeTd}<td style="border:1px solid black; padding:5px;">${r.item}</td><td style="border:1px solid black; padding:5px;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; width:80pt;"></td><td style="border:1px solid black; width:35pt;"></td></tr>`;
+        });
+
+        const header = `<table style="width:100%; border-collapse:collapse; border:1px solid black; margin-bottom:10px;"><tr><td style="border:1px solid black; width:18%; text-align:center;">工程名稱</td><td colspan="5" style="border:1px solid black; padding-left:5px; color:red;">${pName}</td></tr><tr><td style="border:1px solid black; text-align:center;">分項工程名稱</td><td colspan="5" style="border:1px solid black; padding-left:5px; color:red;">${selMinor}</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查位置</td><td style="border:1px solid black; width:30%;"></td><td style="border:1px solid black; width:15%; text-align:center;">檢查日期</td><td colspan="3" style="border:1px solid black; text-align:center;"> 年 月 日</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查時機</td><td colspan="5" style="border:1px solid black; padding-left:5px;">□施工前 □施工中檢查 □施工完成檢查</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查結果</td><td colspan="5" style="border:1px solid black; padding-left:5px;">○檢查合格 ╳有缺失需改正 ／無此檢查項目</td></tr></table>`;
+
+        const html = `<html><head><meta charset='utf-8'><style>body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 11pt; }</style></head>
+            <body><h2 align="center">施工抽查紀錄表</h2><div align="right">編號：__________</div>${header}
+                <table><tr style="font-weight:bold;"><th colspan="3" style="width:180pt; border:1px solid black;">檢查項目</th><th style="border:1px solid black;">抽查標準(定量定性)</th><th width="80pt" style="border:1px solid black;">實際抽查情形</th><th width="40pt" style="border:1px solid black;">結果</th></tr>${tableRows}</table>
+                <p style="font-size:10pt; margin-top:5px;">備註：1. 合格者註明「○」，不合格者註明「╳」，無需檢查項目打「/」。</p>
+                <div style="margin-top:15px;">監造主管：____________________  派駐現場人員簽名：____________________</div>
+            </body></html>`;
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工抽查紀錄表.doc`);
     }
 </script>
 </body>
