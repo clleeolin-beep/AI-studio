@@ -1,0 +1,344 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 實驗室年度戰略規劃 - 李宗霖</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Fira+Code&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #020617;
+            color: #f1f5f9;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            padding: 4rem;
+            box-sizing: border-box;
+            transition: all 0.5s ease;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .gradient-text {
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-btn {
+            position: fixed;
+            bottom: 2rem;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+
+        .nav-btn:hover { background: rgba(56, 189, 248, 0.2); }
+
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: #38bdf8;
+            transition: width 0.3s;
+            z-index: 1000;
+        }
+
+        .card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #38bdf8;
+            box-shadow: 0 10px 30px -10px rgba(56, 189, 248, 0.3);
+        }
+
+        .code-block {
+            background: #0f172a;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: #38bdf8;
+            border: 1px solid #1e293b;
+        }
+
+        #simMap { height: 100%; width: 100%; border-radius: 1rem; z-index: 10; }
+
+        .architecture-box {
+            border: 2px dashed #334155;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .step-active { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.1) !important; }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="slide active" id="slide1">
+    <div class="text-center">
+        <h1 class="text-6xl font-bold mb-6">AI 實驗室年度戰略規劃</h1>
+        <h2 class="text-3xl font-light text-sky-400 mb-12 uppercase tracking-widest">混合雲架構、DevOps 流程與數據中臺方案</h2>
+        <div class="h-1 w-24 bg-sky-500 mx-auto mb-12"></div>
+        <p class="text-xl">匯報人：李宗霖</p>
+        <p class="text-gray-500 mt-2 text-sm text-center">匯報對象：總經理、副總、CDO、CTO 及各部門主管</p>
+    </div>
+</div>
+
+<div class="slide" id="slide2">
+    <h2 class="text-4xl font-bold mb-10 border-l-8 border-sky-500 pl-6">混合雲協作邏輯：開發與數據的分離與整合</h2>
+    <div class="grid grid-cols-3 gap-8">
+        <div class="card border-t-4 border-t-sky-500">
+            <h3 class="text-xl font-bold mb-4"><i class="fab fa-github mr-2"></i>GitHub 部署端</h3>
+            <p class="text-sm text-gray-400 leading-relaxed">
+                <b>前端介面維護：</b> 代碼推送到 GitHub 後，透過 Actions 自動部署至 NAS Web Station。<br><br>
+                <span class="text-sky-400 text-xs">● 版本控制 ● 自動化部署 ● 程式碼審核</span>
+            </p>
+        </div>
+        <div class="card border-t-4 border-t-indigo-500">
+            <h3 class="text-xl font-bold mb-4"><i class="fas fa-database mr-2"></i>NAS 數據中臺</h3>
+            <p class="text-sm text-gray-400 leading-relaxed">
+                <b>數據資產本地化：</b> 存放物料、圖資與核心 MariaDB 資料庫。提供 Python 高頻運算環境。<br><br>
+                <span class="text-indigo-400 text-xs">● 數據私有 ● 高速存取 ● 24/7 運算</span>
+            </p>
+        </div>
+        <div class="card border-t-4 border-t-emerald-500">
+            <h3 class="text-xl font-bold mb-4"><i class="fab fa-google mr-2"></i>Google Sheets 協作</h3>
+            <p class="text-sm text-gray-400 leading-relaxed">
+                <b>低門檻數據輸入：</b> 技術長授權雲端表單，同仁於熟悉界面更新資訊，Python 定期同步回 NAS。<br><br>
+                <span class="text-emerald-400 text-xs">● 零門檻協作 ● 權限控管 ● 異地備份</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="slide" id="slide3">
+    <h2 class="text-4xl font-bold mb-10 border-l-8 border-sky-500 pl-6">系統全架構：數據流向圖 (Data Pipeline)</h2>
+    <div class="flex items-center justify-between gap-4">
+        <div class="space-y-4 w-1/4">
+            <div class="architecture-box bg-slate-900 border-emerald-500/30">
+                <p class="text-xs text-emerald-400 font-bold">協作層</p>
+                <p class="text-sm">Google Sheets<br>(同仁/窗口填寫)</p>
+            </div>
+            <div class="architecture-box bg-slate-900 border-sky-500/30">
+                <p class="text-xs text-sky-400 font-bold">外部層</p>
+                <p class="text-sm">公共工程物料數據<br>(外部 API / 爬蟲)</p>
+            </div>
+        </div>
+
+        <i class="fas fa-chevron-right text-gray-600 text-2xl"></i>
+
+        <div class="card w-1/3 text-center bg-indigo-950/20 border-indigo-500">
+            <p class="text-xs text-indigo-400 font-bold mb-2">NAS 運算核心 (Docker / Python)</p>
+            <div class="space-y-2">
+                <div class="bg-indigo-900/40 p-2 rounded text-xs">ETL 腳本：讀取 Google Sheets</div>
+                <div class="bg-indigo-900/40 p-2 rounded text-xs">Crawler 腳本：定時爬取外部物料</div>
+                <div class="bg-indigo-900/40 p-2 rounded text-xs">DB Connector：寫入 MariaDB</div>
+            </div>
+        </div>
+
+        <i class="fas fa-chevron-right text-gray-600 text-2xl"></i>
+
+        <div class="space-y-4 w-1/4">
+            <div class="architecture-box bg-slate-900 border-sky-500 shadow-lg shadow-sky-500/10">
+                <p class="text-xs text-sky-400 font-bold">展示層 (Web Station)</p>
+                <p class="text-sm">AI Tool Portal<br>(GitHub CI/CD 更新)</p>
+            </div>
+            <p class="text-[10px] text-gray-500 text-center italic">終端使用者透過公司內網<br>瀏覽最新分析數據</p>
+        </div>
+    </div>
+</div>
+
+<div class="slide" id="slide4">
+    <h2 class="text-4xl font-bold mb-10 border-l-8 border-sky-500 pl-6">技術實施藍圖 (Roadmap)</h2>
+    <div class="relative mt-16">
+        <div class="absolute left-0 top-1/2 w-full h-0.5 bg-slate-800 -z-10"></div>
+        <div class="flex justify-between">
+            <div class="w-1/4 px-4">
+                <div class="w-4 h-4 bg-sky-500 rounded-full mx-auto mb-4 border-4 border-slate-900 shadow-[0_0_15px_rgba(56,189,248,0.5)]"></div>
+                <h4 class="font-bold text-sky-400 text-center">階段一：架構對接</h4>
+                <p class="text-[11px] text-gray-400 mt-2 text-center">GitHub Actions 部署環境建立<br>Google Sheets API 權限配置</p>
+            </div>
+            <div class="w-1/4 px-4">
+                <div class="w-4 h-4 bg-indigo-500 rounded-full mx-auto mb-4 border-4 border-slate-900"></div>
+                <h4 class="font-bold text-indigo-400 text-center">階段二：自動化數據流</h4>
+                <p class="text-[11px] text-gray-400 mt-2 text-center">NAS 定時爬蟲上線<br>同仁協作表單同步機制建立</p>
+            </div>
+            <div class="w-1/4 px-4">
+                <div class="w-4 h-4 bg-purple-500 rounded-full mx-auto mb-4 border-4 border-slate-900"></div>
+                <h4 class="font-bold text-purple-400 text-center">階段三：介面優化</h4>
+                <p class="text-[11px] text-gray-400 mt-2 text-center">實績地圖、物料分析<br>整合進入 AI Portal 統一入口</p>
+            </div>
+            <div class="w-1/4 px-4">
+                <div class="w-4 h-4 bg-emerald-500 rounded-full mx-auto mb-4 border-4 border-slate-900"></div>
+                <h4 class="font-bold text-emerald-400 text-center">階段四：智慧應用</h4>
+                <p class="text-[11px] text-gray-400 mt-2 text-center">基於本地數據庫之<br>RAG 知識庫或財務預測模型</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" id="slide5">
+    <h2 class="text-4xl font-bold mb-8 border-l-8 border-sky-500 pl-6 text-sky-300">實績地圖：自動化流程演練</h2>
+    <div class="flex h-[450px] gap-8">
+        <div class="w-1/3 flex flex-col justify-between">
+            <div class="space-y-4">
+                <div id="step1" class="p-3 bg-slate-900 rounded border-l-4 border-slate-700 transition-all">
+                    <p class="text-xs font-bold text-emerald-400">DATA INPUT</p>
+                    <p class="text-sm">同仁在 Google 表單新增南港專案座標。</p>
+                </div>
+                <div id="step2" class="p-3 bg-slate-900 rounded border-l-4 border-slate-700 transition-all">
+                    <p class="text-xs font-bold text-indigo-400">NAS ETL</p>
+                    <p class="text-sm">NAS Python 腳本每小時同步，寫入 MariaDB。</p>
+                </div>
+                <div id="step3" class="p-3 bg-slate-900 rounded border-l-4 border-slate-700 transition-all">
+                    <p class="text-xs font-bold text-sky-400">WEB UPDATE</p>
+                    <p class="text-sm">GitHub 介面代碼同步，地圖即時顯現新點位。</p>
+                </div>
+            </div>
+            <button onclick="startSimDrill()" id="drillBtn" class="w-full py-4 bg-sky-600 hover:bg-sky-500 rounded-xl font-bold text-lg transition-all active:scale-95 shadow-lg shadow-sky-600/20">
+                <i class="fas fa-play mr-2"></i> 啟動模擬演示
+            </button>
+        </div>
+        <div class="flex-1 relative bg-slate-950 rounded-2xl overflow-hidden border border-slate-800">
+            <div id="simMap"></div>
+            <div class="absolute top-4 left-4 z-[1000]"><div class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-bold border border-emerald-500/30">SYSTEM LIVE FEED</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="slide" id="slide6">
+    <h2 class="text-4xl font-bold mb-10 border-l-8 border-sky-500 pl-6">運維安全與治理 (CTO 指導)</h2>
+    <div class="grid grid-cols-2 gap-10">
+        <div class="card border-l-4 border-l-orange-500">
+            <h4 class="font-bold text-orange-400 mb-4"><i class="fas fa-user-shield mr-2"></i>權限管理</h4>
+            <ul class="text-sm space-y-4 text-gray-400">
+                <li>● <b>GitHub Secrets:</b> 連線資訊加密，代碼庫不留憑證。</li>
+                <li>● <b>Google Service Account:</b> 僅授權腳本讀取特定表單。</li>
+                <li>● <b>NAS Firewall:</b> 嚴格限制僅公司內網或 VPN 可存取。</li>
+            </ul>
+        </div>
+        <div class="card border-l-4 border-l-sky-500">
+            <h4 class="font-bold text-sky-400 mb-4"><i class="fas fa-history mr-2"></i>穩定性維護</h4>
+            <ul class="text-sm space-y-4 text-gray-400">
+                <li>● <b>3-2-1 備援:</b> 定期將 NAS 數據快照備份至異地。</li>
+                <li>● <b>日誌審計:</b> 所有爬蟲與部署行為皆有詳細日誌。</li>
+                <li>● <b>故障告警:</b> 腳本執行失敗即時發送 Line 通知開發者。</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="slide" id="slide7">
+    <div class="text-center">
+        <h3 class="text-2xl text-sky-400 font-bold mb-4 tracking-widest uppercase">技術驅動工程</h3>
+        <h2 class="text-7xl font-bold mb-10">以數據為核心，打造智慧工程引擎</h2>
+        <div class="h-1 w-32 bg-sky-500 mx-auto mb-10"></div>
+        <p class="text-xl text-gray-400 font-light mb-12">感謝技術長與各位長官支持 AI 實驗室數位轉型計畫</p>
+        <p class="text-gray-500 italic text-sm">匯報人：李宗霖</p>
+    </div>
+</div>
+
+<div class="flex gap-4">
+    <div class="nav-btn left-8" id="prevBtn" onclick="changeSlide(-1)">
+        <i class="fas fa-chevron-left mr-2"></i> 上一頁
+    </div>
+    <div class="nav-btn right-8" id="nextBtn" onclick="changeSlide(1)">
+        下一頁 <i class="fas fa-chevron-right ml-2"></i>
+    </div>
+</div>
+
+<script>
+    let currentSlide = 1;
+    const totalSlides = 7;
+    let mapInstance = null;
+
+    function updateProgress() {
+        const percent = (currentSlide / totalSlides) * 100;
+        document.getElementById('progressBar').style.width = percent + '%';
+        if (currentSlide === 5) setTimeout(initMap, 400);
+    }
+
+    function initMap() {
+        if (mapInstance) return;
+        mapInstance = L.map('simMap').setView([23.58, 120.95], 7);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(mapInstance);
+        L.marker([25.033, 121.565]).addTo(mapInstance).bindPopup("<b>敦陽工程 總部</b>");
+    }
+
+    function startSimDrill() {
+        const btn = document.getElementById('drillBtn');
+        const s1 = document.getElementById('step1');
+        const s2 = document.getElementById('step2');
+        const s3 = document.getElementById('step3');
+        btn.disabled = true;
+
+        s1.classList.add('step-active');
+        setTimeout(() => {
+            s1.classList.remove('step-active');
+            s2.classList.add('step-active');
+            setTimeout(() => {
+                s2.classList.remove('step-active');
+                s3.classList.add('step-active');
+                const pos = [25.052, 121.606];
+                L.marker(pos).addTo(mapInstance).bindPopup("<b>[自動同步] 115 南港案</b><br>來源：Google Sheets").openPopup();
+                mapInstance.flyTo(pos, 13);
+                setTimeout(() => {
+                    btn.innerText = "演示完成 - 重置";
+                    btn.disabled = false;
+                    btn.onclick = () => location.reload();
+                }, 1000);
+            }, 1500);
+        }, 1500);
+    }
+
+    function changeSlide(direction) {
+        document.getElementById(`slide${currentSlide}`).classList.remove('active');
+        currentSlide += direction;
+        if (currentSlide > totalSlides) currentSlide = 1;
+        if (currentSlide < 1) currentSlide = totalSlides;
+        document.getElementById(`slide${currentSlide}`).classList.add('active');
+        updateProgress();
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ') changeSlide(1);
+        if (e.key === 'ArrowLeft') changeSlide(-1);
+    });
+    updateProgress();
+</script>
+
+</body>
+</html>
