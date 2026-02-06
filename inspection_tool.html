@@ -1,10 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>施工流程圖生成器 (箭頭精準貼合版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.2/docxtemplater.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         :root { --primary: #1a5276; --accent: #2980b9; --bg: #eef2f5; --hp-color: #e74c3c; --card-bg: #ffffff; }
         
@@ -364,98 +369,67 @@
             btn.innerText = originalText;
         });
     }
+async function generateDoc(imgData) {
+    const selectedMinor = document.getElementById('minorSelect').value;
+    const status = document.getElementById('status');
+    status.innerText = "正在調用範本...";
 
-   function generateDoc(imgData) {
-        const selectedMinor = document.getElementById('minorSelect').value;
-        let tableRows = '';
+    try {
+        // 1. 讀取與範例一模一樣的 docx 檔案 (確保路徑正確)
+        const response = await fetch('./施工抽查流程圖範例.docx');
+        if (!response.ok) throw new Error("找不到範本檔案，請確認檔案已放置於伺服器目錄。");
+        const templateBuffer = await response.arrayBuffer();
+
+        // 2. 收集網頁表單中勾選的查驗資料
+        const tableData = [];
         let count = 0;
-        const sections = document.querySelectorAll('.form-panel > div'); 
-        
-        sections.forEach(sec => {
-            const titleEl = sec.querySelector('.group-title');
-            if(!titleEl) return;
-            const title = titleEl.innerText;
+        document.querySelectorAll('.form-panel > div').forEach(sec => {
+            const title = sec.querySelector('.group-title')?.innerText || "";
             const checks = sec.querySelectorAll('input[type="checkbox"]:checked');
             checks.forEach(chk => {
-                if(chk.parentElement.style.display === 'none') return;
+                if (chk.parentElement.style.display === 'none') return;
                 count++;
                 const inputEl = document.getElementById(`txt_${chk.value}`);
-                const itemName = inputEl ? inputEl.value : "";
-                const stdEl = inputEl.nextElementSibling;
-                const standard = stdEl ? stdEl.innerText : '';
-                tableRows += `<tr><td>${count}</td><td>${title}</td><td>${itemName}</td><td>${standard}</td><td>□ 合格  □ 不合格</td></tr>`;
+                tableData.push({
+                    no: count,
+                    proc: title,
+                    item: inputEl ? inputEl.value : "",
+                    std: inputEl?.nextElementSibling?.innerText || "",
+                    res: "□合格 □不合格"
+                });
             });
         });
 
-        // 模擬 Word 樣式與功能變數結構
-        const htmlContent = `
-            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head>
-                <meta charset="utf-8">
-                <style>
-                    @font-face { font-family: "標楷體"; panose-1:2 1 6 9 6 1 1 1 1 1; }
-                    p.W-FigureName { 
-                        text-align:center; 
-                        font-family:"標楷體"; 
-                        font-size:12pt; 
-                        font-weight:bold;
-                        margin-top:6pt;
-                        margin-bottom:12pt;
-                    }
-                    body { font-family: "標楷體", serif; }
-                    table.MsoNormalTable { width: 100%; border-collapse: collapse; }
-                    .invisible-table { width: 100%; border: none; border-collapse: collapse; }
-                    .invisible-table td { border: none; padding: 0; text-align: center; }
-                    
-                    /* 查驗表樣式 */
-                    .check-table { border: 0.5pt solid windowtext; width: 100%; border-collapse: collapse; font-size: 12pt; }
-                    .check-table th, .check-table td { border: 0.5pt solid windowtext; padding: 5pt; }
-                    .check-table th { background: #F2F2F2; text-align: center; }
-                </style>
-            </head>
-            <body>
-                <table class="invisible-table">
-                    <tr>
-                        <td>
-                            <img src="${imgData}" style="width:15.7cm;" />
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <p class="W-FigureName">
-                                圖 <span style='mso-field-code:" STYLEREF 1 \\\\s "'>7</span>-<span style='mso-field-code:" SEQ 圖 \\\\* ARABIC "'>1</span> 
-                                ${selectedMinor}施工抽查流程圖
-                            </p>
-                        </td>
-                    </tr>
-                </table>
+        // 3. 使用 PizZip 與 docxtemplater 處理 Word 二進位流
+        const zip = new PizZip(templateBuffer);
+        const doc = new window.docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        });
 
-                <br style="page-break-after:always;" />
+        // 4. 將變數注入範本 (這會保留原始檔案的所有 Custom UI 與樣式)
+        doc.setData({
+            minor: selectedMinor,
+            table: tableData
+        });
 
-                <h3>二、查驗項目表</h3>
-                <table class="check-table">
-                    <thead>
-                        <tr>
-                            <th width="8%">項次</th>
-                            <th width="22%">流程步驟</th>
-                            <th width="25%">檢查項目</th>
-                            <th width="30%">查驗標準</th>
-                            <th width="15%">結果</th>
-                        </tr>
-                    </thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </body>
-            </html>
-        `;
+        // 5. 渲染並匯出
+        doc.render();
+        const out = doc.getZip().generate({
+            type: "blob",
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
 
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `${selectedMinor}_施工抽查紀錄表_${new Date().getTime()}.doc`;
-        link.click();
+        // 6. 下載檔案
+        saveAs(out, `${selectedMinor}_施工抽查紀錄表.docx`);
+        status.innerText = "匯出完成 (已保留增益集)";
+
+    } catch (error) {
+        console.error(error);
+        alert("匯出失敗：" + error.message);
+        status.innerText = "發生錯誤";
     }
+}
 </script>
-
 </body>
 </html>
