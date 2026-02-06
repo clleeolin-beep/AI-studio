@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>施工流程圖生成器</title>
+    <title>施工流程圖生成器 (修正版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://unpkg.com/docxtemplater@3.37.2/build/docxtemplater.js"></script>
@@ -12,16 +12,7 @@
 
     <style>
         :root { --primary: #1a5276; --accent: #2980b9; --bg: #eef2f5; --hp-color: #e74c3c; --card-bg: #ffffff; }
-        
-        body { 
-            font-family: "Microsoft JhengHei", "BiauKai", "標楷體", serif; 
-            margin: 0; padding: 0; 
-            background: var(--bg); 
-            height: 100vh; 
-            display: flex; flex-direction: column; overflow: hidden; 
-        }
-
-        /* 頂部導航 */
+        body { font-family: "Microsoft JhengHei", "BiauKai", "標楷體", serif; margin: 0; padding: 0; background: var(--bg); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .header-wrapper { background: #fff; border-bottom: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; flex-shrink: 0; }
         .header-content { max-width: 1280px; margin: 0 auto; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; height: 50px; }
         h2 { margin: 0; font-size: 18px; color: var(--primary); }
@@ -29,95 +20,34 @@
         select { padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-family: "Microsoft JhengHei"; }
         .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; color: white; display: flex; align-items: center; gap: 5px; }
         .btn-word { background: #27ae60; }
-        .btn-word:hover { background: #219150; }
-
-        /* 主內容區 */
         .main-wrapper { flex: 1; display: flex; justify-content: center; padding: 20px; overflow: hidden; }
         .main-card { display: flex; width: 100%; max-width: 1380px; background: var(--card-bg); border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e1e4e8; }
-
-        /* 左側表單 */
         .form-panel { width: 30%; background: #fdfdfd; border-right: 1px solid #eee; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
-        
-        /* 右側預覽 */
         .preview-panel { width: 70%; background: #e0e5ec; overflow: auto; padding: 40px; display: flex; flex-direction: column; align-items: center; position: relative; }
-
-        /* --- V12 排版引擎 --- */
-        .flowchart-container { 
-            display: flex; flex-direction: column; align-items: stretch; position: relative; 
-            width: 15.7cm; min-height: 23cm; background: #fff; padding: 1cm 0.5cm; 
-            box-shadow: 0 0 15px rgba(0,0,0,0.1); box-sizing: border-box; 
-        }
-
+        .flowchart-container { display: flex; flex-direction: column; align-items: stretch; position: relative; width: 15.7cm; min-height: 23cm; background: #fff; padding: 1cm 0.5cm; box-shadow: 0 0 15px rgba(0,0,0,0.1); box-sizing: border-box; }
         .height-limit-line { position: absolute; top: 23cm; left: 0; width: 100%; border-bottom: 2px dashed red; pointer-events: none; z-index: 10; }
-        .height-limit-line::after { content: "⚠️ 23cm 高度限制線"; position: absolute; right: 0; top: -20px; color: red; font-size: 12px; background: rgba(255,255,255,0.8); }
-        
         .flow-row { display: flex; align-items: stretch; min-height: 80px; width: 100%; }
-        
-        .node-col { 
-            width: 4.5cm; position: relative; 
-            display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; 
-            flex-shrink: 0; 
-        }
-
+        .node-col { width: 4.5cm; position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; flex-shrink: 0; }
         .node-wrapper { position: relative; z-index: 2; }
-        
-        .node-box { 
-            width: 3.5cm; padding: 10px 5px; background: #fff; border: 1.5px solid #000; 
-            text-align: center; font-family: "標楷體", serif; 
-            font-size: 12pt; font-weight: bold; position: relative; 
-            display: flex; align-items: center; justify-content: center;
-        }
-        .node-box.oval { border-radius: 50%; height: 1.2cm; width: 2.5cm; padding: 5px; }
-        .node-box.rect { border-radius: 0; min-height: 1.2cm; }
-        
-        .hp-star { color: red; margin-right: 4px; font-size: 14pt; }
-
+        .node-box { width: 3.5cm; padding: 10px 5px; background: #fff; border: 1.5px solid #000; text-align: center; font-family: "標楷體", serif; font-size: 12pt; font-weight: bold; position: relative; display: flex; align-items: center; justify-content: center; }
+        .node-box.oval { border-radius: 50%; height: 1.2cm; width: 2.5cm; }
         .v-line { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; background: #000; z-index: 1; }
         .line-full { top: 0; bottom: 0; }
         .line-start { top: 50%; bottom: 0; }
         .line-end { top: 0; bottom: 50%; }
-
-        .arrow-down { 
-            width: 0; height: 0; 
-            border-left: 5px solid transparent; 
-            border-right: 5px solid transparent; 
-            border-top: 10px solid #000; 
-            position: absolute; 
-            left: 50%; transform: translateX(-50%); 
-            bottom: 100%; z-index: 3; margin-bottom: -1px; 
-        }
-
+        .arrow-down { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 10px solid #000; position: absolute; left: 50%; transform: translateX(-50%); bottom: 100%; z-index: 3; margin-bottom: -1px; }
         .detail-col { flex: 1; display: flex; align-items: center; position: relative; }
         .h-connector { width: 1cm; height: 1px; border-top: 1.5px dashed #000; flex-shrink: 0; }
-        .detail-box { 
-            border: 1.5px dashed #000; padding: 8px 12px; background: #fff; 
-            font-family: "標楷體", serif; font-size: 12pt; 
-            line-height: 1.5; text-align: left; width: fit-content; max-width: 9.5cm;
-            white-space: pre-wrap;
-        }
-
+        .detail-box { border: 1.5px dashed #000; padding: 8px 12px; background: #fff; font-family: "標楷體", serif; font-size: 12pt; line-height: 1.5; text-align: left; width: fit-content; max-width: 9.5cm; white-space: pre-wrap; }
         .edit-input { border: none; border-bottom: 1px dashed #ccc; background: transparent; width: 100%; padding: 2px; }
-        .edit-input:focus { outline: none; border-bottom: 2px solid var(--accent); background: #fff; }
-
-        .group-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; margin-top: 15px; border-radius: 5px 5px 0 0; border-left: 5px solid var(--primary); border: 1px solid #eee; }
-        .group-header.hp { border-left-color: var(--hp-color); }
-        .item-list { border: 1px solid #eee; border-top: none; padding: 10px; margin-bottom: 5px; background: #fff; border-radius: 0 0 5px 5px; }
-        .check-row { display: flex; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #f9f9f9; }
-        .std-text { display: block; font-size: 12px; color: #999; margin-top: 2px; }
-        .btn-toggle { background: none; border: 1px solid #ccc; color: #666; padding: 2px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; }
-
-        @media (max-width: 768px) { .main-card { flex-direction: column; } .form-panel, .preview-panel { width: 100%; height: 50%; } }
+        .group-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; margin-top: 15px; border-radius: 5px 5px 0 0; border-left: 5px solid var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="header-wrapper">
     <div class="header-content">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <h2>🏗️ 施工計畫流程製作工具</h2>
-            <span id="status" style="font-size:12px; color:#888;">連線中...</span>
-        </div>
+        <h2>🏗️ 施工計畫流程製作工具</h2>
         <div class="controls">
             <select id="minorSelect" onchange="loadForm()"></select>
             <button class="btn btn-word" onclick="exportToWord()">📥 匯出 Word</button>
@@ -127,11 +57,8 @@
 
 <div class="main-wrapper">
     <div class="main-card">
-        <div class="form-panel" id="formContainer">
-            <div style="text-align:center; color:#999; margin-top:50px;">資料讀取中...</div>
-        </div>
+        <div class="form-panel" id="formContainer">載入中...</div>
         <div class="preview-panel">
-            <h4 style="margin:0 0 10px 0; color:#555;">流程圖預覽 (寬度 15.7cm)</h4>
             <div id="flowchart-canvas" class="flowchart-container">
                 <div class="height-limit-line"></div>
             </div>
@@ -155,7 +82,6 @@
                     return { id: idx, minor: get(1), hp: get(2).includes('HP'), process: get(4), item: get(5), standard: get(6) };
                 }).filter(r => r.process && r.process !== "施工流程" && r.minor);
                 initMenu();
-                document.getElementById('status').innerText = "就緒";
             }
         };
         const script = document.createElement('script');
@@ -187,32 +113,17 @@
                     <input type="checkbox" id="chk_${it.id}" value="${it.id}" checked onchange="updatePreview()">
                     <div style="width:100%">
                         <input type="text" class="edit-input" id="txt_${it.id}" value="${it.item}" oninput="updatePreview()">
-                        <span class="std-text">${it.standard || ''}</span>
+                        <span class="std-text" style="font-size:12px;color:#999">${it.standard || ''}</span>
                     </div>
                 </div>`).join('');
-            return `
-                <div class="group-header ${grp.hp ? 'hp' : ''}">
-                    <span class="group-title">${idx+1}. ${procName}</span>
-                    <button class="btn-toggle" onclick="toggleGroup(this)">全選</button>
-                </div>
-                <div class="item-list">${itemsHtml || '<div style="color:#aaa; font-size:12px">無細項</div>'}</div>`;
+            return `<div class="group-header"><span>${idx+1}. ${procName}</span></div><div class="item-list">${itemsHtml || '無細項'}</div>`;
         }).join('');
-        updatePreview();
-    }
-
-    function toggleGroup(btn) {
-        const list = btn.parentElement.nextElementSibling;
-        const checks = list.querySelectorAll('input[type="checkbox"]');
-        const isAllChecked = Array.from(checks).every(c => c.checked);
-        checks.forEach(c => c.checked = !isAllChecked);
         updatePreview();
     }
 
     function updatePreview() {
         const canvas = document.getElementById('flowchart-canvas');
-        const limitLine = canvas.querySelector('.height-limit-line');
-        canvas.innerHTML = ''; if(limitLine) canvas.appendChild(limitLine);
-
+        canvas.innerHTML = '<div class="height-limit-line"></div>';
         const checkedIds = new Set(Array.from(document.querySelectorAll('#formContainer input[type="checkbox"]:checked')).map(cb => cb.value));
         const selectedMinor = document.getElementById('minorSelect').value;
         const flowMap = new Map();
@@ -235,49 +146,48 @@
 
     function createRow(type, text, isHp, items, lineType) {
         const row = document.createElement('div'); row.className = 'flow-row';
-        const left = `<div class="node-col"><div class="v-line ${lineType}"></div><div class="node-wrapper">${(type!=='Start')?'<div class="arrow-down"></div>':''}<div class="node-box ${type==='Process'?'rect':'oval'}">${isHp?'<span class="hp-star">★</span>':''}${text}</div></div></div>`;
-        const right = `<div class="detail-col">${(type==='Process' && items.length)?'<div class="h-connector"></div><div class="detail-box">'+items.map((it,i)=>`${i+1}. ${it}`).join('<br>')+'</div>':''}</div>`;
-        row.innerHTML = left + right; return row;
+        row.innerHTML = `<div class="node-col"><div class="v-line ${lineType}"></div><div class="node-wrapper">${(type!=='Start')?'<div class="arrow-down"></div>':''}<div class="node-box ${type==='Process'?'rect':'oval'}">${text}</div></div></div><div class="detail-col">${(items.length)?'<div class="h-connector"></div><div class="detail-box">'+items.map((it,i)=>`${i+1}. ${it}`).join('<br>')+'</div>':''}</div>`;
+        return row;
     }
 
     function exportToWord() {
         const element = document.getElementById('flowchart-canvas');
-        const btn = document.querySelector('.btn-word');
-        const originalText = btn.innerText;
-        btn.innerText = "生成中...";
-
-        html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+        html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
             generateDoc(canvas.toDataURL("image/png"), canvas.width, canvas.height);
-            btn.innerText = originalText;
-        }).catch(err => { alert("圖片生成失敗"); btn.innerText = originalText; });
+        });
     }
 
     async function generateDoc(imgData, imgW, imgH) {
-        const selectedMinor = document.getElementById('minorSelect').value;
         try {
             const response = await fetch('./施工抽查流程圖範例.docx');
-            if (!response.ok) throw new Error("找不到範本檔案，請確保檔案與 HTML 同目錄。");
+            if (!response.ok) throw new Error("範本讀取失敗");
             const zip = new PizZip(await response.arrayBuffer());
 
-            const tableData = [];
-            document.querySelectorAll('.form-panel > div').forEach((sec, idx) => {
-                const title = sec.querySelector('.group-title')?.innerText;
-                sec.querySelectorAll('input[type="checkbox"]:checked').forEach((chk, i) => {
-                    const input = document.getElementById(`txt_${chk.value}`);
-                    if(input) tableData.push({ no: tableData.length+1, proc: title, item: input.value, std: input.nextElementSibling?.innerText || "" });
-                });
-            });
+            // 修正：正確取得 ImageModule 與 Docxtemplater
+            const ImageModule = window.ImageModule || window.DocxtemplaterImageModule;
+            const Docxtemplater = window.docxtemplater;
 
-            const imgOpts = {
+            const opts = {
                 centered: true,
                 getImage: v => Uint8Array.from(atob(v.split(",")[1]), c => c.charCodeAt(0)),
-                getSize: () => [593, 593 * (imgH / imgW)] // 15.7cm 寬度比例縮放
+                getSize: () => [593, 593 * (imgH / imgW)]
             };
 
-            const doc = new window.docxtemplater(zip, { modules: [new window.ImageModule(imgOpts)], paragraphLoop: true, linebreaks: true });
-            doc.render({ minor: selectedMinor, flowchart: imgData, table: tableData });
-            saveAs(doc.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), `${selectedMinor}_施工抽查紀錄表.docx`);
-        } catch (e) { alert("失敗：" + e.message); }
+            const doc = new Docxtemplater(zip, { 
+                modules: [new ImageModule(opts)],
+                paragraphLoop: true,
+                linebreaks: true 
+            });
+
+            const tableData = [];
+            document.querySelectorAll('.item-list input[type="checkbox"]:checked').forEach((chk, i) => {
+                const input = document.getElementById(`txt_${chk.value}`);
+                tableData.push({ no: i + 1, item: input.value, std: input.nextElementSibling?.innerText || "" });
+            });
+
+            doc.render({ minor: document.getElementById('minorSelect').value, flowchart: imgData, table: tableData });
+            saveAs(doc.getZip().generate({ type: "blob" }), "施工抽查紀錄表.docx");
+        } catch (e) { alert("錯誤: " + e.message); }
     }
 </script>
 </body>
