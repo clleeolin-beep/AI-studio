@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI Lab - 標案進度管理工具 (圈選連動版)</title>
+    <title>AI Lab - 標案進度管理工具</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
@@ -33,7 +33,6 @@
 
         .phase-row { font-weight: bold; text-align: left; padding-left: 10px; cursor: move; color: white; }
         .item-name { padding: 0 10px; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 42px; text-align: left; cursor: pointer; }
-        /* 選取狀態樣式 */
         .item-selected { background-color: #ffeb3b !important; color: #000 !important; font-weight: bold; }
         
         .contract-cell { text-align: center; color: #2980b9; font-weight: bold; cursor: pointer; text-decoration: underline; }
@@ -93,28 +92,21 @@
 </div>
 
 <script>
-    // 預設資料：匯入您提供的「標案存檔 (2).json」內容
-    let data = [{"name":"【階段一：啟動與準備】","color":"#a89494","items":[{"name":"1.1服務實施計畫書","contract":"簽約 +14","start":0,"duration":14,"ms":false,"showBar":true},{"name":"1.2實施簽證執行計畫","contract":"簽約 +14","start":0,"duration":14,"ms":false,"showBar":true},{"name":"1.3專業責任險投保","contract":"簽約 +30","start":0,"duration":30,"ms":false,"showBar":true},{"name":"1.4 服務人員名冊與投保資料","contract":"機關指定日","start":30,"duration":17,"ms":true,"showBar":true},{"name":"1.5工作坊企劃書","contract":"簽約 +30","start":0,"duration":30,"ms":true,"showBar":true}]},{"name":"【階段二：調查與基設】","color":"#3a6d9c","items":[{"name":"2.1工作坊成果報告","contract":"完成工作坊30+","start":60,"duration":30,"ms":false,"showBar":true},{"name":"2.2測量與樹木調查","contract":"決標 +60","start":0,"duration":60,"ms":false,"showBar":true},{"name":"2.3地質鑽探資料","contract":"決標 +75","start":0,"duration":75,"ms":false,"showBar":true},{"name":"2.4基設初稿","contract":"決標 +90","start":0,"duration":90,"ms":true,"showBar":true},{"name":"2.5基設成果報告書","contract":"基設核定+30","start":785,"duration":30,"ms":false,"showBar":true}]},{"name":"【階段三：審議與許可】","color":"#6b9c3a","items":[{"name":"3.1水保與樹保送審","contract":"基設核定+30","start":150,"duration":30,"ms":false,"showBar":true},{"name":"3.2都審掛號 (UDR)","contract":"基設核定+14","start":150,"duration":14,"ms":true,"showBar":true}]},{"name":"【階段四：細部與招標】","color":"#ff7e05","items":[{"name":"4.1 細設圖文","contract":"都審核定+75","start":210,"duration":75,"ms":true,"showBar":true},{"name":"4.2 細設成果報告","contract":"細設核定+40","start":300,"duration":40,"ms":false,"showBar":true},{"name":"4.3 建雜照申請","contract":"細設核定+20","start":300,"duration":20,"ms":false,"showBar":true},{"name":"4.4 五大管線申請","contract":"建雜照核定+30","start":330,"duration":30,"ms":true,"showBar":true}]},{"name":"【階段五：監造與結案】","color":"#d41111","items":[{"name":"5.1 監造計畫書","contract":"工程決標+15","start":390,"duration":15,"ms":true,"showBar":true},{"name":"5.2 竣工圖","contract":"完工 +30","start":450,"duration":30,"ms":false,"showBar":true}]}];
+    // 預設資料：匯入「標案存檔 (4).json」內容
+    let data = [{"name":"【階段一：啟動與準備】","items":[{"name":"1.1服務實施計畫書","contract":"簽約 +14","start":0,"duration":14,"ms":false,"showBar":true},{"name":"1.2實施簽證執行計畫","contract":"簽約 +14","start":0,"duration":14,"ms":false,"showBar":true},{"name":"1.3專業責任險投保","contract":"簽約 +30","start":0,"duration":30,"ms":false,"showBar":true},{"name":"1.4 服務人員名冊與投保資料","contract":"機關指定日","start":30,"duration":17,"ms":true,"showBar":true},{"name":"1.5工作坊企劃書","contract":"簽約 +30","start":0,"duration":30,"ms":true,"showBar":true}],"color":"#e200e6"},{"name":"【階段二：調查與基設】","items":[{"name":"2.1工作坊成果報告","contract":"完成工作坊30+","start":60,"duration":30,"ms":false,"showBar":true},{"name":"2.2測量與樹木調查","contract":"決標 +60","start":0,"duration":60,"ms":false,"showBar":true},{"name":"2.3地質鑽探資料","contract":"決標 +75","start":0,"duration":75,"ms":false,"showBar":true},{"name":"2.4基設初稿","contract":"決標 +90","start":0,"duration":90,"ms":true,"showBar":true},{"name":"2.5基設成果報告書","contract":"基設核定+30","start":120,"duration":30,"ms":false,"showBar":true}],"color":"#3a6d9c"},{"name":"【階段三：審議與許可】","items":[{"name":"3.1水保與樹保送審","contract":"基設核定+30","start":150,"duration":30,"ms":false,"showBar":true},{"name":"3.2都審掛號 (UDR)","contract":"基設核定+14","start":150,"duration":14,"ms":true,"showBar":true}],"color":"#6b9c3a"},{"name":"【階段四：細部與招標】","items":[{"name":"4.1 細設圖文","contract":"都審核定+75","start":210,"duration":75,"ms":true,"showBar":true},{"name":"4.2 細設成果報告","contract":"細設核定+40","start":300,"duration":40,"ms":false,"showBar":true},{"name":"4.3 建雜照申請","contract":"細設核定+20","start":300,"duration":20,"ms":false,"showBar":true},{"name":"4.4 五大管線申請","contract":"建雜照核定+30","start":330,"duration":30,"ms":true,"showBar":true}],"color":"#ff7e05"},{"name":"【階段五：監造與結案】","items":[{"name":"5.1 監造計畫書","contract":"工程決標+15","start":390,"duration":15,"ms":true,"showBar":true},{"name":"5.2 竣工圖","contract":"完工 +30","start":450,"duration":30,"ms":false,"showBar":true}],"color":"#d41111"}];
 
-    let dragSource = null;
-    let mTarget = null;
-    let selectedItems = []; // 儲存選取的項目 {pIdx, iIdx}
+    let dragSource = null, mTarget = null, selectedItems = [];
 
     function lightenColor(hex, percent) {
         if(!hex) return '#a2c65a';
-        var num = parseInt(hex.replace("#",""),16),
-            amt = Math.round(2.55 * percent),
-            R = (num >> 16) + amt,
-            G = (num >> 8 & 0x00FF) + amt,
-            B = (num & 0x0000FF) + amt;
+        var num = parseInt(hex.replace("#",""),16), amt = Math.round(2.55 * percent),
+            R = (num >> 16) + amt, G = (num >> 8 & 0x00FF) + amt, B = (num & 0x0000FF) + amt;
         return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
     function render() {
-        const tbody = document.getElementById('ganttBody');
-        tbody.innerHTML = '';
-        let maxEnd = 0;
-        data.forEach(p => p.items.forEach(i => maxEnd = Math.max(maxEnd, i.start + i.duration)));
+        const tbody = document.getElementById('ganttBody'); tbody.innerHTML = '';
+        let maxEnd = 0; data.forEach(p => p.items.forEach(i => maxEnd = Math.max(maxEnd, i.start + i.duration)));
         const tickCount = Math.ceil((maxEnd + 30) / 30) || 1;
         const timelineWidthPx = tickCount * 37.8;
         document.getElementById('col-timeline').style.width = timelineWidthPx + 'px';
@@ -124,7 +116,6 @@
             ptr.className = 'phase-row'; ptr.draggable = true;
             ptr.style.backgroundColor = phase.color || '#e8f0e0';
             ptr.innerHTML = `<td colspan="3" onclick="showMenu(event, 'phase', ${pIdx})">${phase.name}</td>`;
-            
             ptr.ondragstart = (e) => { dragSource = { type: 'phase', pIdx }; e.target.classList.add('dragging'); };
             ptr.ondragover = (e) => { e.preventDefault(); ptr.classList.add('drop-target'); };
             ptr.ondragleave = () => ptr.classList.remove('drop-target');
@@ -135,8 +126,7 @@
             phase.items.forEach((item, iIdx) => {
                 const isSelected = selectedItems.some(s => s.pIdx === pIdx && s.iIdx === iIdx);
                 const tr = document.createElement('tr');
-                const left = (item.start / 30) * 37.8;
-                const width = (item.duration / 30) * 37.8;
+                const left = (item.start / 30) * 37.8, width = (item.duration / 30) * 37.8;
                 const barColor = phase.color ? lightenColor(phase.color, 15) : '#a2c65a';
                 
                 tr.innerHTML = `
@@ -152,7 +142,6 @@
                         </div>` : ''}
                         ${item.ms ? `<div class="milestone-dot" style="left:${left + width}px"></div>` : ''}
                     </td>`;
-                
                 const span = tr.querySelector('.item-name');
                 span.oncontextmenu = (e) => showMenu(e, 'item', pIdx, iIdx);
                 span.ondragstart = (e) => { dragSource = { type: 'item', pIdx, iIdx }; tr.classList.add('dragging'); };
@@ -175,28 +164,17 @@
     }
 
     function startBarAction(e, pIdx, iIdx, resize=false) {
-        e.stopPropagation();
-        const sX = e.clientX;
-        const timelinePxPerDay = 37.8 / 30;
-
+        e.stopPropagation(); const sX = e.clientX, timelinePxPerDay = 37.8 / 30;
         const isThisSelected = selectedItems.some(s => s.pIdx === pIdx && s.iIdx === iIdx);
         let targets = isThisSelected ? selectedItems : [{ pIdx, iIdx }];
-        
-        const initialStates = targets.map(t => ({
-            pIdx: t.pIdx, iIdx: t.iIdx,
-            start: data[t.pIdx].items[t.iIdx].start,
-            duration: data[t.pIdx].items[t.iIdx].duration
-        }));
+        const initialStates = targets.map(t => ({ pIdx: t.pIdx, iIdx: t.iIdx, start: data[t.pIdx].items[t.iIdx].start, duration: data[t.pIdx].items[t.iIdx].duration }));
 
         document.onmousemove = (ev) => {
             const deltaDays = (ev.clientX - sX) / timelinePxPerDay;
             initialStates.forEach(state => {
                 const targetItem = data[state.pIdx].items[state.iIdx];
-                if (resize && targets.length === 1) {
-                    targetItem.duration = Math.max(0, Math.round(state.duration + deltaDays));
-                } else if (!resize) {
-                    targetItem.start = Math.max(0, Math.round((state.start + deltaDays) / 5) * 5);
-                }
+                if (resize && targets.length === 1) targetItem.duration = Math.max(0, Math.round(state.duration + deltaDays));
+                else if (!resize) targetItem.start = Math.max(0, Math.round((state.start + deltaDays) / 5) * 5);
             });
             render();
         };
@@ -218,8 +196,7 @@
     }
 
     function doAction(act) {
-        if (!mTarget) return;
-        const { type, pIdx, iIdx } = mTarget;
+        if (!mTarget) return; const { type, pIdx, iIdx } = mTarget;
         if (act === 'clearSelection') selectedItems = [];
         else if (act === 'addItem') data[pIdx].items.push({ name: "新工項", contract: "30", start: 0, duration: 30, ms: false, showBar: true });
         else if (act === 'addPhase') data.splice(pIdx + 1, 0, { name: "新階段", color: '#7d9e6d', items: [] });
@@ -227,25 +204,15 @@
         else if (act === 'toggleBar') data[pIdx].items[iIdx].showBar = (data[pIdx].items[iIdx].showBar === false);
         else if (act === 'editName') { const n = prompt("修改名稱:", (type==='phase'?data[pIdx].name:data[pIdx].items[iIdx].name)); if(n) (type==='phase'?data[pIdx].name=n:data[pIdx].items[iIdx].name=n); }
         else if (act === 'delete') { if(confirm("確定刪除?")) (type==='phase'?data.splice(pIdx, 1):data[pIdx].items.splice(iIdx, 1)); }
-        document.getElementById('menu').style.display = 'none';
-        render();
+        document.getElementById('menu').style.display = 'none'; render();
     }
 
-    // --- 標尺、存檔、匯出邏輯 ---
     function updateRulers(count) {
-        const headerW = document.getElementById('col-name').offsetWidth + document.getElementById('col-contract').offsetWidth;
-        const timelineW = count * 37.8;
-        let t = '', b = '';
-        for (let i = 0; i <= count; i++) {
-            t += `<div class="ruler-tick">${i * 30}</div>`;
-            if (i < count) b += `<div class="ruler-tick" style="background:#eee">${i+1}月</div>`;
-        }
-        const topR = document.getElementById('topRuler');
-        topR.style.width = (headerW + timelineW) + 'px';
-        topR.innerHTML = `<div style="width:${headerW}px; border-right:1px solid #ccc; flex-shrink:0;"></div><div style="display:flex; width:${timelineW}px;">${t}</div>`;
-        const botR = document.getElementById('bottomRuler');
-        botR.style.width = (headerW + timelineW) + 'px';
-        botR.innerHTML = `<div style="width:${headerW}px; border-right:1px solid #ccc; flex-shrink:0; text-align:center; line-height:35px; font-weight:bold;">月份累計</div><div style="display:flex; width:${timelineW}px;">${b}</div>`;
+        const headerW = document.getElementById('col-name').offsetWidth + document.getElementById('col-contract').offsetWidth, timelineW = count * 37.8;
+        let t = '', b = ''; for (let i = 0; i <= count; i++) { t += `<div class="ruler-tick">${i * 30}</div>`; if (i < count) b += `<div class="ruler-tick" style="background:#eee">${i+1}月</div>`; }
+        const topR = document.getElementById('topRuler'), botR = document.getElementById('bottomRuler');
+        topR.style.width = (headerW + timelineW) + 'px'; topR.innerHTML = `<div style="width:${headerW}px; border-right:1px solid #ccc; flex-shrink:0;"></div><div style="display:flex; width:${timelineW}px;">${t}</div>`;
+        botR.style.width = (headerW + timelineW) + 'px'; botR.innerHTML = `<div style="width:${headerW}px; border-right:1px solid #ccc; flex-shrink:0; text-align:center; line-height:35px; font-weight:bold;">月份累計</div><div style="display:flex; width:${timelineW}px;">${b}</div>`;
     }
 
     function startColResize(e, id) { e.stopPropagation(); let obj = document.getElementById(id), sX = e.clientX, sW = obj.offsetWidth; document.onmousemove = (ev) => { obj.style.width = Math.max(60, sW + (ev.clientX - sX)) + 'px'; render(); }; document.onmouseup = () => document.onmousemove = null; }
@@ -255,7 +222,6 @@
     function saveData() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({data})], {type:"application/json"})); a.download = `標案存檔.json`; a.click(); }
     function loadData(e) { const reader = new FileReader(); reader.onload = (ev) => { data = JSON.parse(ev.target.result).data; render(); }; reader.readAsText(e.target.files[0]); }
     function exportImage() { html2canvas(document.getElementById('captureArea'), { scale: 2, backgroundColor: "#ffffff", width: document.getElementById('captureArea').offsetWidth, height: document.getElementById('captureArea').offsetHeight }).then(canvas => { const link = document.createElement('a'); link.download = `標案甘特圖.png`; link.href = canvas.toDataURL(); link.click(); }); }
-
     window.onclick = () => document.getElementById('menu').style.display = 'none';
     window.onload = render;
 </script>
