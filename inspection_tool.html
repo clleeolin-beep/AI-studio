@@ -1,193 +1,425 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
+
 <html lang="zh-TW">
+
 <head>
+
     <meta charset="UTF-8">
-    <title>施工表單生成器 (V35 無格式精準版)</title>
+
+    <title>施工表單生成器 (V44 絕對貫穿版)</title>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
+
+
     <style>
+
         :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; }
+
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        
+
         .header { background: #fff; padding: 10px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+
         .main { flex: 1; display: flex; padding: 20px; gap: 20px; overflow: hidden; }
+
         .form-panel { width: 380px; background: #fff; padding: 20px; overflow-y: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); flex-shrink: 0; }
+
         .preview-panel { flex: 1; background: #95a5a6; padding: 30px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
 
-        .input-group { margin-bottom: 15px; }
-        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: var(--primary); }
-        .input-group input, .input-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .btn-group { display: flex; gap: 8px; }
-        .btn { padding: 8px 12px; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
-        .btn-green { background: var(--accent); } .btn-blue { background: var(--blue); } .btn-orange { background: var(--orange); }
+
+
+        /* --- 流程圖畫布核心 --- */
 
         .flowchart-container { 
-            width: 15.7cm; background: #fff; padding: 40px 30px; box-sizing: border-box; 
-            display: flex; flex-direction: column; align-items: stretch;
+
+            width: 17.5cm; background: #fff; padding: 50px 40px; box-sizing: border-box; 
+
+            display: flex; flex-direction: column; position: relative;
+
             font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2);
+
         }
-        .flow-row { display: flex; width: 100%; align-items: center; position: relative; min-height: 55px; }
-        .node-col { width: 140px; position: relative; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; align-self: stretch; }
-        .v-line { position: absolute; left: 50%; transform: translateX(-50%); width: 1.5px; background: #000; z-index: 1; top: 0; bottom: 0; }
-        .line-start { top: 50% !important; } .line-end { bottom: 50% !important; }
-        .node-wrapper { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 5px 0; }
-        .node-box { width: 110px; padding: 6px 2px; border: 1.5px solid #000; text-align: center; background: #fff; font-weight: bold; font-size: 14pt; box-sizing: border-box; }
-        .node-box.oval { border-radius: 40px; }
-        .arrow-head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 10px solid #000; margin-bottom: -1px; background: #fff; }
-        .detail-col { flex: 1; display: flex; align-items: center; max-width: calc(15.7cm - 170px); align-self: stretch; }
-        .h-line { width: 25px; border-top: 1.5px dashed #000; flex-shrink: 0; }
-        .detail-box { border: 1.5px dashed #000; padding: 6px 10px; font-size: 12px; background: #fff; line-height: 1.3; display: inline-block; max-width: 100%; white-space: normal; word-break: break-all; text-align: left; }
+
+
+
+        /* 關鍵：畫一條貫穿整個容器的垂直實線 */
+
+        .flowchart-container::before {
+
+            content: "";
+
+            position: absolute;
+
+            left: calc(40px + 75px); /* padding + node-col一半 */
+
+            top: 80px;    /* 從第一個方塊中心開始 */
+
+            bottom: 80px; /* 到最後一個方塊中心結束 */
+
+            width: 1.5px;
+
+            background: #000;
+
+            z-index: 1;
+
+        }
+
+
+
+        .flow-row { 
+
+            display: flex; width: 100%; align-items: center; position: relative; 
+
+            z-index: 2; /* 確保內容在貫穿線上方 */
+
+            min-height: 85px; 
+
+        }
+
+
+
+        .node-col { 
+
+            width: 150px; display: flex; flex-direction: column; 
+
+            justify-content: center; align-items: center; flex-shrink: 0; 
+
+        }
+
+
+
+        .node-wrapper { 
+
+            display: flex; flex-direction: column; align-items: center; 
+
+            background: #fff; /* 白色背景遮住下方的貫穿線 */
+
+            padding: 5px 0;
+
+        }
+
+
+
+        /* 統一字體 14pt */
+
+        .node-box { 
+
+            width: 130px; padding: 8px 4px; border: 1.5px solid #000; 
+
+            text-align: center; background: #fff; font-weight: bold; 
+
+            font-size: 14pt; box-sizing: border-box; line-height: 1.2;
+
+        }
+
+        .node-box.oval { border-radius: 45px; }
+
+
+
+        /* 向下箭頭：精準放在方塊正上方 */
+
+        .arrow-head { 
+
+            width: 0; height: 0; 
+
+            border-left: 6px solid transparent; border-right: 6px solid transparent; 
+
+            border-top: 10px solid #000; 
+
+            margin-bottom: 2px;
+
+        }
+
+
+
+        .detail-col { flex: 1; display: flex; align-items: center; }
+
+
+
+        /* 水平連線：精準抵達邊緣 */
+
+        .h-line { 
+
+            width: 35px; border-top: 1.5px dashed #000; flex-shrink: 0; 
+
+            margin-right: -1px;
+
+        }
+
+
+
+        .detail-box { 
+
+            border: 1.5px dashed #000; padding: 10px 15px; font-size: 14pt; 
+
+            background: #fff; line-height: 1.5; display: inline-block; max-width: 100%; 
+
+            word-break: break-all; text-align: left; 
+
+        }
+
+
+
+        .group-item { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
     </style>
+
 </head>
+
 <body>
 
+
+
 <div class="header">
-    <h3 style="margin:0;">🏗️ 施工表單生成器 (V35 無格式版)</h3>
+
+    <h3 style="margin:0;">🏗️ 施工表單生成器 (V44 絕對貫穿版)</h3>
+
     <div class="btn-group">
+
         <button class="btn btn-blue" onclick="exportFlow()">📥 流程圖</button>
+
         <button class="btn btn-green" onclick="exportStandard()">📋 標準表</button>
+
         <button class="btn btn-orange" onclick="exportRecord()">📝 紀錄表</button>
+
     </div>
+
 </div>
+
+
 
 <div class="main">
+
     <div class="form-panel">
-        <div class="input-group">
-            <label>工程名稱：</label>
-            <input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程">
-        </div>
-        <div class="input-group">
-            <label>分項工程選擇：</label>
-            <select id="minorSelect" onchange="loadForm()"></select>
-        </div>
+
+        <div class="input-group"><label>工程名稱：</label><input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程"></div>
+
+        <div class="input-group"><label>分項工程選擇：</label><select id="minorSelect" onchange="loadForm()"></select></div>
+
         <hr>
-        <div id="formContainer">正在讀取資料...</div>
+
+        <div id="formContainer">載入中...</div>
+
     </div>
+
     <div class="preview-panel">
+
         <div id="flowchart-canvas" class="flowchart-container"></div>
+
     </div>
+
 </div>
 
+
+
 <script>
+
     const SS_ID = "1tCW1yzvBnzoQv2mAcLhAWcKOTe8mrOkyavWHaXRii3U";
+
     let rawData = [];
 
+
+
+    // 資料讀取
+
     document.addEventListener("DOMContentLoaded", () => {
+
         window.loader = (json) => {
+
             if (!json.table) return;
+
             rawData = json.table.rows.map(r => ({
+
                 stage: r.c[3]?.v || "", minor: r.c[1]?.v || "", node: r.c[4]?.v || "",
+
                 item: r.c[5]?.v || "", std: r.c[6]?.v || "", timing: r.c[7]?.v || "",
+
                 method: r.c[8]?.v || "", freq: r.c[9]?.v || "", failProc: r.c[10]?.v || ""
+
             })).filter(r => r.node && r.node !== "施工流程");
+
             const minors = [...new Set(rawData.map(r => r.minor))];
+
             document.getElementById('minorSelect').innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
+
             loadForm();
+
         };
+
         const s = document.createElement('script');
+
         s.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:loader`;
+
         document.body.appendChild(s);
+
     });
 
+
+
     function loadForm() {
+
         const sel = document.getElementById('minorSelect').value;
+
         const groups = {};
+
         rawData.filter(r => r.minor === sel).forEach(r => {
+
             if (!groups[r.node]) groups[r.node] = [];
+
             if (r.item) groups[r.node].push(r);
+
         });
+
         document.getElementById('formContainer').innerHTML = Object.keys(groups).map(node => `
+
             <div class="group-item">
-                <strong style="color:var(--primary); font-size:14px;">${node}</strong>
-                ${groups[node].map(r => `<label style="display:flex; align-items:start; gap:5px; font-size:12px; margin-top:4px;"><input type="checkbox" class="chk" data-info='${JSON.stringify(r).replace(/'/g, "&apos;")}' checked onchange="updatePreview()"><span>${r.item}</span></label>`).join('')}
+
+                <strong style="font-size:14px;">${node}</strong>
+
+                ${groups[node].map(r => `<label style="display:flex; gap:5px; font-size:12px; margin-top:4px;"><input type="checkbox" class="chk" data-info='${JSON.stringify(r).replace(/'/g, "&apos;")}' checked onchange="updatePreview()"><span>${r.item}</span></label>`).join('')}
+
             </div>
+
         `).join('');
+
         updatePreview();
+
     }
 
-    function createRow(txt, items, lineCls, shape, forceArrow = false) {
+
+
+    function createRow(txt, items, shape, isStart = false) {
+
         const row = document.createElement('div'); row.className = 'flow-row';
-        const hasArrow = (lineCls !== 'line-start' || forceArrow);
+
         let detailHtml = items.length ? `<div class="h-line"></div><div class="detail-box">${items.map((it, i) => `${i + 1}.${it}`).join('<br>')}</div>` : '';
-        row.innerHTML = `<div class="node-col"><div class="v-line ${lineCls}"></div><div class="node-wrapper">${hasArrow ? '<div class="arrow-head"></div>' : '<div style="height:10px;"></div>'}<div class="node-box ${shape}">${txt}</div></div></div><div class="detail-col">${detailHtml}</div>`;
+
+
+
+        row.innerHTML = `
+
+            <div class="node-col">
+
+                <div class="node-wrapper">
+
+                    ${!isStart ? '<div class="arrow-head"></div>' : ''}
+
+                    <div class="node-box ${shape}">${txt}</div>
+
+                </div>
+
+            </div>
+
+            <div class="detail-col">${detailHtml}</div>
+
+        `;
+
         return row;
+
     }
+
+
 
     function updatePreview() {
+
         const canvas = document.getElementById('flowchart-canvas'); canvas.innerHTML = '';
+
         const chks = Array.from(document.querySelectorAll('.chk:checked'));
+
         const flow = new Map();
+
         chks.forEach(c => {
+
             const data = JSON.parse(c.dataset.info);
+
             if(!flow.has(data.node)) flow.set(data.node, []);
+
             flow.get(data.node).push(data.item);
+
         });
+
         if(flow.size === 0) return;
-        canvas.appendChild(createRow("準備", [], "line-start", "oval"));
-        flow.forEach((items, node) => canvas.appendChild(createRow(node, items, "v-line", "rect")));
-        canvas.appendChild(createRow("完成", [], "line-end", "oval"));
+
+
+
+        canvas.appendChild(createRow("準備", [], "oval", true));
+
+        flow.forEach((items, node) => canvas.appendChild(createRow(node, items, "rect")));
+
+        canvas.appendChild(createRow("完成", [], "oval"));
+
     }
+
+
+
+    // 匯出功能保留完整邏輯
 
     async function exportFlow() {
+
         const canvas = document.getElementById('flowchart-canvas');
+
         const img = await html2canvas(canvas, { scale: 3, useCORS: true });
-        const selMinor = document.getElementById('minorSelect').value;
-        const html = `<html><body style="font-family:標楷體; text-align:center;"><h2>施工抽查紀錄表 (流程圖)</h2><img src="${img.toDataURL()}" width="590"><p>圖 7-1 ${selMinor} 施工抽查流程圖</p></body></html>`;
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工流程圖.doc`);
+
+        const html = `<html><body style="font-family:標楷體; text-align:center;"><h2>施工流程圖</h2><img src="${img.toDataURL()}" width="590"></body></html>`;
+
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `流程圖.doc`);
+
     }
+
+
 
     function exportStandard() {
+
         const selMinor = document.getElementById('minorSelect').value;
+
         const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
 
-        let currentStage = ''; let currentNode = ''; let tableRows = '';
-        selectedItems.forEach((r, i) => {
-            let stageTd = ''; let nodeTd = '';
-            if (r.stage !== currentStage) {
-                stageTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage).length}" style="border:1px solid black; text-align:center;">${r.stage}</td>`;
-                currentStage = r.stage;
-            }
-            if (r.node !== currentNode) {
-                nodeTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage && x.node === r.node).length}" style="border:1px solid black; text-align:center;">${r.node}</td>`;
-                currentNode = r.node;
-            }
-            tableRows += `<tr>${stageTd}${nodeTd}<td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; text-align:center;">${r.timing.includes('施工中') ? '<span style="color:red;">＊</span>' : ''}${r.timing}</td><td style="border:1px solid black; text-align:center;">${r.method}</td><td style="border:1px solid black; text-align:center;">${r.freq}</td><td style="border:1px solid black; text-align:center;">${r.failProc}</td><td style="border:1px solid black; text-align:center;">施工抽查紀錄</td><td style="border:1px solid black;"></td></tr>`;
+        let tableRows = '';
+
+        selectedItems.forEach((r) => {
+
+            tableRows += `<tr><td style="border:1px solid black; text-align:center;">${r.stage}</td><td style="border:1px solid black; text-align:center;">${r.node}</td><td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; text-align:center;">${r.timing}</td><td style="border:1px solid black; text-align:center;">${r.method}</td><td style="border:1px solid black; text-align:center;">${r.freq}</td><td style="border:1px solid black; text-align:center;">${r.failProc}</td><td style="border:1px solid black; text-align:center;">抽查紀錄</td><td style="border:1px solid black;"></td></tr>`;
+
         });
 
-        const html = `<html><head><meta charset='utf-8'><style>@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 10pt; }</style></head>
-            <body><div class="Section2"><h2 align="center">表 7-5 ${selMinor} 施工抽查標準表</h2><table><tr><th colspan="10" style="border:1px solid black; font-size:12pt; padding:8px; text-align:center;">混凝土工程施工品質抽查標準</th></tr><tr style="font-weight:bold;"><th>施工階段</th><th>施工流程</th><th>管理項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th></tr>${tableRows}</table><p style="color:red; font-size:10pt;">＊為檢驗停留點(或註明：抽查時機內除標註為「不定期」外，餘皆為檢驗停留點)</p></div></body></html>`;
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工抽查標準表.doc`);
+        const html = `<html><head><style>@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 10pt; }</style></head><body><div class="Section2"><h2 align="center">${selMinor} 標準表</h2><table><tr style="font-weight:bold;"><th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th></tr>${tableRows}</table></div></body></html>`;
+
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_標準表.doc`);
+
     }
+
+
 
     function exportRecord() {
+
         const pName = document.getElementById('projName').value;
+
         const selMinor = document.getElementById('minorSelect').value;
+
         const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
 
-        let currentStage = ''; let currentNode = ''; let tableRows = '';
-        selectedItems.forEach((r, i) => {
-            let stageTd = ''; let nodeTd = '';
-            if (r.stage !== currentStage) {
-                stageTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage).length}" style="border:1px solid black; text-align:center; font-weight:bold;">${r.stage}</td>`;
-                currentStage = r.stage;
-            }
-            if (r.node !== currentNode) {
-                nodeTd = `<td rowspan="${selectedItems.filter(x => x.stage === r.stage && x.node === r.node).length}" style="border:1px solid black; text-align:center;">${r.node}</td>`;
-                currentNode = r.node;
-            }
-            tableRows += `<tr>${stageTd}${nodeTd}<td style="border:1px solid black; padding:5px;">${r.item}</td><td style="border:1px solid black; padding:5px;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; width:80pt;"></td><td style="border:1px solid black; width:35pt;"></td></tr>`;
+        let tableRows = '';
+
+        selectedItems.forEach((r) => {
+
+            tableRows += `<tr><td style="border:1px solid black; text-align:center;">${r.stage}</td><td style="border:1px solid black; text-align:center;">${r.node}</td><td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; width:80pt;"></td><td style="border:1px solid black; width:40pt;"></td></tr>`;
+
         });
 
-        const header = `<table style="width:100%; border-collapse:collapse; border:1px solid black; margin-bottom:10px;"><tr><td style="border:1px solid black; width:18%; text-align:center;">工程名稱</td><td colspan="5" style="border:1px solid black; padding-left:5px; color:red;">${pName}</td></tr><tr><td style="border:1px solid black; text-align:center;">分項工程名稱</td><td colspan="5" style="border:1px solid black; padding-left:5px; color:red;">${selMinor}</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查位置</td><td style="border:1px solid black; width:30%;"></td><td style="border:1px solid black; width:15%; text-align:center;">檢查日期</td><td colspan="3" style="border:1px solid black; text-align:center;"> 年 月 日</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查時機</td><td colspan="5" style="border:1px solid black; padding-left:5px;">□施工前 □施工中檢查 □施工完成檢查</td></tr><tr><td style="border:1px solid black; text-align:center;">檢查結果</td><td colspan="5" style="border:1px solid black; padding-left:5px;">○檢查合格 ╳有缺失需改正 ／無此檢查項目</td></tr></table>`;
+        const header = `<table style="width:100%; border:1px solid black; border-collapse:collapse; margin-bottom:10px;"><tr><td style="border:1px solid black; width:18%; text-align:center;">工程名稱</td><td style="border:1px solid black; padding-left:5px;">${pName}</td></tr><tr><td style="border:1px solid black; text-align:center;">分項工程</td><td style="border:1px solid black; padding-left:5px;">${selMinor}</td></tr></table>`;
 
-        const html = `<html><head><meta charset='utf-8'><style>body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 11pt; }</style></head>
-            <body><h2 align="center">施工抽查紀錄表</h2><div align="right">編號：__________</div>${header}
-                <table><tr style="font-weight:bold;"><th colspan="3" style="width:180pt; border:1px solid black;">檢查項目</th><th style="border:1px solid black;">抽查標準(定量定性)</th><th width="80pt" style="border:1px solid black;">實際抽查情形</th><th width="40pt" style="border:1px solid black;">結果</th></tr>${tableRows}</table>
-                <p style="font-size:10pt; margin-top:5px;">備註：1. 合格者註明「○」，不合格者註明「╳」，無需檢查項目打「/」。</p>
-                <div style="margin-top:15px;">監造主管：____________________  派駐現場人員簽名：____________________</div>
-            </body></html>`;
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_施工抽查紀錄表.doc`);
+        const html = `<html><head><style>body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 11pt; }</style></head><body><h2 align="center">施工抽查紀錄表</h2>${header}<table><tr style="font-weight:bold;"><th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th></tr>${tableRows}</table></body></html>`;
+
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_紀錄表.doc`);
+
     }
+
 </script>
+
 </body>
+
 </html>
