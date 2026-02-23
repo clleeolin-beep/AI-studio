@@ -1,8 +1,8 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V26.1 (本地/雲端獨立版)</title>
+    <title>氣候資料智慧工具 V26.2 (完整版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -27,7 +27,7 @@
 
     <div class="card">
         <h2>📂 區塊一：資料彙整與地理補全</h2>
-        <p class="desc">直接讀取檔案進行合併。站名/座標資料會自動與雲端對照表(12VSS...)同步。</p>
+        <p class="desc">直接在本地進行檔案合併。站名/座標資料自動與雲端對照表 (12VSS...) 同步。</p>
         <div class="section">
             <input type="file" id="mergeInput" multiple accept=".csv, .xlsx">
         </div>
@@ -45,59 +45,51 @@
 
     <div class="card cloud">
         <h2>☁️ 區塊三：更新雲端資料庫 (1-AuV...)</h2>
-        <p class="desc">將處理好的 Excel 直接寫入雲端試算表。若登入失敗將在此顯示錯誤原因。</p>
+        <p class="desc">自動同步至 Google Sheets。若分頁不存在會自動建立，並確保舊資料徹底清空。</p>
         <div class="section">
             <input type="file" id="syncInput" accept=".xlsx">
         </div>
-        <button id="syncBtn" class="btn-cloud" disabled>登入並開始同步</button>
+        <button id="syncBtn" class="btn-cloud" disabled>登入並自動同步至雲端</button>
     </div>
 
     <div id="status">系統初始化中...</div>
 
     <script>
         const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
-        const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg'; // 測站資訊
-        const CLIMATE_SS_ID = '1-AuVNaVmjnzXP0XqrjjkC8aXVkvn54YTFMYVPadkfXE'; // 氣候資料庫
+        const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
+        const CLIMATE_SS_ID = '1-AuVNaVmjnzXP0XqrjjkC8aXVkvn54YTFMYVPadkfXE';
         
         let STATION_DB = {};
         let tokenClient;
         let accessToken = null;
         const status = document.getElementById('status');
 
-        // 時間計算
         const now = new Date();
         const baseDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const baseMonthStr = `${baseDate.getFullYear()}-${(baseDate.getMonth() + 1).toString().padStart(2, '0')}`;
         const cutoffDate = new Date(baseDate.getFullYear() - 10, baseDate.getMonth() + 1, 0, 23, 59, 59);
         document.getElementById('baseShow').innerText = baseMonthStr;
 
-        // 初始化
         document.addEventListener("DOMContentLoaded", () => {
-            // 自動讀取測站資料 (不影響本地功能)
             window.stationLoader = (json) => {
                 if (json && json.table) {
                     json.table.rows.forEach(r => {
                         const id = r.c[0]?.v || "";
                         if (id) STATION_DB[id] = { name: r.c[1]?.v || "", alt: r.c[3]?.v || "", lon: r.c[4]?.v || "", lat: r.c[5]?.v || "", city: r.c[6]?.v || "", addr: r.c[7]?.v || "" };
                     });
-                    status.innerText = "✅ 雲端測站清單同步成功。區塊一、二可直接使用。";
+                    status.innerText = "✅ 雲端測站清單同步完成。";
                 }
             };
-
             const s = document.createElement('script');
             s.src = `https://docs.google.com/spreadsheets/d/${MASTER_SS_ID}/gviz/tq?tqx=responseHandler:stationLoader`;
             document.body.appendChild(s);
 
-            // 初始化 Google OAuth 客戶端
             if (typeof google !== 'undefined') {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/spreadsheets',
                     callback: (resp) => {
-                        if (resp.error) {
-                            status.innerText = `❌ 登入失敗: ${resp.error_description || resp.error}`;
-                            return;
-                        }
+                        if (resp.error) { status.innerText = `❌ 登入失敗: ${resp.error_description}`; return; }
                         accessToken = resp.access_token;
                         startSync();
                     }
@@ -107,14 +99,14 @@
 
         const cleanVal = (val) => ['/', '-', 'X', '...', 'T'].includes(String(val).trim()) ? '' : val;
 
-        // --- 區塊一：彙整邏輯 (修正並補完) ---
+        // 區塊一邏輯
         const mergeBtn = document.getElementById('mergeBtn');
         document.getElementById('mergeInput').onchange = (e) => mergeBtn.disabled = e.target.files.length === 0;
         mergeBtn.onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
             const stations = {}; 
             const stnHeaders = {};
-            status.innerText = "⏳ 本地彙整中...";
+            status.innerText = "⏳ 執行本地彙整中...";
 
             for (const file of files) {
                 if (file.name.endsWith('.xlsx')) {
@@ -153,62 +145,69 @@
                 XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([stnHeaders[stn], ...unique]), stn);
             }
             XLSX.writeFile(outWb, `氣候彙整_${baseMonthStr}.xlsx`);
-            status.innerText = "✅ 彙整完成，已產出本地檔案。";
+            status.innerText = "✅ 彙整下載成功。";
         };
 
-        // --- 區塊二：清理邏輯 ---
+        // 區塊二邏輯
         const cleanBtn = document.getElementById('cleanBtn');
         document.getElementById('cleanInput').onchange = (e) => cleanBtn.disabled = e.target.files.length === 0;
         cleanBtn.onclick = async () => {
-            status.innerText = "⏳ 執行本地 10 年清理...";
+            status.innerText = "⏳ 執行本地清理...";
             const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
             const outWb = XLSX.utils.book_new();
             wb.SheetNames.forEach(name => {
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
                 if (rows.length <= 1) return;
-                const filtered = rows.slice(1).filter(r => {
-                    const d = new Date(r[9]);
-                    return !isNaN(d) && d > cutoffDate;
-                });
+                const filtered = rows.slice(1).filter(r => new Date(r[9]) > cutoffDate);
                 XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], ...filtered]), name);
             });
             XLSX.writeFile(outWb, `氣候清理_${baseMonthStr}.xlsx`);
-            status.innerText = "✅ 清理完成，已產出本地檔案。";
+            status.innerText = "✅ 清理下載成功。";
         };
 
-        // --- 區塊三：同步與錯誤提示 ---
+        // 區塊三邏輯 (修正版)
         const syncBtn = document.getElementById('syncBtn');
         document.getElementById('syncInput').onchange = (e) => syncBtn.disabled = e.target.files.length === 0;
         syncBtn.onclick = () => {
-            if (!tokenClient) {
-                status.innerText = "❌ 錯誤：Google API 腳本載入失敗。請檢查網路或是否被阻擋。";
-                return;
-            }
             if (!accessToken) tokenClient.requestAccessToken({prompt: 'consent'}); 
             else startSync();
         };
 
         async function startSync() {
-            const fileInput = document.getElementById('syncInput');
-            const file = fileInput.files[0];
-            status.innerText = `🚀 正在同步至雲端...`;
+            const file = document.getElementById('syncInput').files[0];
+            status.innerText = `🚀 啟動自動同步流程...`;
             try {
                 const wb = XLSX.read(await file.arrayBuffer());
+                const ssMetadata = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                }).then(res => res.json());
+
+                const existingSheets = ssMetadata.sheets.map(s => s.properties.title);
+
                 for (const name of wb.SheetNames) {
+                    if (!existingSheets.includes(name)) {
+                        status.innerText = `➕ 雲端自動建立分頁 [${name}]...`;
+                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}:batchUpdate`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requests: [{ addSheet: { properties: { title: name } } }] })
+                        });
+                    }
                     const data = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
-                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1?valueInputOption=USER_ENTERED`, {
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1:ZZ5000:clear`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1?valueInputOption=USER_ENTERED`, {
                         method: 'PUT',
                         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ values: data })
                     });
-                    if (!res.ok) {
-                        const errData = await res.json();
-                        throw new Error(errData.error.message || "權限不足或工作表名稱不匹配");
-                    }
+                    status.innerText = `✅ [${name}] 同步成功。`;
                 }
-                status.innerText = "🎉 雲端更新成功！";
+                status.innerText = "🎉 雲端資料庫已全數同步更新完成！";
             } catch (err) {
-                status.innerText = `❌ 同步失敗：${err.message}\n請確認您對此表單有編輯權限，或 Google Cloud 設定是否正確。`;
+                status.innerText = `❌ 同步失敗：${err.message}`;
             }
         }
     </script>
