@@ -2,205 +2,333 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象分析工具 v11.5 - 惇陽 AI 實驗室</title>
+    <title>氣象全測站大數據分析系統 v22.5 - 地理彙整專用版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --p-blue: #2563eb; --p-green: #059669; }
-        body { font-family: 'Microsoft JhengHei', sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
-        .container { max-width: 1500px; margin: auto; }
-        #map-nav { height: 350px; border-radius: 12px; border: 3px solid var(--p-blue); margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; border: 1px solid #e2e8f0; }
-        .st-header { border-left: 10px solid var(--p-blue); background: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
-        
-        /* 顯式獨立分析區塊 */
-        .analysis-block { display: grid; grid-template-columns: 320px 1fr; gap: 20px; border-top: 5px solid var(--p-blue); padding-top: 20px; }
-        .sidebar-ctrl { background: #fafafa; padding: 20px; border-radius: 10px; border: 1px solid #cbd5e1; }
-        .btn-update { background: var(--p-green); color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 15px; transition: 0.3s; }
-        .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; background: #fffbeb; padding: 12px; border-radius: 8px; font-size: 12px; }
-        
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 15px; }
-        th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: center; }
-        th { background: var(--p-blue); color: white; }
+        :root { --nav-bg: #1a2a3a; --accent: #007bff; --success: #28a745; --orange: #e67e22; --danger: #dc3545; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        #top-nav { background: var(--nav-bg); color: white; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        #main-layout { display: flex; flex: 1; overflow: hidden; }
+        #map-container { width: 420px; background: #ddd; border-right: 2px solid #ccc; position: relative; }
+        #map { height: 100%; width: 100%; }
+        #content-area { flex: 1; overflow-y: auto; padding: 25px; scroll-behavior: auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .category-section { display: grid; grid-template-columns: 320px 1fr; gap: 20px; border-top: 5px solid var(--accent); padding-top: 20px; }
+        .control-panel { background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #eee; font-size: 13px; }
+        .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; border-top: 1px dotted #ccc; padding-top: 10px; }
+        .mode-switch { display: flex; gap: 5px; margin: 10px 0; }
+        .mode-btn { flex: 1; padding: 8px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; background: #eee; border-radius: 4px; font-weight: bold; transition: 0.2s; }
+        .mode-btn.active { background: var(--accent); color: white; border-color: #0056b3; }
+        .multi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
+        .chart-box-wrapper { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; align-items: center; }
+        .chart-container { width: 100%; height: 400px; }
+        .individual-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 8px; width: 95%; border: 1px solid #eee; }
+        .leg-item { display: flex; align-items: center; font-size: 11px; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+        .leg-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
+        .hidden-series { color: #ccc !important; text-decoration: line-through; }
+        .btn-update { background: var(--success); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        #color-picker-popover { position: fixed; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 9999; display: none; width: 240px; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div id="map-nav"></div>
-
-    <div class="card st-header">
-        <div id="stTitle"><h3>📡 請點擊地圖標記載入氣象數據</h3></div>
-        <div id="stStatus" style="color: var(--p-blue); font-weight: bold;">[ 狀態：等待載入 ]</div>
+<div id="top-nav">
+    <h2 style="margin:0;">🌍 氣象分析系統 v22.5</h2>
+    <div style="display:flex; gap:10px;">
+        <button class="btn-update" style="width:auto;" onclick="document.getElementById('fileInput').click()">📁 匯入地理補全資料</button>
+        <input type="file" id="fileInput" multiple accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleFileUpload(event)">
     </div>
+</div>
 
-    <div class="card analysis-block">
-        <div class="sidebar-ctrl">
-            <h4>🌡️ 氣溫趨勢分析</h4>
-            <div id="temp-fields-ui"></div>
-            <div class="year-grid" id="temp-years-ui"></div>
-            <button class="btn-update" onclick="drawTempChart()">🔄 更新氣溫圖</button>
+<div id="main-layout">
+    <div id="map-container"><div id="map"></div></div>
+    <div id="content-area">
+        <div id="station-info-bar" class="card" style="background:#e7f3ff; border-left:5px solid var(--accent);">請匯入氣候彙整資料...</div>
+        <div id="dashboard" style="display:none;">
+            <div id="categoryContainer"></div>
         </div>
-        <div id="chart-temp" style="height: 450px;"></div>
     </div>
+</div>
 
-    <div class="card analysis-block">
-        <div class="sidebar-ctrl">
-            <h4>🌬️ 風玫瑰頻率分析</h4>
-            <div class="year-grid" id="wind-years-ui"></div>
-            <button class="btn-update" onclick="drawWindRose()">🔄 更新風場玫瑰圖</button>
-        </div>
-        <div id="chart-wind" style="height: 500px;"></div>
-    </div>
-
-    <div class="card">
-        <h3>📅 測站歷史平均統計大表</h3>
-        <div id="table-container" style="overflow-x: auto;"></div>
+<div id="color-picker-popover">
+    <div id="cp-target-title" style="font-weight:bold; margin-bottom:12px; font-size: 13px;">修改配色</div>
+    <input type="color" id="cp-color" style="width:100%; height:40px; cursor:pointer;">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:15px;">
+        <button class="btn-update" id="cp-apply">套用</button>
+        <button class="btn-update" id="cp-close" style="background:#6c757d;">取消</button>
     </div>
 </div>
 
 <script>
-    const SS_ID = "1-AuVNaVmjnzXP0XqrjjkC8aXVkvn54YTFMYVPadkfXE";
-    const STATIONS = [
-        { name: "台北", gid: "1863261962", lat: 25.0376, lon: 121.5149 },
-        { name: "淡水", gid: "1350175591", lat: 25.1648, lon: 121.4489 },
-        { name: "新北", gid: "1071066236", lat: 24.9592, lon: 121.5252 }
-    ];
+    const CATEGORY_MAP = { 
+        "風場分析": ["風速", "風向", "WD", "WS"], 
+        "氣溫分析": ["氣溫", "Temperature", "Temp"], 
+        "降雨分析": ["降水", "Precp", "雨量"] 
+    };
+    const WIND_DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
+    const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
+    const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
 
-    // 全域變數 - 嚴格資料隔離
-    let headers = [], rows = [], yearlyData = {}, monthlyAvg = {};
+    let allStations = {}, currentHeaders = [], currentRows = [], currentYearly = {}, currentMonthly = {}, chartModes = {};
+    let activeColorTarget = null, customColorMap = {};
 
-    // 1. 初始化地圖
-    const map = L.map('map-nav').setView([25.05, 121.5], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    (function init() {
+        const map = L.map('map').setView([23.6, 121], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        window.myMap = map;
+        document.getElementById('cp-apply').onclick = applyIndividualColor;
+        document.getElementById('cp-close').onclick = () => document.getElementById('color-picker-popover').style.display='none';
+    })();
 
-    STATIONS.forEach(st => {
-        L.marker([st.lat, st.lon]).addTo(map).bindTooltip(st.name, {permanent:true}).on('click', () => loadStationData(st));
-    });
+    async function handleFileUpload(event) {
+        const files = event.target.files;
+        for (let file of files) {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            workbook.SheetNames.forEach(name => {
+                const raw = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+                if (raw.length < 3) return;
 
-    // 2. 關鍵：JSONP 模式載入 (避開所有權限問題)
-    function loadStationData(st) {
-        document.getElementById('stTitle').innerHTML = `<h3>🔄 正在連線 ${st.name} 分頁...</h3>`;
-        
-        // 物理清理
-        headers = []; rows = []; yearlyData = {}; monthlyAvg = {};
-        const oldScript = document.getElementById('jsonp-loader');
-        if(oldScript) oldScript.remove();
+                // 補全版結構：Index 0=ChHeader, Index 1=EnHeader, Index 2+=Data
+                // 地理資訊位址：4=Lat, 5=Lon, 2=Name, 0=ID
+                const headers = raw[0];
+                const dataRows = raw.slice(2);
+                
+                const sampleRow = dataRows[0];
+                const stId = String(sampleRow[0]);
+                const stLat = parseFloat(sampleRow[4]);
+                const stLon = parseFloat(sampleRow[5]);
+                const stName = sampleRow[2] || name;
 
-        // 建立唯一的回呼函式
-        window.cb_weather = (json) => {
-            if(!json.table) { alert("讀取失敗：分頁名稱或 GID 有誤"); return; }
-            headers = json.table.cols.map(c => (c.label || "").trim());
-            rows = json.table.rows.map(r => r.c.map(cell => cell ? cell.v : null));
-            
-            document.getElementById('stTitle').innerHTML = `<h3>📍 當前測站：${st.name}</h3>`;
-            document.getElementById('stStatus').innerText = `連線成功：讀取 ${rows.length} 筆觀測值`;
-
-            processClimateMath();
-            initUI();
-            drawTempChart();
-            drawWindRose();
-            renderTable();
-        };
-
-        const script = document.createElement('script');
-        script.id = 'jsonp-loader';
-        // 使用 gviz API 穿透權限
-        script.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:cb_weather&gid=${st.gid}&t=${Date.now()}`;
-        document.body.appendChild(script);
+                if (!isNaN(stLat) && !isNaN(stLon)) {
+                    allStations[stId] = {
+                        name: stName,
+                        lat: stLat,
+                        lon: stLon,
+                        headers: headers,
+                        rows: dataRows
+                    };
+                }
+            });
+        }
+        renderMarkers();
     }
 
-    function processClimateMath() {
-        const buf = {};
-        rows.forEach(r => {
-            const y = r[headers.indexOf("年")], m = r[headers.indexOf("月")];
-            if (y && m) {
-                if (!buf[y]) buf[y] = {};
-                if (!buf[y][m]) { buf[y][m] = {}; headers.forEach(h => buf[y][m][h] = []); }
-                headers.forEach((h, i) => { if(!isNaN(parseFloat(r[i]))) buf[y][m][h].push(parseFloat(r[i])); });
-            }
+    function renderMarkers() {
+        Object.values(allStations).forEach(st => {
+            L.marker([st.lat, st.lon]).addTo(window.myMap)
+             .bindTooltip(st.name)
+             .on('click', () => loadStation(st.id || st.name));
         });
+    }
 
-        yearlyData = {};
-        for (let y in buf) {
-            yearlyData[y] = {};
-            for (let m = 1; m <= 12; m++) {
-                yearlyData[y][m] = {};
-                headers.forEach(h => {
-                    const a = buf[y][m][h] || [];
-                    if (a.length === 0) yearlyData[y][m][h] = 0;
-                    else if (h.includes("降水")) yearlyData[y][m][h] = a.reduce((s,v)=>s+v, 0).toFixed(1);
-                    else yearlyData[y][m][h] = (a.reduce((s,v)=>s+v, 0)/a.length).toFixed(2);
-                });
+    function loadStation(id) {
+        const st = Object.values(allStations).find(s => s.id === id || s.name === id);
+        currentHeaders = st.headers; 
+        currentRows = st.rows;
+        processStats();
+        document.getElementById('station-info-bar').innerHTML = `<h3>📍 測站：${st.name}</h3>`;
+        document.getElementById('dashboard').style.display = 'block';
+        renderDashboard();
+    }
+
+    function processStats() {
+        // 補全版固定索引：7=Year, 8=Month
+        const store = {};
+        currentRows.forEach(r => {
+            const y = r[7], m = parseInt(r[8]);
+            if (!y || isNaN(m)) return;
+            if (!store[y]) store[y] = {};
+            if (!store[y][m]) { 
+                store[y][m] = {}; 
+                currentHeaders.forEach(h => store[y][m][h] = []); 
             }
-        }
+            currentHeaders.forEach((h, i) => {
+                let v = parseFloat(r[i]);
+                if (!isNaN(v)) store[y][m][h].push(v);
+            });
+        });
+        currentYearly = store;
 
-        monthlyAvg = {};
-        for (let m = 1; m <= 12; m++) {
-            monthlyAvg[m] = {};
-            headers.forEach(h => {
-                let s=0, c=0;
-                Object.keys(yearlyData).forEach(y => { let v = parseFloat(yearlyData[y][m][h]); if(v!==0){s+=v; c++;} });
-                monthlyAvg[m][h] = c > 0 ? (s/c).toFixed(2) : 0;
+        // 計算歷史月平均
+        currentMonthly = {};
+        for(let m=1; m<=12; m++) {
+            currentMonthly[m] = {};
+            currentHeaders.forEach(h => {
+                let validYearsData = [];
+                Object.keys(store).forEach(y => {
+                    if(store[y][m] && store[y][m][h].length) {
+                        const vals = store[y][m][h];
+                        validYearsData.push(vals.reduce((a,b)=>a+b, 0) / vals.length);
+                    }
+                });
+                currentMonthly[m][h] = validYearsData.length > 0 ? (validYearsData.reduce((a,b)=>a+b, 0) / validYearsData.length).toFixed(2) : 0;
             });
         }
     }
 
-    function initUI() {
-        const ys = Object.keys(yearlyData).sort();
-        const yHtml = ys.map(y => `<label><input type="checkbox" class="y-chk" value="${y}"> ${y}</label>`).join('');
-        document.getElementById('temp-years-ui').innerHTML = yHtml;
-        document.getElementById('wind-years-ui').innerHTML = yHtml;
-        document.getElementById('temp-fields-ui').innerHTML = headers.filter(h=>h.includes("氣溫")).map((h,i)=>`<label style="display:block;"><input type="checkbox" class="f-chk" value="${h}" ${i==0?'checked':''}> ${h}</label>`).join('');
+    function setMode(cat, mode) {
+        chartModes[cat] = mode;
+        drawCharts(cat);
     }
 
-    // --- 顯式繪圖 (不縮減代碼) ---
-    function drawTempChart() {
-        const fs = Array.from(document.querySelectorAll('.f-chk:checked')).map(i=>i.value);
-        const ys = Array.from(document.querySelectorAll('#temp-years-ui .y-chk:checked')).map(i=>i.value);
-        let opts = { title:{text:'氣溫長期分析'}, xAxis:{categories:['1-12月']}, series:[], credits:{enabled:false} };
-        fs.forEach(f => {
-            opts.series.push({ name:`10年平均 ${f}`, data:Array.from({length:12},(_,i)=>parseFloat(monthlyAvg[i+1][f])), lineWidth:4, color:'#333' });
-            ys.forEach(y => opts.series.push({ name:`${y}年 ${f}`, data:Array.from({length:12},(_,i)=>parseFloat(yearlyData[y][i+1][f])) }));
-        });
-        Highcharts.chart('chart-temp', opts);
-    }
-
-    function drawWindRose() {
-        const ys = Array.from(document.querySelectorAll('#wind-years-ui .y-chk:checked')).map(i=>i.value);
-        const DIRS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
-        const COLS = ['#44546a', '#5b9bd5', '#70ad47', '#ffc000', '#ed7d31'];
-        let opts = { chart:{polar:true, type:'column'}, title:{text:'風玫瑰頻率圖'}, xAxis:{categories:DIRS, tickmarkPlacement:'on'}, plotOptions:{column:{stacking:'normal', pointPlacement:'on'}}, series:[], credits:{enabled:false} };
+    function renderDashboard() {
+        const container = document.getElementById('categoryContainer');
+        container.innerHTML = "";
+        const years = Object.keys(currentYearly).sort();
         
-        const mat = Array.from({length:16}, ()=>new Array(5).fill(0));
-        const rng = [[0,1], [1,2], [2,3], [3,4], [4,99]];
+        Object.keys(CATEGORY_MAP).forEach(cat => {
+            // 從 Index 10 以後開始尋找氣候欄位
+            const fields = currentHeaders.slice(10).filter(h => CATEGORY_MAP[cat].some(k => h.includes(k)));
+            if (!fields.length) return;
 
-        rows.forEach(r => {
-            const y = r[headers.indexOf("年")];
-            if(ys.length === 0 || ys.includes(String(y))) {
-                const s = parseFloat(r[headers.findIndex(h=>h.includes("風速"))]), d = parseFloat(r[headers.findIndex(h=>h.includes("風向"))]);
-                if(!isNaN(s) && !isNaN(d)) {
-                    let dI = Math.floor((d + 11.25)/22.5)%16;
-                    let sI = rng.findIndex(g => s >= g[0] && s < g[1]);
-                    if(sI !== -1) mat[dI][sI]++;
-                }
+            chartModes[cat] = chartModes[cat] || "overlay";
+            const catSafe = cat.replace(/\s/g,'');
+            const div = document.createElement('div');
+            div.className = 'card category-section';
+            div.innerHTML = `
+                <div class="control-panel">
+                    <h4>${cat}</h4>
+                    <div class="mode-switch">
+                        <button class="mode-btn mode-btn-${catSafe} ${chartModes[cat]==='overlay'?'active':''}" onclick="setMode('${cat}','overlay')">疊加</button>
+                        <button class="mode-btn mode-btn-${catSafe} ${chartModes[cat]==='split'?'active':''}" onclick="setMode('${cat}','split')">並列</button>
+                    </div>
+                    <div id="fields-${catSafe}">${fields.map((f,i)=>`<label style="display:block;"><input type="checkbox" value="${f}" ${i===0?'checked':''}> ${f}</label>`).join('')}</div>
+                    <div class="dimension-box">
+                        <label><input type="checkbox" id="avg-chk-${catSafe}" checked> 歷史月平均</label>
+                        <div class="year-grid">${years.map(y=>`<label><input type="checkbox" class="y-chk-${catSafe}" value="${y}"> ${y}</label>`).join('')}</div>
+                    </div>
+                    <button class="btn-update" onclick="drawCharts('${cat}')">🔄 更新圖表</button>
+                </div>
+                <div id="charts-mount-${catSafe}" class="multi-grid"></div>`;
+            container.appendChild(div);
+            drawCharts(cat);
+        });
+    }
+
+    function drawCharts(cat) {
+        const catSafe = cat.replace(/\s/g,'');
+        const mount = document.getElementById(`charts-mount-${catSafe}`);
+        mount.innerHTML = "";
+        
+        const selYears = Array.from(document.querySelectorAll(`.y-chk-${catSafe}:checked`)).map(i=>i.value);
+        const selFields = Array.from(document.querySelectorAll(`#fields-${catSafe} input:checked`)).map(i=>i.value);
+        const showAvg = document.getElementById(`avg-chk-${catSafe}`).checked;
+        const mode = chartModes[cat];
+
+        const datasets = [];
+        if(showAvg) datasets.push({ title: "歷史平均", rows: currentRows, palette: ['#999','#888','#777','#666','#555'], isAvg: true });
+        selYears.forEach((y, i) => {
+            const yearRows = currentRows.filter(r => String(r[7]) === y);
+            datasets.push({ title: `${y}年度`, rows: yearRows, palette: YEARLY_PALETTES[i % 4], isAvg: false });
+        });
+
+        if(mode === "split") {
+            datasets.forEach((ds, dIdx) => createChartWrapper(mount, ds.title, [ds], `chart-${catSafe}-${dIdx}`, `leg-${catSafe}-${dIdx}`, cat, selFields, true));
+        } else {
+            createChartWrapper(mount, `${cat} 年度對照`, datasets, `main-${catSafe}`, `leg-main-${catSafe}`, cat, selFields, false);
+        }
+    }
+
+    function createChartWrapper(parent, title, datasets, cId, lId, cat, fields, isSplit) {
+        const box = document.createElement('div');
+        box.className = 'chart-box-wrapper';
+        box.innerHTML = `<div id="${cId}" class="chart-container"></div><div id="${lId}" class="individual-legend"></div>`;
+        parent.appendChild(box);
+
+        const isWind = cat === "風場分析";
+        const options = {
+            chart: { polar: isWind, type: isWind ? 'column' : (cat.includes("降雨") ? 'column' : 'line') },
+            title: { text: title },
+            xAxis: { categories: isWind ? WIND_DIRECTIONS : Array.from({length:12}, (_,i)=>(i+1)+'月') },
+            yAxis: { min: 0, title: { text: isWind ? '累積頻率 (%)' : '月平均值' } },
+            plotOptions: { column: { stacking: isWind ? 'normal' : undefined } },
+            series: [], credits: { enabled: false }, legend: { enabled: false }
+        };
+
+        datasets.forEach(ds => {
+            if(isWind) {
+                const matrix = Array.from({length:16}, () => new Array(5).fill(0));
+                let total = 0;
+                const wsIdx = currentHeaders.findIndex(h => h.includes("風速") || h === "WS");
+                const wdIdx = currentHeaders.findIndex(h => h.includes("風向") || h === "WD");
+                
+                ds.rows.forEach(r => {
+                    const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
+                    if(!isNaN(s) && !isNaN(d)) {
+                        let dIdx = Math.floor((d + 11.25) / 22.5) % 16;
+                        let sIdx = [0, 1, 2, 4, 6].findIndex((v, i, arr) => s >= v && (i === arr.length-1 || s < arr[i+1]));
+                        if(sIdx !== -1) { matrix[dIdx][sIdx]++; total++; }
+                    }
+                });
+                SPEED_LABELS.forEach((label, i) => {
+                    const colorKey = `${ds.title}_${label}`;
+                    options.series.push({ 
+                        name: isSplit ? label : `${ds.title} ${label}`, 
+                        data: matrix.map(d => total > 0 ? (d[i]/total*100) : 0), 
+                        color: customColorMap[colorKey] || ds.palette[i], 
+                        stack: ds.title,
+                        _dsTitle: ds.title, _sLabel: label, _cat: cat 
+                    });
+                });
+            } else {
+                fields.forEach(f => {
+                    const colorKey = `${ds.title}_${f}`;
+                    const valIdx = currentHeaders.indexOf(f);
+                    const data = Array.from({length:12}, (_, m) => {
+                        if(ds.isAvg) return parseFloat(currentMonthly[m+1][f]);
+                        const mRows = ds.rows.filter(r => parseInt(r[8]) === (m+1));
+                        return mRows.length ? parseFloat((mRows.reduce((a,b)=>a+parseFloat(b[valIdx]||0), 0)/mRows.length).toFixed(2)) : null;
+                    });
+                    options.series.push({ 
+                        name: isSplit ? f : `${ds.title} ${f}`, 
+                        data: data, 
+                        color: customColorMap[colorKey] || ds.palette[2],
+                        _dsTitle: ds.title, _sLabel: f, _cat: cat 
+                    });
+                });
             }
         });
-        rng.forEach((r,i) => opts.series.push({ name:['0-1','1-2','2-3','3-4','>4'][i]+' m/s', data:mat.map(row=>row[i]), color:COLS[i] }));
-        Highcharts.chart('chart-wind', opts);
+
+        const chart = Highcharts.chart(cId, options);
+        const legMount = document.getElementById(lId);
+        chart.series.forEach((s, sIdx) => {
+            const item = document.createElement('div');
+            item.className = 'leg-item';
+            item.innerHTML = `<div class="leg-dot" style="background:${s.color}"></div><span>${s.name}</span>`;
+            item.onclick = (e) => {
+                if(e.target.className === 'leg-dot') openPicker(chart, sIdx, e);
+                else { s.visible ? s.hide() : s.show(); item.classList.toggle('hidden-series'); }
+            };
+            legMount.appendChild(item);
+        });
     }
 
-    function renderTable() {
-        const fs = headers.filter(h => h.includes("氣溫") || h.includes("降水") || h.includes("風速"));
-        let h = `<table><tr><th>月份</th>${fs.map(f=>`<th>${f}</th>`).join('')}</tr>`;
-        for(let m=1; m<=12; m++) h += `<tr><td>${m}月</td>${fs.map(f=>`<td>${monthlyAvg[m][f]||0}</td>`).join('')}</tr>`;
-        document.getElementById('table-container').innerHTML = h + `</table>`;
+    function openPicker(chart, sIdx, e) {
+        activeColorTarget = { chart, sIdx };
+        const s = chart.series[sIdx];
+        const pop = document.getElementById('color-picker-popover');
+        pop.style.display = 'block';
+        pop.style.left = Math.min(window.innerWidth - 260, e.pageX) + 'px';
+        pop.style.top = (e.pageY - 120) + 'px';
+        document.getElementById('cp-target-title').innerText = `${s.options._dsTitle} - ${s.options._sLabel}`;
+        document.getElementById('cp-color').value = s.color;
     }
 
-    // 啟動載入
-    loadStationData(STATIONS[0]);
+    function applyIndividualColor() {
+        const { chart, sIdx } = activeColorTarget;
+        const color = document.getElementById('cp-color').value;
+        const s = chart.series[sIdx];
+        s.update({ color });
+        customColorMap[`${s.options._dsTitle}_${s.options._sLabel}`] = color;
+        chart.renderTo.parentElement.querySelectorAll('.leg-dot')[sIdx].style.background = color;
+        document.getElementById('color-picker-popover').style.display = 'none';
+    }
 </script>
 </body>
 </html>
