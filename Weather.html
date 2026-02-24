@@ -2,245 +2,251 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象分析系統 v9.0 - 1000+ 測站擴展架構</title>
+    <title>氣象大數據分析系統 v9.6 - 專業完整版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
+        :root { --accent: #2563eb; --success: #059669; --bg: #f8fafc; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
         .container { max-width: 1500px; margin: auto; }
-        #map { height: 400px; border-radius: 15px; margin-bottom: 25px; border: 3px solid #007bff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        .info-bar { border-left: 10px solid #007bff; background: #eef7ff; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 顯式定義的獨立分析區塊 */
-        .analysis-container { display: grid; grid-template-columns: 350px 1fr; gap: 20px; border-top: 5px solid #007bff; padding-top: 20px; margin-top: 10px; }
-        .sidebar { background: #fdfdfd; padding: 20px; border-radius: 10px; border: 1px solid #eee; }
-        .btn-update { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        /* 地圖導航區 */
+        #map { height: 350px; border-radius: 15px; margin-bottom: 25px; border: 3px solid var(--accent); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        /* 統計控制區 */
-        .option-box { background: #fff3cd; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 13px; border: 1px solid #ffeeba; }
-        .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .info-header { border-left: 10px solid var(--accent); background: #eef2ff; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* 獨立分析區塊 - 顯式定義架構 */
+        .analysis-block { display: grid; grid-template-columns: 350px 1fr; gap: 20px; border-top: 5px solid var(--accent); padding-top: 20px; margin-top: 10px; }
+        .control-panel { background: #fdfdfd; padding: 20px; border-radius: 12px; border: 1px solid #eee; }
+        .btn-update { background: var(--success); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; transition: 0.3s; }
+        .btn-update:hover { background: #047857; }
+        
+        .option-group { background: #fffbeb; padding: 12px; border-radius: 8px; margin-top: 10px; border: 1px solid #fef3c7; }
+        .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 8px; font-size: 13px; }
         
         table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        th { background: #007bff; color: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: var(--accent); color: white; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card" style="text-align: center;">
-        <h2>🌍 氣象全測站大數據分析系統 v9.0</h2>
-        <p>獨立資料封裝技術 | 支援地圖交互選擇</p>
-    </div>
-
     <div id="map"></div>
 
-    <div class="card info-bar" id="stationStatus">
-        <div id="stName">請選擇地圖標記...</div>
-        <div id="stMeta" style="color: #666;">載入狀態：待命</div>
+    <div class="card info-header">
+        <div id="stDisplay"><h3>📡 請點擊地圖標記載入測站資料</h3></div>
+        <div id="stMeta" style="color: #64748b;">狀態：待命</div>
     </div>
 
-    <div class="card analysis-container">
-        <div class="sidebar">
-            <h4>🌡️ 氣溫趨勢分析</h4>
-            <div id="temp-fields"></div>
-            <div class="option-box">
-                <strong>年度對比篩選：</strong>
-                <div id="temp-years" class="year-grid"></div>
+    <div class="card analysis-block">
+        <div class="control-panel">
+            <h4>🌡️ 氣溫分析</h4>
+            <div id="temp-fields-ui"></div>
+            <div class="option-group">
+                <strong>年度篩選：</strong>
+                <div id="temp-years-ui" class="year-grid"></div>
             </div>
-            <button class="btn-update" onclick="runTempAnalysis()">更新氣溫數據</button>
+            <button class="btn-update" onclick="drawTemperature()">🔄 更新氣溫圖表</button>
         </div>
         <div id="chart-temp" style="height: 450px;"></div>
     </div>
 
-    <div class="card analysis-container">
-        <div class="sidebar">
-            <h4>🌬️ 風頻率玫瑰圖</h4>
-            <p style="font-size: 12px; color: #777;">依據 16 方位風速天數累計</p>
-            <div class="option-box">
-                <strong>分析年份：</strong>
-                <div id="wind-years" class="year-grid"></div>
+    <div class="card analysis-block">
+        <div class="control-panel">
+            <h4>🌧️ 降雨分析</h4>
+            <div id="precp-fields-ui"></div>
+            <div class="option-group">
+                <strong>年度篩選：</strong>
+                <div id="precp-years-ui" class="year-grid"></div>
             </div>
-            <button class="btn-update" onclick="runWindAnalysis()">更新風玫瑰圖</button>
+            <button class="btn-update" onclick="drawPrecipitation()">🔄 更新降雨圖表</button>
+        </div>
+        <div id="chart-precp" style="height: 450px;"></div>
+    </div>
+
+    <div class="card analysis-block">
+        <div class="control-panel">
+            <h4>🌬️ 風玫瑰頻率圖</h4>
+            <p style="font-size: 12px; color: #666;">基於 16 方位與風速等級累計天數</p>
+            <div class="option-group">
+                <strong>分析年份：</strong>
+                <div id="wind-years-ui" class="year-grid"></div>
+            </div>
+            <button class="btn-update" onclick="drawWindRose()">🔄 更新風玫瑰圖</button>
         </div>
         <div id="chart-wind" style="height: 500px;"></div>
     </div>
 
     <div class="card">
-        <h3>📅 測站長期平均值統計大表</h3>
-        <div id="main-table-container" style="overflow-x: auto;"></div>
+        <h3>📅 測站長期統計平均表 (10年累計)</h3>
+        <div id="full-table-container" style="overflow-x: auto;"></div>
     </div>
 </div>
 
 <script>
-    // --- 配置區 ---
-    const SS_ID = "1-AuVNaVmjnzXP0XqrjjkC8aXVkvn54YTFMYVPadkfXE";
-    // 每個分頁對應的 GID (請務必根據您的 Google Sheet 修改此處)
-    const STATIONS = [
+    // --- 配置資訊 ---
+    const GOOGLE_SHEET_ID = "1-AuVNaVmjnzXP0XqrjjkC8aXVkvn54YTFMYVPadkfXE";
+    const STATION_CONFIG = [
         { id: "466920", name: "台北", lat: 25.0376, lon: 121.5149, gid: "1863261962" },
         { id: "466900", name: "淡水", lat: 25.1648, lon: 121.4489, gid: "1350175591" },
         { id: "466881", name: "新北", lat: 24.9592, lon: 121.5252, gid: "1071066236" }
     ];
 
-    // 全域變數 (物理隔離)
-    let currentData = [];
-    let currentHeaders = [];
-    let yearlyStats = {};
-    let monthlyAverages = {};
+    const DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
+    const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-3 m/s', '3-4 m/s', '>4 m/s'];
+    const SPEED_COLORS = ['#44546a', '#5b9bd5', '#70ad47', '#ffc000', '#ed7d31'];
+
+    // --- 資料緩衝區 ---
+    let activeHeaders = [], activeRows = [], yearlyDataMap = {}, monthlyAvgMap = {};
 
     // --- 地圖初始化 ---
     const map = L.map('map').setView([25.05, 121.5], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    STATIONS.forEach(st => {
+    STATION_CONFIG.forEach(st => {
         L.marker([st.lat, st.lon]).addTo(map)
-            .bindTooltip(`<b>${st.name}</b>`, { permanent: true, direction: 'top' })
-            .on('click', () => loadStationData(st));
+            .bindTooltip(`<b>${st.name}測站</b>`, { permanent: true, direction: 'top' })
+            .on('click', () => syncData(st));
     });
 
-    // --- 資料載入與隔離 (核心邏輯) ---
-    async function loadStationData(st) {
-        document.getElementById('stName').innerHTML = `<h3>🔄 正在讀取：${st.name} 測站資料...</h3>`;
+    // --- 資料同步 (徹底物理隔離) ---
+    async function syncData(st) {
+        document.getElementById('stDisplay').innerHTML = `<h3>🔄 正在獲取：${st.name} 數據...</h3>`;
         document.getElementById('stMeta').innerText = "連線中...";
 
-        // 構建 CSV 下載網址 (加上時間戳 t= 避免快取導致資料相同)
-        const csvUrl = `https://docs.google.com/spreadsheets/d/${SS_ID}/export?format=csv&gid=${st.gid}&t=${Date.now()}`;
+        // 換站時徹底清空緩衝區
+        activeHeaders = []; activeRows = []; yearlyDataMap = {}; monthlyAvgMap = {};
+
+        const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv&gid=${st.gid}&t=${Date.now()}`;
 
         try {
-            const resp = await fetch(csvUrl);
-            const csvText = await resp.text();
+            const response = await fetch(url);
+            const csvData = await response.text();
             
-            // 使用 PapaParse 進行顯式解析
-            Papa.parse(csvText, {
+            Papa.parse(csvData, {
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
-                    // 核心：換站時立即清空並重新賦值
-                    currentData = results.data;
-                    currentHeaders = results.meta.fields;
+                    activeRows = results.data;
+                    activeHeaders = results.meta.fields;
                     
-                    document.getElementById('stName').innerHTML = `<h3>📍 當前測站：${st.name} (${st.id})</h3>`;
-                    document.getElementById('stMeta').innerText = `成功載入 ${currentData.length} 筆觀測紀錄`;
+                    document.getElementById('stDisplay').innerHTML = `<h3>📍 當前測站：${st.name} (${st.id})</h3>`;
+                    document.getElementById('stMeta').innerText = `成功同步 ${activeRows.length} 筆資料`;
 
-                    processClimateLogic();
-                    updateControlPanels();
+                    calculateClimateStats();
+                    buildControlUI();
                     
-                    // 自動執行初始繪圖
-                    runTempAnalysis();
-                    runWindAnalysis();
+                    // 自動執行全項目繪圖
+                    drawTemperature();
+                    drawPrecipitation();
+                    drawWindRose();
                     renderFullTable();
                 }
             });
         } catch (e) {
-            alert("資料載入失敗，請確認 Google Sheet 權限已開放");
+            alert("讀取失敗，請確認 Google Sheet 權限。");
         }
     }
 
-    function processClimateLogic() {
-        const tempObj = {};
-        currentData.forEach(r => {
+    function calculateClimateStats() {
+        const dataBuffer = {};
+        activeRows.forEach(r => {
             const y = r["年"], m = r["月"];
             if (y && m) {
-                if (!tempObj[y]) tempObj[y] = {};
-                if (!tempObj[y][m]) { 
-                    tempObj[y][m] = {}; 
-                    currentHeaders.forEach(h => tempObj[y][m][h] = []); 
+                if (!dataBuffer[y]) dataBuffer[y] = {};
+                if (!dataBuffer[y][m]) { 
+                    dataBuffer[y][m] = {}; 
+                    activeHeaders.forEach(h => dataBuffer[y][m][h] = []); 
                 }
-                currentHeaders.forEach(h => {
-                    const val = parseFloat(r[h]);
-                    if (!isNaN(val)) tempObj[y][m][h].push(val);
+                activeHeaders.forEach(h => {
+                    const v = parseFloat(r[h]);
+                    if (!isNaN(v)) dataBuffer[y][m][h].push(v);
                 });
             }
         });
 
-        yearlyStats = {};
-        for (let y in tempObj) {
-            yearlyStats[y] = {};
+        yearlyDataMap = {};
+        for (let y in dataBuffer) {
+            yearlyDataMap[y] = {};
             for (let m = 1; m <= 12; m++) {
-                yearlyStats[y][m] = {};
-                currentHeaders.forEach(h => {
-                    const a = tempObj[y][m][h] || [];
-                    if (a.length === 0) yearlyStats[y][m][h] = 0;
-                    else if (h.includes("降水")) yearlyStats[y][m][h] = a.reduce((s, v) => s + v, 0).toFixed(1);
-                    else yearlyStats[y][m][h] = (a.reduce((s, v) => s + v, 0) / a.length).toFixed(2);
+                yearlyDataMap[y][m] = {};
+                activeHeaders.forEach(h => {
+                    const arr = dataBuffer[y][m][h] || [];
+                    if (arr.length === 0) yearlyDataMap[y][m][h] = 0;
+                    else if (h.includes("降水")) yearlyDataMap[y][m][h] = arr.reduce((s, v) => s + v, 0).toFixed(1);
+                    else yearlyDataMap[y][m][h] = (arr.reduce((s, v) => s + v, 0) / arr.length).toFixed(2);
                 });
             }
         }
 
-        monthlyAverages = {};
+        monthlyAvgMap = {};
         for (let m = 1; m <= 12; m++) {
-            monthlyAverages[m] = {};
-            currentHeaders.forEach(h => {
-                let s = 0, c = 0;
-                Object.keys(yearlyStats).forEach(y => {
-                    let v = parseFloat(yearlyStats[y][m][h]);
-                    if (v !== 0) { s += v; c++; }
+            monthlyAvgMap[m] = {};
+            activeHeaders.forEach(h => {
+                let sum = 0, count = 0;
+                Object.keys(yearlyDataMap).forEach(y => {
+                    let val = parseFloat(yearlyDataMap[y][m][h]);
+                    if (val !== 0) { sum += val; count++; }
                 });
-                monthlyAverages[m][h] = c > 0 ? (s / c).toFixed(2) : 0;
+                monthlyAvgMap[m][h] = count > 0 ? (sum / count).toFixed(2) : 0;
             });
         }
     }
 
-    // --- 顯式 UI 控制 (不使用簡化循環) ---
-    function updateControlPanels() {
-        const ys = Object.keys(yearlyStats).sort();
-        const yearHTML = ys.map(y => `<label><input type="checkbox" class="y-chk" value="${y}"> ${y}</label>`).join('');
+    function buildControlUI() {
+        const years = Object.keys(yearlyDataMap).sort();
+        const yearHTML = years.map(y => `<label><input type="checkbox" class="y-select" value="${y}"> ${y}</label>`).join('');
         
-        document.getElementById('temp-years').innerHTML = yearHTML;
-        document.getElementById('wind-years').innerHTML = yearHTML;
+        document.getElementById('temp-years-ui').innerHTML = yearHTML;
+        document.getElementById('precp-years-ui').innerHTML = yearHTML;
+        document.getElementById('wind-years-ui').innerHTML = yearHTML;
 
-        const tempFields = currentHeaders.filter(h => h.includes("氣溫"));
-        document.getElementById('temp-fields').innerHTML = tempFields.map((h, i) => 
-            `<label style="display:block;"><input type="checkbox" class="t-f-chk" value="${h}" ${i==0?'checked':''}> ${h}</label>`
+        // 顯式指定欄位
+        document.getElementById('temp-fields-ui').innerHTML = activeHeaders.filter(h => h.includes("氣溫")).map((h, i) => 
+            `<label style="display:block;"><input type="checkbox" class="t-f-select" value="${h}" ${i==0?'checked':''}> ${h}</label>`
+        ).join('');
+        document.getElementById('precp-fields-ui').innerHTML = activeHeaders.filter(h => h.includes("降水")).map((h, i) => 
+            `<label style="display:block;"><input type="checkbox" class="p-f-select" value="${h}" ${i==0?'checked':''}> ${h}</label>`
         ).join('');
     }
 
-    // --- 獨立繪圖函式 (顯式) ---
+    // --- 獨立繪圖函式 (顯式定義) ---
 
-    function runTempAnalysis() {
-        const selF = Array.from(document.querySelectorAll('.t-f-chk:checked')).map(i => i.value);
-        const selY = Array.from(document.querySelectorAll('#temp-years .y-chk:checked')).map(i => i.value);
-        
-        let options = {
-            chart: { type: 'line' },
-            title: { text: '氣溫分析趨勢' },
-            xAxis: { categories: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] },
-            series: [],
-            credits: { enabled: false }
-        };
-
+    function drawTemperature() {
+        const selF = Array.from(document.querySelectorAll('.t-f-select:checked')).map(i => i.value);
+        const selY = Array.from(document.querySelectorAll('#temp-years-ui .y-select:checked')).map(i => i.value);
+        let opts = { chart: { type: 'line' }, title: { text: '氣溫分析' }, xAxis: { categories: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] }, series: [], credits: { enabled: false } };
         selF.forEach(f => {
-            options.series.push({ name: `10年平均 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(monthlyAverages[i+1][f])), lineWidth: 4, color: '#222' });
-            selY.forEach(y => {
-                options.series.push({ name: `${y}年 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(yearlyStats[y][i+1][f])) });
-            });
+            opts.series.push({ name: `10年平均 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(monthlyAvgMap[i+1][f])), lineWidth: 4, color: '#333' });
+            selY.forEach(y => opts.series.push({ name: `${y}年 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(yearlyDataMap[y][i+1][f])) }));
         });
-        Highcharts.chart('chart-temp', options);
+        Highcharts.chart('chart-temp', opts);
     }
 
-    function runWindAnalysis() {
-        const selY = Array.from(document.querySelectorAll('#wind-years .y-chk:checked')).map(i => i.value);
-        const DIRS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
-        const COLORS = ['#44546a', '#5b9bd5', '#70ad47', '#ffc000', '#ed7d31'];
-        const SPEEDS = ['0-1 m/s', '1-2 m/s', '2-3 m/s', '3-4 m/s', '>4 m/s'];
+    function drawPrecipitation() {
+        const selF = Array.from(document.querySelectorAll('.p-f-select:checked')).map(i => i.value);
+        const selY = Array.from(document.querySelectorAll('#precp-years-ui .y-select:checked')).map(i => i.value);
+        let opts = { chart: { type: 'column' }, title: { text: '降雨分析' }, xAxis: { categories: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] }, series: [], credits: { enabled: false } };
+        selF.forEach(f => {
+            opts.series.push({ name: `10年平均 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(monthlyAvgMap[i+1][f])), color: '#2563eb' });
+            selY.forEach(y => opts.series.push({ name: `${y}年 ${f}`, data: Array.from({length:12}, (_,i)=>parseFloat(yearlyDataMap[y][i+1][f])) }));
+        });
+        Highcharts.chart('chart-precp', opts);
+    }
 
-        let options = {
-            chart: { polar: true, type: 'column' },
-            title: { text: '風頻率玫瑰圖 (Revit 模式)' },
-            xAxis: { categories: DIRS, tickmarkPlacement: 'on' },
-            plotOptions: { column: { stacking: 'normal', groupPadding: 0, pointPlacement: 'on' } },
-            series: [],
-            credits: { enabled: false }
-        };
-
+    function drawWindRose() {
+        const selY = Array.from(document.querySelectorAll('#wind-years-ui .y-select:checked')).map(i => i.value);
+        let opts = { chart: { polar: true, type: 'column' }, title: { text: '風玫瑰圖' }, xAxis: { categories: DIRECTIONS, tickmarkPlacement: 'on' }, plotOptions: { column: { stacking: 'normal', groupPadding: 0, pointPlacement: 'on' } }, series: [], credits: { enabled: false } };
+        
         const mat = Array.from({length: 16}, () => new Array(5).fill(0));
         const rng = [[0,1], [1,2], [2,3], [3,4], [4,99]];
 
-        currentData.forEach(r => {
+        activeRows.forEach(r => {
             if (selY.length === 0 || selY.includes(String(r["年"]))) {
                 const s = parseFloat(r["風速(m/s)(WS)"]), d = parseFloat(r["風向(360degree)(WD)"]);
                 if (!isNaN(s) && !isNaN(d)) {
@@ -251,23 +257,21 @@
             }
         });
 
-        rng.forEach((r, i) => {
-            options.series.push({ name: SPEEDS[i], data: mat.map(row => row[i]), color: COLORS[i] });
-        });
-        Highcharts.chart('chart-wind', options);
+        rng.forEach((r, i) => opts.series.push({ name: SPEED_LABELS[i], data: mat.map(row => row[i]), color: SPEED_COLORS[i] }));
+        Highcharts.chart('chart-wind', opts);
     }
 
     function renderFullTable() {
-        const fs = currentHeaders.filter(h => h.includes("氣溫") || h.includes("降水") || h.includes("風"));
+        const fs = activeHeaders.filter(h => h.includes("氣溫") || h.includes("降水") || h.includes("風速"));
         let h = `<table><tr><th>月份</th>${fs.map(f => `<th>${f}</th>`).join('')}</tr>`;
         for (let m = 1; m <= 12; m++) {
-            h += `<tr><td>${m}月</td>${fs.map(f => `<td>${monthlyAverages[m][f] || 0}</td>`).join('')}</tr>`;
+            h += `<tr><td>${m}月</td>${fs.map(f => `<td>${monthlyAvgMap[m][f] || 0}</td>`).join('')}</tr>`;
         }
-        document.getElementById('main-table-container').innerHTML = h + `</table>`;
+        document.getElementById('full-table-container').innerHTML = h + `</table>`;
     }
 
-    // 預設載入台北
-    loadStationData(STATIONS[0]);
+    // 預設載入第一站
+    syncData(STATION_CONFIG[0]);
 </script>
 </body>
 </html>
