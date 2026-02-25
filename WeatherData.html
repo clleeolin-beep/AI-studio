@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V47 (路徑強制版)</title>
+    <title>氣候資料智慧工具 V48 (全面監控版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -10,126 +10,210 @@
         :root { --primary: #2c3e50; --accent: #27ae60; --blue: #3498db; --danger: #e74c3c; --purple: #8e44ad; }
         body { font-family: "Microsoft JhengHei", sans-serif; max-width: 950px; margin: 40px auto; padding: 20px; background-color: #f4f7f6; }
         .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; border-top: 5px solid var(--primary); }
+        .card.cleaner { border-top-color: var(--danger); }
         .card.cloud { border-top-color: var(--purple); }
         h2 { margin: 0 0 10px 0; color: var(--primary); font-size: 1.4em; }
+        .desc { color: #7f8c8d; font-size: 0.85em; margin-bottom: 15px; }
         .section { margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
         button { padding: 12px 20px; font-size: 15px; cursor: pointer; color: white; border: none; border-radius: 6px; width: 100%; transition: 0.3s; }
         .btn-merge { background: var(--blue); }
+        .btn-clean { background: var(--danger); }
         .btn-cloud { background: var(--purple); }
         #status { margin-top: 20px; padding: 15px; border-radius: 6px; background: #2c3e50; color: #ecf0f1; font-size: 0.9em; white-space: pre-line; border-left: 5px solid var(--accent); }
-        .diag-box { font-family: monospace; font-size: 0.85em; color: #f1c40f; background: #000; padding: 15px; margin-top: 10px; border-radius: 4px; line-height: 1.5; }
-        .link-btn { color: #3498db; text-decoration: underline; cursor: pointer; display: block; margin-top: 5px; }
+        .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 300px; overflow-y: auto; }
+        .diag-err { color: #ff5555; font-weight: bold; }
+        .diag-suc { color: #55ff55; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>📂 區塊一：本地彙整</h2>
+        <h2>📂 第一區：本地彙整與地理補全</h2>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
-        <button id="mergeBtn" class="btn-merge" disabled>執行彙整下載</button>
+        <button id="mergeBtn" class="btn-merge" disabled>執行彙整並產出 [站號].xlsx</button>
+    </div>
+
+    <div class="card cleaner">
+        <h2>🧹 第二區：10 年滾動清理 (智慧對位)</h2>
+        <div class="section"><input type="file" id="cleanInput" accept=".xlsx"></div>
+        <button id="cleanBtn" class="btn-clean" disabled>執行清理下載</button>
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 區塊三：雲端自動同步 (強制歸位版)</h2>
-        <p style="font-size:0.85em; color:#666;">目標: 1HqmjT4H1Z1optd8QV3W21GSfgoL6894F</p>
+        <h2>☁️ 第三區：雲端智慧同步 (全流程診斷)</h2>
         <div class="section">
+            <p class="desc">目標資料夾：1HqmjT4H1Z1optd8QV3W21GSfgoL6894F</p>
             <input type="file" id="syncInput" multiple accept=".xlsx">
         </div>
-        <button id="syncBtn" class="btn-cloud">授權並執行強制同步</button>
-        <div id="diag" class="diag-box">診斷日誌：等待執行...</div>
+        <button id="syncBtn" class="btn-cloud">授權並啟動同步監控</button>
+        <div id="diag" class="diag-box">等待執行指令...</div>
     </div>
 
-    <div id="status">準備就緒</div>
+    <div id="status">系統初始化中...</div>
 
     <script>
         const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
+        const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
         const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F';
+        
+        let STATION_DB = {};
         let tokenClient, accessToken = null;
+        const status = document.getElementById('status');
+        const diag = document.getElementById('diag');
+
+        const cutoffDate = new Date(new Date().getFullYear() - 10, new Date().getMonth() + 1, 0, 23, 59, 59);
+
+        // 載入對照表
+        window.stationLoader = (json) => {
+            if (json?.table) {
+                json.table.rows.forEach(r => {
+                    const id = String(r.c[0]?.v || "").trim();
+                    if (id) STATION_DB[id] = { city: r.c[6]?.v || "", name: r.c[1]?.v || "", alt: r.c[3]?.v || "", lon: r.c[4]?.v || "", lat: r.c[5]?.v || "", addr: r.c[7]?.v || "" };
+                });
+                status.innerText = "✅ 測站對照表連線成功。";
+            }
+        };
+        const s = document.createElement('script');
+        s.src = `https://docs.google.com/spreadsheets/d/${MASTER_SS_ID}/gviz/tq?tqx=responseHandler:stationLoader`;
+        document.body.appendChild(s);
 
         window.onload = () => {
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata',
-                callback: (resp) => { accessToken = resp.access_token; startFinalSync(); }
+                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata https://www.googleapis.com/auth/drive.readonly',
+                callback: (resp) => { accessToken = resp.access_token; startFolderSync(); }
             });
         };
 
-        document.getElementById('syncBtn').onclick = () => {
-            if (!document.getElementById('syncInput').files.length) return alert("請選取檔案");
-            accessToken ? startFinalSync() : tokenClient.requestAccessToken({prompt: 'consent'});
+        const cleanVal = (v) => ['/', '-', 'X', '...', 'T'].includes(String(v).trim()) ? '' : v;
+
+        // --- 第一區：彙整邏輯 (補全 STATION_DB) ---
+        document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
+        document.getElementById('mergeBtn').onclick = async () => {
+            const files = Array.from(document.getElementById('mergeInput').files);
+            const stationsData = {}; const stnHeadersEn = {}; const stnEnToCh = {};
+            status.innerText = "⏳ 正在分析數據...";
+            for (const file of files) {
+                const results = await new Promise(res => {
+                    if(file.name.endsWith('.csv')) Papa.parse(file, { complete: r => res(r.data) });
+                    else {
+                        const reader = new FileReader();
+                        reader.onload = e => { const wb = XLSX.read(e.target.result); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1})); };
+                        reader.readAsArrayBuffer(file);
+                    }
+                });
+                const m = file.name.match(/(\d+)-/);
+                if (m && results.length >= 2) {
+                    const stn = m[1]; const yr = file.name.split('-')[1]; const mo = file.name.split('-')[2]?.split('.')[0] || "";
+                    if (!stnHeadersEn[stn]) { stnHeadersEn[stn] = new Set(); stnEnToCh[stn] = {}; stationsData[stn] = []; }
+                    results[1].forEach((en, i) => { if(en) { stnHeadersEn[stn].add(en); stnEnToCh[stn][en] = results[0][i]; } });
+                    results.slice(2).forEach(row => {
+                        const dRaw = row[0]; if (!dRaw) return;
+                        const date = String(dRaw).includes('/') ? dRaw : `${yr}/${mo}/${String(dRaw).padStart(2, '0')}`;
+                        const obj = {}; results[1].forEach((en, i) => { obj[en] = cleanVal(row[i]); });
+                        stationsData[stn].push({ date, obj });
+                    });
+                }
+            }
+            for (const stn in stationsData) {
+                const info = STATION_DB[stn] || { city: "-", name: "-", alt: "-", lon: "-", lat: "-", addr: "-" };
+                const allEn = Array.from(stnHeadersEn[stn]);
+                const unique = Array.from(new Map(stationsData[stn].sort((a,b)=>a.date.localeCompare(b.date)).map(it => [it.date, it])).values());
+                const finalRows = unique.map(it => [stn, info.city, info.name, info.alt, info.lat, info.lon, info.addr, it.date.split('/')[0], it.date.split('/')[1], it.date, ...allEn.map(en => it.obj[en] || "")]);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...allEn.map(en => stnEnToCh[stn][en])], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...allEn], ...finalRows]), stn);
+                XLSX.writeFile(wb, `${stn}.xlsx`);
+            }
+            status.innerText = "✅ 彙整完成，地理補全成功。";
         };
 
-        async function startFinalSync() {
-            const files = Array.from(document.getElementById('syncInput').files);
-            const diag = document.getElementById('diag');
-            diag.innerHTML = "--- 啟動強制歸位同步 ---\n";
+        // --- 第二區：清理邏輯 ---
+        document.getElementById('cleanInput').onchange = () => document.getElementById('cleanBtn').disabled = false;
+        document.getElementById('cleanBtn').onclick = async () => {
+            const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
+            const outWb = XLSX.utils.book_new();
+            let report = "";
+            wb.SheetNames.forEach(name => {
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
+                if (rows.length <= 2) return;
+                const idx = rows[0][0] === "站碼" ? 9 : 0;
+                const filtered = rows.slice(2).filter(r => new Date(r[idx]) > cutoffDate);
+                report += `[${name}] 刪除 ${rows.length - 2 - filtered.length} 筆\n`;
+                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], rows[1], ...filtered]), name);
+            });
+            XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
+            status.innerText = "✅ 清理完成報表：\n" + report;
+        };
+
+        // --- 第三區：全面監控同步 ---
+        document.getElementById('syncBtn').onclick = () => {
+            if (!document.getElementById('syncInput').files.length) return alert("請選取檔案");
+            accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'consent'});
+        };
+
+        async function startFolderSync() {
+            const syncFiles = Array.from(document.getElementById('syncInput').files);
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] 🚀 啟動同步監控程序...<br>`;
+            status.innerText = "🚀 同步中，請觀察下方診斷盒子...";
 
             try {
-                // 1. 檢查資料夾權限
-                const folderRes = await fetch(`https://www.googleapis.com/drive/v3/files/${FOLDER_ID}?fields=name,owners`, {
+                // Step 1: 掃描資料夾
+                diag.innerHTML += `🔍 正在搜尋資料夾 [${FOLDER_ID}]...<br>`;
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name, owners, parents)`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
-                const folderMeta = await folderRes.json();
-                diag.innerHTML += `📁 資料夾: ${folderMeta.name} (擁有者: ${folderMeta.owners[0].emailAddress})\n`;
+                const driveData = await driveRes.json();
+                if (driveData.error) throw new Error(`Drive API 錯誤: ${driveData.error.message}`);
+                const driveFiles = driveData.files || [];
+                diag.innerHTML += `<span class="diag-suc">✅ 資料夾讀取成功，內含 ${driveFiles.length} 個檔案。</span><br>`;
 
-                for (const file of files) {
+                for (const file of syncFiles) {
                     const stnId = file.name.replace('.xlsx', '');
-                    diag.innerHTML += `\n[${stnId}] 正在掃描...`;
+                    diag.innerHTML += `<br><b>📡 測站 [${stnId}]:</b><br>`;
 
-                    // 2. 尋找檔案 (不限於資料夾，找全域，以防它被建在外面)
-                    const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=name contains '${stnId}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id, name, parents)`, {
-                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                    });
-                    const searchData = await searchRes.json();
-                    let targetFile = searchData.files[0];
-                    let ssid = targetFile?.id;
+                    let target = driveFiles.find(f => f.name.includes(stnId));
+                    let ssid = target?.id;
 
                     if (!ssid) {
-                        diag.innerHTML += `\n -> 雲端無此檔，建立新檔並搬移至目標資料夾...`;
-                        const createRes = await fetch(`https://www.googleapis.com/drive/v3/files`, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                name: `${stnId}.xlsx`,
-                                mimeType: 'application/vnd.google-apps.spreadsheet',
-                                parents: [FOLDER_ID]
-                            })
+                        diag.innerHTML += ` -> ❌ 找不到現有檔案，嘗試建立新試算表...<br>`;
+                        const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
+                            method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: `${stnId}.xlsx`, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
                         });
-                        const newFile = await createRes.json();
+                        const newFile = await create.json();
                         ssid = newFile.id;
+                        diag.innerHTML += ` -> <span class="diag-suc">✨ 建立成功! ID: ${ssid}</span><br>`;
                     } else {
-                        diag.innerHTML += `\n -> 找到現有檔案 (ID: ${ssid})`;
-                        // 檢查是否在正確資料夾，若不在則搬移
-                        if (!targetFile.parents || !targetFile.parents.includes(FOLDER_ID)) {
-                            diag.innerHTML += `\n -> 位置不正確，執行強制搬移...`;
-                            await fetch(`https://www.googleapis.com/drive/v3/files/${ssid}?addParents=${FOLDER_ID}&removeParents=${targetFile.parents?.join(',')}`, {
-                                method: 'PATCH', headers: { 'Authorization': `Bearer ${accessToken}` }
-                            });
-                        }
+                        diag.innerHTML += ` -> 🔗 找到現有檔，擁有者: ${target.owners[0].displayName}<br>`;
                     }
 
-                    // 3. 更新資料
+                    // Step 2: 寫入數據
+                    diag.innerHTML += ` -> ⏳ 正在解析本地數據並寫入 Google Sheets...<br>`;
                     const wb = XLSX.read(await file.arrayBuffer());
                     const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, defval: ""});
                     
+                    // 清空 A1:ZZ20000
                     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                    const putRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
-                        method: 'PUT',
-                        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                    
+                    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                        method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ values: data })
                     });
 
-                    if (putRes.ok) {
-                        diag.innerHTML += `\n ✅ 更新成功！ <a class="link-btn" href="https://docs.google.com/spreadsheets/d/${ssid}" target="_blank">點此開啟測站表單確認內容</a>`;
+                    if (updateRes.ok) {
+                        diag.innerHTML += ` -> <span class="diag-suc">✅ 數據同步成功！</span><br>`;
+                        diag.innerHTML += ` -> 🔗 <a href="https://docs.google.com/spreadsheets/d/${ssid}" target="_blank" style="color:#3498db">點此查看雲端實體檔案</a><br>`;
+                    } else {
+                        const errInfo = await updateRes.json();
+                        diag.innerHTML += ` -> <span class="diag-err">❌ 寫入失敗: ${errInfo.error.message}</span><br>`;
                     }
                 }
+                status.innerText = "🎉 同步作業完成，請檢查上方診斷資訊。";
             } catch (err) {
-                diag.innerHTML += `\n ❌ 發生錯誤: ${err.message}`;
+                diag.innerHTML += `<br><span class="diag-err">❌ 嚴重異常: ${err.message}</span>`;
+                status.innerText = "❌ 操作失敗。";
             }
         }
-        
-        // 彙整邏輯 (同 V46，確保檔名簡約)
-        document.getElementById('mergeBtn').onclick = async () => { /* ... */ };
     </script>
 </body>
 </html>
