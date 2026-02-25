@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V49 (全功能穩定版)</title>
+    <title>氣候資料智慧工具 V50 (版本覆蓋穩定版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -16,18 +16,20 @@
         .desc { color: #7f8c8d; font-size: 0.85em; margin-bottom: 15px; }
         .section { margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
         button { padding: 12px 20px; font-size: 15px; cursor: pointer; color: white; border: none; border-radius: 6px; width: 100%; transition: 0.3s; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
         .btn-merge { background: var(--blue); }
         .btn-clean { background: var(--danger); }
         .btn-cloud { background: var(--purple); }
         #status { margin-top: 20px; padding: 15px; border-radius: 6px; background: #2c3e50; color: #ecf0f1; font-size: 0.9em; white-space: pre-line; border-left: 5px solid var(--accent); }
         .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 250px; overflow-y: auto; }
         .diag-err { color: #ff5555; }
+        .diag-info { color: #3498db; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>📂 第一區：彙整與地理資訊自動注入 (gviz)</h2>
+        <h2>📂 第一區：彙整與地理資訊自動注入</h2>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行彙整下載</button>
     </div>
@@ -40,7 +42,8 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (Google Drive 目錄對位)</h2>
+        <h2>☁️ 第三區：智慧同步 (Google Drive 版本更新)</h2>
+        <p class="desc">自動偵測雲端同名檔案進行覆蓋，防止重複檔案堆積。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".xlsx">
         </div>
@@ -86,7 +89,7 @@
 
         const cleanVal = (v) => ['/', '-', 'X', '...', 'T'].includes(String(v).trim()) ? '' : v;
 
-        // 第一區：彙整補完地理資訊
+        // 第一區：彙整
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
@@ -127,7 +130,7 @@
             status.innerText = "✅ 彙整下載完成。";
         };
 
-        // 第二區：智慧對位清理
+        // 第二區：清理
         document.getElementById('cleanInput').onchange = () => document.getElementById('cleanBtn').disabled = false;
         document.getElementById('cleanBtn').onclick = async () => {
             const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
@@ -145,7 +148,7 @@
             status.innerText = "✅ 清理完成報表：\n" + report;
         };
 
-        // 第三區：智慧同步
+        // 第三區：智慧同步 (修正覆蓋邏輯)
         document.getElementById('syncBtn').onclick = () => {
             if (!document.getElementById('syncInput').files.length) return alert("請先選擇檔案");
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'consent'});
@@ -155,33 +158,56 @@
             const syncFiles = Array.from(document.getElementById('syncInput').files);
             diag.innerHTML = `[${new Date().toLocaleTimeString()}] 🚀 啟動同步程序...<br>`;
             try {
+                // 1. 獲取當前目錄清單
                 const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const driveData = await driveRes.json();
-                if (driveData.error) throw new Error(`請先啟用 Drive API: ${driveData.error.message}`);
+                if (driveData.error) throw new Error(`API 錯誤: ${driveData.error.message}`);
                 const driveFiles = driveData.files || [];
 
                 for (const file of syncFiles) {
-                    const stnId = file.name.replace('.xlsx', '');
-                    let ssid = driveFiles.find(f => f.name.includes(stnId))?.id;
-                    if (!ssid) {
-                        diag.innerHTML += `➕ 建立新檔案 [${stnId}]...<br>`;
+                    const fileName = file.name;
+                    const stnId = fileName.replace('.xlsx', '');
+                    
+                    // 2. 尋找是否存在同名檔案
+                    let targetFile = driveFiles.find(f => f.name === fileName);
+                    let ssid;
+
+                    if (targetFile) {
+                        diag.innerHTML += `<span class="diag-info">🔄 偵測到重複，覆蓋舊檔 [${fileName}]...</span><br>`;
+                        ssid = targetFile.id;
+                    } else {
+                        diag.innerHTML += `➕ 建立新檔案 [${fileName}]...<br>`;
                         const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
                             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: `${stnId}.xlsx`, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
+                            body: JSON.stringify({ name: fileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
                         });
                         ssid = (await create.json()).id;
                     }
+
+                    // 3. 數據寫入 (Excel 轉 JSON 再透過 Sheets API 寫入)
                     const wb = XLSX.read(await file.arrayBuffer());
                     const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, defval: ""});
-                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                    
+                    // 清空既有內容
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { 
+                        method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } 
+                    });
+                    
+                    // 寫入新內容
+                    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
                         method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ values: data })
                     });
-                    diag.innerHTML += `<span style="color:#55ff55">✅ ${stnId} 同步成功。</span><br>`;
+
+                    if(updateRes.ok) {
+                        diag.innerHTML += `<span style="color:#55ff55">✅ ${stnId} 同步成功。</span><br>`;
+                    } else {
+                        diag.innerHTML += `<span class="diag-err">❌ ${stnId} 寫入失敗。</span><br>`;
+                    }
                 }
+                status.innerText = "✅ 所有檔案同步程序執行完畢。";
             } catch (err) {
                 diag.innerHTML += `<span class="diag-err">❌ 失敗: ${err.message}</span>`;
             }
