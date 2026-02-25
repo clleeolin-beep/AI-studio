@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V56 (反應強化穩定版)</title>
+    <title>氣候資料智慧工具 V58 (即時反應版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -18,15 +18,16 @@
         label { font-weight: bold; font-size: 0.9em; color: var(--primary); margin-right: 10px; }
         select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; }
         button { padding: 12px 20px; font-size: 15px; cursor: pointer; color: white; border: none; border-radius: 6px; width: 100%; transition: 0.3s; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.6; }
         .btn-merge { background: var(--blue); }
         .btn-clean { background: var(--danger); }
         .btn-cloud { background: var(--purple); }
         #status { margin-top: 20px; padding: 15px; border-radius: 6px; background: #2c3e50; color: #ecf0f1; font-size: 0.9em; white-space: pre-line; border-left: 5px solid var(--accent); }
-        .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 250px; overflow-y: auto; }
+        .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 300px; overflow-y: auto; }
         .diag-err { color: #ff5555; }
         .diag-info { color: #3498db; }
         .diag-success { color: #55ff55; }
+        .diag-wait { color: #f1c40f; }
     </style>
 </head>
 <body>
@@ -52,13 +53,13 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (反應與異動即時分析)</h2>
-        <p class="desc">自動合併：相同日期若內容變動則覆蓋，新日期則補入。</p>
+        <h2>☁️ 第三區：智慧同步 (即時異動判讀版)</h2>
+        <p class="desc">上傳檔案後，點擊下方按鈕執行「增量判讀」並同步至雲端。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
         </div>
-        <button id="syncBtn" class="btn-cloud">授權並執行雲端同步</button>
-        <div id="diag" class="diag-box">診斷：等待點擊同步...</div>
+        <button id="syncBtn" class="btn-cloud" disabled>授權並執行同步判讀</button>
+        <div id="diag" class="diag-box">診斷：等待匯入檔案...</div>
     </div>
 
     <div id="status">準備中...</div>
@@ -122,6 +123,7 @@
             return { stnId: stnId, data: [['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...chHeaders], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...enHeaders], ...rows] };
         }
 
+        // --- 第一區 & 第二區 邏輯保持最大化保留 ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
@@ -151,22 +153,27 @@
             XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
         };
 
-        // 第三區：智慧同步 (強化反應監測)
+        // --- 第三區：智慧同步 (修正匯入反應) ---
+        document.getElementById('syncInput').onchange = () => {
+            const files = document.getElementById('syncInput').files;
+            if (files.length > 0) {
+                document.getElementById('syncBtn').disabled = false;
+                diag.innerHTML = `[${new Date().toLocaleTimeString()}] <span class="diag-wait">📥 已就緒：準備同步 ${files.length} 個檔案。</span><br>`;
+                Array.from(files).forEach(f => diag.innerHTML += `• ${f.name}<br>`);
+                diag.innerHTML += `<hr>點擊「執行同步判讀」按鈕開始處理。`;
+            }
+        };
+
         document.getElementById('syncBtn').onclick = () => {
-            if (!document.getElementById('syncInput').files.length) return alert("請先選擇檔案");
-            // 強制重置診斷區
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 正在聯繫 Google API，請稍候...<br>`;
-            status.innerText = "⏳ 授權處理中...";
-            accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'consent'});
+            if (!document.getElementById('syncInput').files.length) return;
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 正在聯繫 Google API...<br>`;
+            accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'none'});
         };
 
         async function startFolderSync() {
             const syncFiles = Array.from(document.getElementById('syncInput').files);
-            diag.innerHTML += `[${new Date().toLocaleTimeString()}] 🚀 授權成功，啟動分析程序...<br>`;
-            
             try {
-                // 增加 Cache-Control 防止讀取到舊的 Drive 清單
-                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)&t=${new Date().getTime()}`, {
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)&_=${new Date().getTime()}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const driveData = await driveRes.json();
@@ -174,11 +181,11 @@
 
                 for (const file of syncFiles) {
                     let stnId, processedData = [];
-                    diag.innerHTML += `<span class="diag-info">📄 處理檔案: ${file.name}...</span><br>`;
+                    diag.innerHTML += `<span class="diag-info">🔍 正在讀取並判讀 [${file.name}]...</span><br>`;
 
                     if (file.name.toLowerCase().endsWith('.csv')) {
                         const result = await processRawToStandard(file);
-                        if (!result) { diag.innerHTML += `<span class="diag-err">❌ 無法辨識測站 ID: ${file.name}</span><br>`; continue; }
+                        if (!result) continue;
                         stnId = result.stnId; processedData = result.data;
                     } else {
                         stnId = file.name.replace('.xlsx', '');
@@ -195,7 +202,7 @@
                         const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                         existingData = (await getRes.json()).values || [];
                     } else {
-                        diag.innerHTML += `➕ 雲端尚無此站，正在建立新檔案 [${targetFileName}]...<br>`;
+                        diag.innerHTML += `➕ 建立雲端新檔案 [${targetFileName}]...<br>`;
                         const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
                             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: targetFileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
@@ -203,9 +210,9 @@
                         ssid = (await create.json()).id;
                     }
 
-                    // --- 比對邏輯 ---
+                    // --- 異動分析 ---
                     const dataMap = new Map();
-                    let addCount = 0; let updateCount = 0; let sameCount = 0;
+                    let addCount = 0; let updateCount = 0;
 
                     existingData.slice(2).forEach(row => { if (row[9]) dataMap.set(row[9], JSON.stringify(row)); });
 
@@ -217,28 +224,24 @@
 
                         if (!oldRowJson) { addCount++; dataMap.set(dateKey, newRowJson); }
                         else if (oldRowJson !== newRowJson) { updateCount++; dataMap.set(dateKey, newRowJson); }
-                        else { sameCount++; }
                     });
 
                     const sortedRows = Array.from(dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => JSON.parse(dataMap.get(k)));
-                    const finalOutput = [processedData[0] || [], processedData[1] || [], ...sortedRows];
+                    const finalOutput = [processedData[0], processedData[1], ...sortedRows];
 
-                    if (addCount > 0 || updateCount > 0) {
-                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                        const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
-                            method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ values: finalOutput })
-                        });
-                        if (updateRes.ok) diag.innerHTML += `<span class="diag-success">✅ ${stnId} 同步成功：新增 ${addCount} / 更新 ${updateCount} / 總筆數 ${sortedRows.length}。</span><br>`;
-                    } else {
-                        diag.innerHTML += `<span class="diag-info">ℹ️ ${stnId}：與雲端現有資料相同，跳過更新。</span><br>`;
+                    // 強制更新寫入
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                        method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: finalOutput })
+                    });
+                    
+                    if (updateRes.ok) {
+                        diag.innerHTML += `<span class="diag-success">✅ ${stnId}：新增 ${addCount} 筆 / 更新 ${updateCount} 筆 / 總計 ${sortedRows.length} 筆。</span><br>`;
                     }
                 }
-                status.innerText = "✅ 程序執行完畢。";
-            } catch (err) { 
-                diag.innerHTML += `<span class="diag-err">❌ 發生錯誤: ${err.message}</span>`;
-                console.error(err);
-            }
+                status.innerText = "✅ 同步判讀程序完成。";
+            } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 錯誤: ${err.message}</span>`; }
         }
     </script>
 </body>
