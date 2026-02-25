@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V54 (滾動清理升級版)</title>
+    <title>氣候資料智慧工具 V55 (增量分析版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -27,26 +27,25 @@
         .diag-err { color: #ff5555; }
         .diag-info { color: #3498db; }
         .diag-success { color: #55ff55; }
+        .diag-stat { color: #f1c40f; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <h2>📂 第一區：彙整與地理資訊注入 (免登入/離線版)</h2>
-        <p class="desc">上傳原始 CSV，自動補全地理資訊並下載標準 XLSX 檔案。</p>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行彙整下載</button>
     </div>
 
     <div class="card cleaner">
         <h2>🧹 第二區：10 年滾動清理 (智慧日期對位)</h2>
-        <p class="desc">自動尋找第 10 欄日期進行清理，保持資料夾結構穩定。</p>
         <div class="section">
             <label>清理基準：</label>
             <select id="cleanBasis">
-                <option value="year">以年份為基準 (保留近10年全年度)</option>
-                <option value="month">以月份為基準 (保留近120個月)</option>
-                <option value="day" selected>以日期為基準 (精確10年)</option>
+                <option value="year">以年份為基準</option>
+                <option value="month">以月份為基準</option>
+                <option value="day" selected>以日期為基準</option>
             </select>
         </div>
         <div class="section"><input type="file" id="cleanInput" accept=".xlsx"></div>
@@ -54,8 +53,8 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (管理員直通版)</h2>
-        <p class="desc">支援原始 CSV 或彙整 XLSX。自動增量合併、排序並同步至雲端。</p>
+        <h2>☁️ 第三區：智慧同步 (增量異動分析版)</h2>
+        <p class="desc">自動合併：重複日期若內容變動則覆蓋，新日期則補入。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
         </div>
@@ -74,8 +73,8 @@
         let tokenClient, accessToken = null;
         const status = document.getElementById('status');
         const diag = document.getElementById('diag');
+        const cutoffDate = new Date(new Date().getFullYear() - 10, new Date().getMonth() + 1, 0, 23, 59, 59);
 
-        // 載入對照表
         window.stationLoader = (json) => {
             if (json?.table) {
                 json.table.rows.forEach(r => {
@@ -105,7 +104,6 @@
             const stnId = m[1];
             const yr = file.name.split('-')[1];
             const mo = file.name.split('-')[2]?.split('.')[0] || "";
-
             const results = await new Promise(res => { 
                 if(file.name.endsWith('.csv')) Papa.parse(file, { complete: r => res(r.data) });
                 else {
@@ -114,26 +112,22 @@
                     reader.readAsArrayBuffer(file);
                 }
             });
-
             if (results.length < 2) return null;
             const info = STATION_DB[stnId] || { city: "-", name: "-", alt: "-", lon: "-", lat: "-", addr: "-" };
             const enHeaders = results[1].filter(h => h);
             const chHeaders = results[0].slice(0, enHeaders.length);
-
             const rows = results.slice(2).filter(r => r[0]).map(row => {
                 const dRaw = row[0];
                 const date = String(dRaw).includes('/') ? dRaw : `${yr}/${mo}/${String(dRaw).padStart(2, '0')}`;
                 return [stnId, info.city, info.name, info.alt, info.lat, info.lon, info.addr, date.split('/')[0], date.split('/')[1], date, ...enHeaders.map((_, i) => cleanVal(row[i]))];
             });
-
             return { stnId: stnId, data: [['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...chHeaders], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...enHeaders], ...rows] };
         }
 
-        // --- 第一區：彙整下載 ---
+        // --- 第一區與第二區邏輯維持 (V54版本) ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
-            status.innerText = "⏳ 正在彙整檔案...";
             for (const file of files) {
                 const result = await processRawToStandard(file);
                 if (result) {
@@ -142,46 +136,25 @@
                     XLSX.writeFile(wb, `${result.stnId}.xlsx`);
                 }
             }
-            status.innerText = "✅ 彙整下載完成。";
         };
 
-        // --- 第二區：升級版 10 年滾動清理 ---
         document.getElementById('cleanInput').onchange = () => document.getElementById('cleanBtn').disabled = false;
         document.getElementById('cleanBtn').onclick = async () => {
             const basis = document.getElementById('cleanBasis').value;
             const now = new Date();
-            let dynamicCutoff;
-
-            // 計算截止日期 (Cutoff Date)
-            if (basis === 'year') {
-                // 以年份為基準：保留今年及其前 9 年 (共 10 年份)
-                dynamicCutoff = new Date(now.getFullYear() - 10, 0, 1);
-            } else if (basis === 'month') {
-                // 以月份為基準：保留 120 個月前的 1 日至今
-                dynamicCutoff = new Date(now.getFullYear(), now.getMonth() - 120, 1);
-            } else {
-                // 以日期為基準：精確至 10 年前當天
-                dynamicCutoff = new Date(now.getFullYear() - 10, now.getMonth(), now.getDate());
-            }
-
+            let dynamicCutoff = (basis === 'year') ? new Date(now.getFullYear()-10, 0, 1) : (basis === 'month') ? new Date(now.getFullYear(), now.getMonth()-120, 1) : new Date(now.getFullYear()-10, now.getMonth(), now.getDate());
             const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
             const outWb = XLSX.utils.book_new();
-            let report = `清理基準: ${basis}\n截止日期: ${dynamicCutoff.toLocaleDateString()}\n`;
-
             wb.SheetNames.forEach(name => {
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
-                if (rows.length <= 2) return;
-                const idx = rows[0][0] === "站碼" ? 9 : 0; // 自動對位日期欄位
+                const idx = rows[0][0] === "站碼" ? 9 : 0;
                 const filtered = rows.slice(2).filter(r => new Date(r[idx]) >= dynamicCutoff);
-                report += `[${name}] 刪除 ${rows.length - 2 - filtered.length} 筆\n`;
                 XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], rows[1], ...filtered]), name);
             });
-
             XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
-            status.innerText = "✅ 清理完成報表：\n" + report;
         };
 
-        // --- 第三區：智慧同步 (增量更新) ---
+        // --- 第三區：智慧同步 (異動分析) ---
         document.getElementById('syncBtn').onclick = () => {
             if (!document.getElementById('syncInput').files.length) return alert("請先選擇檔案");
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'consent'});
@@ -189,7 +162,7 @@
 
         async function startFolderSync() {
             const syncFiles = Array.from(document.getElementById('syncInput').files);
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] 🚀 啟動自動化同步程序...<br>`;
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] 🚀 啟動同步分析...<br>`;
             try {
                 const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -203,7 +176,6 @@
                         const result = await processRawToStandard(file);
                         if (!result) continue;
                         stnId = result.stnId; processedData = result.data;
-                        diag.innerHTML += `<span class="diag-info">⚙️ 轉換 CSV [${file.name}]...</span><br>`;
                     } else {
                         stnId = file.name.replace('.xlsx', '');
                         const wb = XLSX.read(await file.arrayBuffer());
@@ -219,7 +191,6 @@
                         const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                         existingData = (await getRes.json()).values || [];
                     } else {
-                        diag.innerHTML += `➕ 建立新檔案 [${targetFileName}]...<br>`;
                         const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
                             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: targetFileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
@@ -227,21 +198,48 @@
                         ssid = (await create.json()).id;
                     }
 
+                    // --- 核心：異動分析邏輯 ---
                     const dataMap = new Map();
-                    existingData.slice(2).forEach(row => { if (row[9]) dataMap.set(row[9], row); });
-                    processedData.slice(2).forEach(row => { if (row[9]) dataMap.set(row[9], row); });
+                    let addCount = 0; let updateCount = 0; let sameCount = 0;
 
-                    const sortedRows = Array.from(dataMap.values()).sort((a, b) => new Date(a[9]) - new Date(b[9]));
-                    const finalOutput = [[processedData[0][0]?processedData[0]:existingData[0]], [processedData[1][0]?processedData[1]:existingData[1]], ...sortedRows];
+                    // 1. 建立雲端既有資料的對照
+                    existingData.slice(2).forEach(row => { if (row[9]) dataMap.set(row[9], JSON.stringify(row)); });
 
-                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
-                        method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ values: finalOutput })
+                    // 2. 比對新上傳資料
+                    processedData.slice(2).forEach(row => {
+                        const dateKey = row[9];
+                        if (!dateKey) return;
+                        const oldRowJson = dataMap.get(dateKey);
+                        const newRowJson = JSON.stringify(row);
+
+                        if (!oldRowJson) {
+                            addCount++;
+                            dataMap.set(dateKey, newRowJson);
+                        } else if (oldRowJson !== newRowJson) {
+                            updateCount++;
+                            dataMap.set(dateKey, newRowJson);
+                        } else {
+                            sameCount++;
+                        }
                     });
-                    if(updateRes.ok) diag.innerHTML += `<span class="diag-success">✅ ${stnId} 同步完成。</span><br>`;
+
+                    // 3. 組合最終結果
+                    const sortedRows = Array.from(dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => JSON.parse(dataMap.get(k)));
+                    const finalOutput = [processedData[0], processedData[1], ...sortedRows];
+
+                    // 4. 寫回雲端 (僅在有異動時)
+                    if (addCount > 0 || updateCount > 0) {
+                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                            method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ values: finalOutput })
+                        });
+                        diag.innerHTML += `<span class="diag-success">✅ ${stnId}：新增 ${addCount} 筆, 更新 ${updateCount} 筆, 總計 ${sortedRows.length} 筆。</span><br>`;
+                    } else {
+                        diag.innerHTML += `<span class="diag-info">ℹ️ ${stnId}：資料與雲端完全一致，無須更新。</span><br>`;
+                    }
                 }
-                status.innerText = "✅ 智慧同步完畢。";
+                status.innerText = "✅ 同步分析完畢。";
             } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 失敗: ${err.message}</span>`; }
         }
     </script>
