@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V55 (增量分析版)</title>
+    <title>氣候資料智慧工具 V56 (反應強化穩定版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -27,7 +27,6 @@
         .diag-err { color: #ff5555; }
         .diag-info { color: #3498db; }
         .diag-success { color: #55ff55; }
-        .diag-stat { color: #f1c40f; }
     </style>
 </head>
 <body>
@@ -53,13 +52,13 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (增量異動分析版)</h2>
-        <p class="desc">自動合併：重複日期若內容變動則覆蓋，新日期則補入。</p>
+        <h2>☁️ 第三區：智慧同步 (反應與異動即時分析)</h2>
+        <p class="desc">自動合併：相同日期若內容變動則覆蓋，新日期則補入。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
         </div>
         <button id="syncBtn" class="btn-cloud">授權並執行雲端同步</button>
-        <div id="diag" class="diag-box">診斷：等待啟用 Drive API 後執行...</div>
+        <div id="diag" class="diag-box">診斷：等待點擊同步...</div>
     </div>
 
     <div id="status">準備中...</div>
@@ -73,7 +72,6 @@
         let tokenClient, accessToken = null;
         const status = document.getElementById('status');
         const diag = document.getElementById('diag');
-        const cutoffDate = new Date(new Date().getFullYear() - 10, new Date().getMonth() + 1, 0, 23, 59, 59);
 
         window.stationLoader = (json) => {
             if (json?.table) {
@@ -124,7 +122,6 @@
             return { stnId: stnId, data: [['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...chHeaders], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...enHeaders], ...rows] };
         }
 
-        // --- 第一區與第二區邏輯維持 (V54版本) ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
@@ -154,17 +151,22 @@
             XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
         };
 
-        // --- 第三區：智慧同步 (異動分析) ---
+        // 第三區：智慧同步 (強化反應監測)
         document.getElementById('syncBtn').onclick = () => {
             if (!document.getElementById('syncInput').files.length) return alert("請先選擇檔案");
+            // 強制重置診斷區
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 正在聯繫 Google API，請稍候...<br>`;
+            status.innerText = "⏳ 授權處理中...";
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'consent'});
         };
 
         async function startFolderSync() {
             const syncFiles = Array.from(document.getElementById('syncInput').files);
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] 🚀 啟動同步分析...<br>`;
+            diag.innerHTML += `[${new Date().toLocaleTimeString()}] 🚀 授權成功，啟動分析程序...<br>`;
+            
             try {
-                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
+                // 增加 Cache-Control 防止讀取到舊的 Drive 清單
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)&t=${new Date().getTime()}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const driveData = await driveRes.json();
@@ -172,9 +174,11 @@
 
                 for (const file of syncFiles) {
                     let stnId, processedData = [];
+                    diag.innerHTML += `<span class="diag-info">📄 處理檔案: ${file.name}...</span><br>`;
+
                     if (file.name.toLowerCase().endsWith('.csv')) {
                         const result = await processRawToStandard(file);
-                        if (!result) continue;
+                        if (!result) { diag.innerHTML += `<span class="diag-err">❌ 無法辨識測站 ID: ${file.name}</span><br>`; continue; }
                         stnId = result.stnId; processedData = result.data;
                     } else {
                         stnId = file.name.replace('.xlsx', '');
@@ -191,6 +195,7 @@
                         const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                         existingData = (await getRes.json()).values || [];
                     } else {
+                        diag.innerHTML += `➕ 雲端尚無此站，正在建立新檔案 [${targetFileName}]...<br>`;
                         const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
                             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: targetFileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
@@ -198,49 +203,42 @@
                         ssid = (await create.json()).id;
                     }
 
-                    // --- 核心：異動分析邏輯 ---
+                    // --- 比對邏輯 ---
                     const dataMap = new Map();
                     let addCount = 0; let updateCount = 0; let sameCount = 0;
 
-                    // 1. 建立雲端既有資料的對照
                     existingData.slice(2).forEach(row => { if (row[9]) dataMap.set(row[9], JSON.stringify(row)); });
 
-                    // 2. 比對新上傳資料
                     processedData.slice(2).forEach(row => {
                         const dateKey = row[9];
                         if (!dateKey) return;
                         const oldRowJson = dataMap.get(dateKey);
                         const newRowJson = JSON.stringify(row);
 
-                        if (!oldRowJson) {
-                            addCount++;
-                            dataMap.set(dateKey, newRowJson);
-                        } else if (oldRowJson !== newRowJson) {
-                            updateCount++;
-                            dataMap.set(dateKey, newRowJson);
-                        } else {
-                            sameCount++;
-                        }
+                        if (!oldRowJson) { addCount++; dataMap.set(dateKey, newRowJson); }
+                        else if (oldRowJson !== newRowJson) { updateCount++; dataMap.set(dateKey, newRowJson); }
+                        else { sameCount++; }
                     });
 
-                    // 3. 組合最終結果
                     const sortedRows = Array.from(dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => JSON.parse(dataMap.get(k)));
-                    const finalOutput = [processedData[0], processedData[1], ...sortedRows];
+                    const finalOutput = [processedData[0] || [], processedData[1] || [], ...sortedRows];
 
-                    // 4. 寫回雲端 (僅在有異動時)
                     if (addCount > 0 || updateCount > 0) {
                         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                        const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
                             method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ values: finalOutput })
                         });
-                        diag.innerHTML += `<span class="diag-success">✅ ${stnId}：新增 ${addCount} 筆, 更新 ${updateCount} 筆, 總計 ${sortedRows.length} 筆。</span><br>`;
+                        if (updateRes.ok) diag.innerHTML += `<span class="diag-success">✅ ${stnId} 同步成功：新增 ${addCount} / 更新 ${updateCount} / 總筆數 ${sortedRows.length}。</span><br>`;
                     } else {
-                        diag.innerHTML += `<span class="diag-info">ℹ️ ${stnId}：資料與雲端完全一致，無須更新。</span><br>`;
+                        diag.innerHTML += `<span class="diag-info">ℹ️ ${stnId}：與雲端現有資料相同，跳過更新。</span><br>`;
                     }
                 }
-                status.innerText = "✅ 同步分析完畢。";
-            } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 失敗: ${err.message}</span>`; }
+                status.innerText = "✅ 程序執行完畢。";
+            } catch (err) { 
+                diag.innerHTML += `<span class="diag-err">❌ 發生錯誤: ${err.message}</span>`;
+                console.error(err);
+            }
         }
     </script>
 </body>
