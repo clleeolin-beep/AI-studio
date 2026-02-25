@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V37 (兼容舊檔版)</title>
+    <title>氣候資料智慧工具 V38 (同步修復版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -26,8 +26,8 @@
 <body>
 
     <div class="card">
-        <h2>📂 區塊一：本地彙整 (相容舊 XLSX)</h2>
-        <p class="desc">支援同時上傳 CSV 與舊彙整檔。自動解析地理標頭，確保新舊資料合併不偏移。</p>
+        <h2>📂 區塊一：本地彙整 (相容新舊資料)</h2>
+        <p class="desc">支援 CSV 及已匯出的 XLSX 合併。自動對位地理標頭，確保資料不偏移。</p>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行彙整並下載 Excel</button>
     </div>
@@ -39,9 +39,10 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 區塊三：更新雲端資料庫 (1-AuV...)</h2>
+        <h2>☁️ 區塊三：更新雲端資料庫 (同步修復)</h2>
+        <p class="desc">修正資料結構偏移問題，確保 Google Sheets 完整覆蓋。</p>
         <div class="section"><input type="file" id="syncInput" accept=".xlsx"></div>
-        <button id="syncBtn" class="btn-cloud" disabled>授權並自動更新雲端</button>
+        <button id="syncBtn" class="btn-cloud" disabled>授權並自動同步至雲端</button>
     </div>
 
     <div id="status">正在載入系統...</div>
@@ -58,15 +59,15 @@
         const now = new Date();
         const baseDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const cutoffDate = new Date(baseDate.getFullYear() - 10, baseDate.getMonth() + 1, 0, 23, 59, 59);
-        document.getElementById('status').innerText = "✅ 系統就緒。";
 
+        // 初始化載入對照表
         window.stationLoader = (json) => {
             if (json && json.table) {
                 json.table.rows.forEach(r => {
                     const id = String(r.c[0]?.v || "").trim();
                     if (id) STATION_DB[id] = { name: r.c[1]?.v || "", alt: r.c[3]?.v || "", lon: r.c[4]?.v || "", lat: r.c[5]?.v || "", city: r.c[6]?.v || "", addr: r.c[7]?.v || "" };
                 });
-                status.innerText = "✅ 雲端對照表載入成功。可讀取新舊資料。";
+                status.innerText = "✅ 系統就緒。已優化同步模組。";
             }
         };
         const s = document.createElement('script');
@@ -84,97 +85,62 @@
 
         const cleanVal = (val) => ['/', '-', 'X', '...', 'T'].includes(String(val).trim()) ? '' : val;
 
-        // --- 區塊一：修正後的兼容彙整邏輯 ---
+        // --- 區塊一：強化彙整邏輯 (兼容處理) ---
         document.getElementById('mergeInput').onchange = (e) => document.getElementById('mergeBtn').disabled = e.target.files.length === 0;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
             const stationsData = {}; 
             const stnHeadersEn = {}; 
             const stnEnToCh = {};    
-            
-            status.innerText = "⏳ 正在解析新舊資料併進行聯集對位...";
+            status.innerText = "⏳ 正在彙整新舊資料...";
 
             for (const file of files) {
                 if (file.name.endsWith('.csv')) {
-                    const csvData = await new Promise(res => Papa.parse(file, { skipEmptyLines: true, complete: r => res(r.data) }));
+                    const csv = await new Promise(res => Papa.parse(file, { skipEmptyLines: true, complete: r => res(r.data) }));
                     const match = file.name.match(/(\d+)-(\d{4})-(\d{2})/);
-                    if (!match || csvData.length < 2) continue;
-                    const [_, stn, yr, mo] = match;
-
-                    processRawData(stn, yr, mo, csvData[0], csvData[1], csvData.slice(2), stationsData, stnHeadersEn, stnEnToCh);
+                    if (match && csv.length >= 2) processData(match[1], match[2], match[3], csv[0], csv[1], csv.slice(2), stationsData, stnHeadersEn, stnEnToCh, false);
                 } else if (file.name.endsWith('.xlsx')) {
                     const wb = XLSX.read(await file.arrayBuffer());
                     wb.SheetNames.forEach(stn => {
                         const rows = XLSX.utils.sheet_to_json(wb.Sheets[stn], {header: 1});
                         if (rows.length < 2) return;
-                        
-                        // 判斷是否為「地理補全版」(前 10 欄為元數據)
-                        const isMetaVersion = rows[0][0] === "站碼" || rows[1][0] === "StationID";
-                        const dataStartIdx = isMetaVersion ? 10 : 0;
-                        
-                        const chHeader = rows[0].slice(dataStartIdx);
-                        const enHeader = rows[1].slice(dataStartIdx);
-                        const dataRows = rows.slice(2);
-
-                        dataRows.forEach(row => {
-                            const obsTime = row[dataStartIdx]; // 原始日期
-                            if (!obsTime) return;
-                            const dMatch = String(obsTime).match(/(\d{4})\/(\d{2})/);
-                            const yr = dMatch ? dMatch[1] : "";
-                            const mo = dMatch ? dMatch[2] : "";
-                            
-                            processRawData(stn, yr, mo, chHeader, enHeader, [row.slice(dataStartIdx)], stationsData, stnHeadersEn, stnEnToCh);
-                        });
+                        const isMeta = rows[0][0] === "站碼";
+                        const startIdx = isMeta ? 10 : 0;
+                        processData(stn, "", "", rows[0].slice(startIdx), rows[1].slice(startIdx), rows.slice(2).map(r => r.slice(startIdx)), stationsData, stnHeadersEn, stnEnToCh, true);
                     });
                 }
             }
 
-            // 輸出 Excel 邏輯 (同 V36，略)
             const outWb = XLSX.utils.book_new();
-            const prefixCh = ['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期'];
-            const prefixEn = ['StationID', 'City', 'StationName', 'Altitude', 'Latitude', 'Longitude', 'Address', 'Year', 'Month', 'Date'];
+            const pCh = ['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期'];
+            const pEn = ['ID', 'City', 'Name', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date'];
 
             for (const stn in stationsData) {
                 const info = STATION_DB[stn] || { name: "未知", city: "未知", alt: "-", lon: "-", lat: "-", addr: "-" };
-                const allEnHeaders = Array.from(stnHeadersEn[stn]);
+                const allEn = Array.from(stnHeadersEn[stn]);
                 const sorted = stationsData[stn].sort((a,b) => a.date.localeCompare(b.date));
-                const uniqueDates = new Map();
-                sorted.forEach(item => uniqueDates.set(item.date, item));
+                const unique = Array.from(new Map(sorted.map(it => [it.date, it])).values());
 
-                const finalRows = Array.from(uniqueDates.values()).map(item => {
-                    const meta = [stn, info.city, info.name, info.alt, info.lat, info.lon, info.addr, item.yr, item.mo, item.date];
-                    const obs = allEnHeaders.map(en => item.obj[en] || "");
-                    return [...meta, ...obs];
-                });
-                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([[...prefixCh, ...allEnHeaders.map(en => stnEnToCh[stn][en])], [...prefixEn, ...allEnHeaders], ...finalRows]), stn);
+                const finalRows = unique.map(it => [...[stn, info.city, info.name, info.alt, info.lat, info.lon, info.addr, it.date.split('/')[0], it.date.split('/')[1], it.date], ...allEn.map(en => it.obj[en] || "")]);
+                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([[...pCh, ...allEn.map(en => stnEnToCh[stn][en])], [...pEn, ...allEn], ...finalRows]), stn);
             }
-            XLSX.writeFile(outWb, `氣候地理彙整_聯集修復版.xlsx`);
-            status.innerText = "✅ 彙整完成！已成功判讀舊彙整檔並合併新資料。";
+            XLSX.writeFile(outWb, `氣候地理彙整_V38.xlsx`);
+            status.innerText = "✅ 彙整下載完成。";
         };
 
-        function processRawData(stn, yr, mo, chHeader, enHeader, dataRows, stationsData, stnHeadersEn, stnEnToCh) {
-            if (!stnHeadersEn[stn]) stnHeadersEn[stn] = new Set();
-            if (!stnEnToCh[stn]) stnEnToCh[stn] = {};
-            if (!stationsData[stn]) stationsData[stn] = [];
-
-            enHeader.forEach((en, idx) => {
-                if(!en) return;
-                stnHeadersEn[stn].add(en);
-                stnEnToCh[stn][en] = chHeader[idx];
-            });
-
-            dataRows.forEach(row => {
-                const dayRaw = row[0];
-                if (dayRaw === undefined || dayRaw === "") return;
-                const fullDate = String(dayRaw).includes('/') ? dayRaw : `${yr}/${mo}/${String(dayRaw).padStart(2, '0')}`;
-                const obsObj = {};
-                enHeader.forEach((en, idx) => { obsObj[en] = cleanVal(row[idx]); });
-                obsObj["ObsTime"] = fullDate;
-                stationsData[stn].push({ date: fullDate, yr: fullDate.split('/')[0], mo: fullDate.split('/')[1], obj: obsObj });
+        function processData(stn, yr, mo, chH, enH, rows, db, hEn, e2c, isXlsx) {
+            if (!hEn[stn]) { hEn[stn] = new Set(); e2c[stn] = {}; db[stn] = []; }
+            enH.forEach((en, i) => { if(en) { hEn[stn].add(en); e2c[stn][en] = chH[i]; } });
+            rows.forEach(r => {
+                const dRaw = r[0]; if (!dRaw) return;
+                const date = String(dRaw).includes('/') ? dRaw : `${yr}/${mo}/${String(dRaw).padStart(2, '0')}`;
+                const obj = {}; enH.forEach((en, i) => { obj[en] = cleanVal(r[i]); });
+                db[stn].push({ date, obj });
             });
         }
 
-        // 區塊二、三邏輯不變...
+        // --- 區塊二：清理邏輯 ---
+        document.getElementById('cleanInput').onchange = (e) => document.getElementById('cleanBtn').disabled = false;
         document.getElementById('cleanBtn').onclick = async () => {
             const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
             const outWb = XLSX.utils.book_new();
@@ -184,20 +150,40 @@
                 const filtered = rows.slice(2).filter(r => r[9] && new Date(r[9]) > cutoffDate);
                 XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], rows[1], ...filtered]), name);
             });
-            XLSX.writeFile(outWb, `清理完成.xlsx`);
+            XLSX.writeFile(outWb, `氣象清理_V38.xlsx`);
             status.innerText = "✅ 清理下載完成。";
         };
 
+        // --- 區塊三：修復後的同步邏輯 ---
+        document.getElementById('syncInput').onchange = (e) => document.getElementById('syncBtn').disabled = false;
         document.getElementById('syncBtn').onclick = () => { accessToken ? startSync() : tokenClient.requestAccessToken({prompt: 'consent'}); };
+
         async function startSync() {
             const file = document.getElementById('syncInput').files[0];
-            const wb = XLSX.read(await file.arrayBuffer());
-            for (const name of wb.SheetNames) {
-                const data = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
-                await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1:ZZ10000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
-                await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1?valueInputOption=USER_ENTERED`, { method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ values: data }) });
-            }
-            status.innerText = "🎉 雲端更新成功！";
+            status.innerText = "🚀 正在啟動穩定同步協定...";
+            try {
+                const wb = XLSX.read(await file.arrayBuffer());
+                for (const name of wb.SheetNames) {
+                    // 修復點：確保使用 aoa 格式提取，防止 JS 物件轉換造成的資料位移
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, defval: ""});
+                    
+                    status.innerText = `⏳ 同步 [${name}] (${data.length} 筆)...`;
+                    
+                    // 1. 清空舊範圍
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1:ZZ15000:clear`, { 
+                        method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } 
+                    });
+                    
+                    // 2. 寫入新資料 (採取 USER_ENTERED 確保數值與日期正確)
+                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CLIMATE_SS_ID}/values/${name}!A1?valueInputOption=USER_ENTERED`, { 
+                        method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: data }) 
+                    });
+
+                    if (!res.ok) throw new Error(`測站 ${name} 同步失敗`);
+                }
+                status.innerText = "🎉 雲端資料庫已全數同步！修復了結構偏移問題。";
+            } catch (err) { status.innerText = `❌ 同步失敗：${err.message}`; }
         }
     </script>
 </body>
