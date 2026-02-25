@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站大數據分析系統 v24.0 - 綜合體感分析版</title>
+    <title>氣象全測站大數據分析系統 v24.2 - 測站管理強化版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -15,12 +15,11 @@
         #top-nav { background: var(--nav-bg); color: white; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
         #main-layout { display: flex; flex: 1; overflow: hidden; }
         #map-container { width: 420px; background: #ddd; border-right: 2px solid #ccc; position: relative; }
-        #map { height: 100%; width: 100%; }
+        #map { height: 100%; width: 100%; cursor: crosshair; }
         #content-area { flex: 1; overflow-y: auto; padding: 25px; scroll-behavior: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; }
         .category-section { display: grid; grid-template-columns: 320px 1fr; gap: 20px; border-top: 5px solid var(--accent); padding-top: 20px; }
         .control-panel { background: #fafafa; padding: 15px; border-radius: 8px; border: 1px solid #eee; font-size: 13px; }
-        .year-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; border-top: 1px dotted #ccc; padding-top: 10px; }
         .mode-switch { display: flex; gap: 5px; margin: 10px 0; }
         .mode-btn { flex: 1; padding: 8px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; background: #eee; border-radius: 4px; font-weight: bold; transition: 0.2s; }
         .mode-btn.active { background: var(--accent); color: white; border-color: #0056b3; }
@@ -30,21 +29,18 @@
         .wind-table, .thi-table { width: 95%; margin-top: 15px; border-collapse: collapse; font-size: 11px; text-align: center; background: #fff; }
         .wind-table th, .thi-table th { background: #f0f0f0; padding: 5px; border: 1px solid #ccc; }
         .wind-table td, .thi-table td { padding: 4px; border: 1px solid #eee; }
-        .individual-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 15px; padding: 10px; background: #f9f9f9; border-radius: 8px; width: 95%; border: 1px solid #eee; }
-        .leg-item { display: flex; align-items: center; font-size: 11px; cursor: pointer; padding: 2px 5px; border-radius: 4px; }
-        .leg-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
-        .hidden-series { color: #ccc !important; text-decoration: line-through; }
         .btn-update { background: var(--success); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px; }
+        .btn-delete-pop { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 8px; width: 100%; }
         #color-picker-popover { position: fixed; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 9999; display: none; width: 240px; border: 1px solid #ccc; }
     </style>
 </head>
 <body>
 
 <div id="top-nav">
-    <h2 style="margin:0;">🌍 氣象分析系統 v24.0</h2>
+    <h2 style="margin:0;">🌍 氣象分析系統 v24.2</h2>
     <div style="display:flex; gap:10px;">
         <button class="btn-update" style="background:var(--orange); width:auto;" onclick="exportToJson()">💾 導出 JSON 備份</button>
-        <button class="btn-update" style="width:auto;" onclick="document.getElementById('fileInput').click()">📁 匯入 (Excel/CSV/JSON)</button>
+        <button class="btn-update" style="width:auto;" onclick="document.getElementById('fileInput').click()">📁 匯入資料</button>
         <input type="file" id="fileInput" multiple accept=".xlsx, .xls, .csv, .json" style="display:none;" onchange="handleFileUpload(event)">
     </div>
 </div>
@@ -52,7 +48,9 @@
 <div id="main-layout">
     <div id="map-container"><div id="map"></div></div>
     <div id="content-area">
-        <div id="station-info-bar" class="card" style="background:#e7f3ff; border-left:5px solid var(--accent);">已新增體感溫度 (Apparent Temp) 綜合分析。</div>
+        <div id="station-info-bar" class="card" style="background:#e7f3ff; border-left:5px solid var(--accent);">
+            <b>測站管理：</b>點擊地圖標記可選擇「載入數據」或「刪除測站」。
+        </div>
         <div id="dashboard" style="display:none;">
             <div id="categoryContainer"></div>
         </div>
@@ -85,17 +83,45 @@
     const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
     const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
 
-    let allStations = {}, currentHeaders = [], currentRows = [], currentYearly = {}, chartModes = {};
-    let activeColorTarget = null, customColorMap = {};
-    let mapMarkers = [];
+    let allStations = {}, currentHeaders = [], currentRows = [], currentYearly = {}, chartModes = {}, currentActiveStation = null;
+    let activeColorTarget = null, customColorMap = {}, mapMarkers = {}, virtualStationCount = 0;
 
     (function init() {
         const map = L.map('map').setView([23.6, 121], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         window.myMap = map;
+        map.on('click', (e) => {
+            if (Object.keys(allStations).length < 2) return alert("請先匯入資料。");
+            createVirtualStation(e.latlng.lat, e.latlng.lng);
+        });
         document.getElementById('cp-apply').onclick = applyIndividualColor;
         document.getElementById('cp-close').onclick = () => document.getElementById('color-picker-popover').style.display='none';
     })();
+
+    function createVirtualStation(lat, lon) {
+        const stations = Object.values(allStations).map(st => ({
+            ...st, dist: Math.sqrt(Math.pow(st.lat - lat, 2) + Math.pow(st.lon - lon, 2))
+        })).sort((a, b) => a.dist - b.dist);
+        const nearby = stations.slice(0, 3);
+        const vId = "V_" + (++virtualStationCount);
+        const virtualRows = nearby[0].rows.map((row, rIdx) => {
+            const newRow = [...row];
+            for(let i=11; i<row.length; i++) {
+                let sum = 0, count = 0;
+                nearby.forEach(st => {
+                    const val = parseFloat(st.rows[rIdx] ? st.rows[rIdx][i] : NaN);
+                    if(!isNaN(val)) { sum += val; count++; }
+                });
+                newRow[i] = count > 0 ? (sum / count).toFixed(2) : "--";
+            }
+            return newRow;
+        });
+        allStations[vId] = { 
+            id: vId, name: `虛擬測站_${vId}`, lat, lon, headers: nearby[0].headers, rows: virtualRows, isVirtual: true, source: nearby.map(s=>s.name).join(',') 
+        };
+        renderMarkers();
+        loadStation(allStations[vId].name);
+    }
 
     async function handleFileUpload(event) {
         const files = event.target.files;
@@ -110,8 +136,7 @@
                 };
                 reader.readAsText(file);
             } else {
-                const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data, { type: 'array' });
+                const data = await file.arrayBuffer(), workbook = XLSX.read(data, { type: 'array' });
                 workbook.SheetNames.forEach(name => {
                     const raw = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
                     if (raw.length < 3) return;
@@ -120,8 +145,7 @@
                     const lonIdx = headers.indexOf("經度") !== -1 ? headers.indexOf("經度") : 5;
                     const nameIdx = headers.indexOf("站名") !== -1 ? headers.indexOf("站名") : 2;
                     if (!isNaN(parseFloat(sample[latIdx]))) {
-                        if(allStations[stId]) { allStations[stId].headers = headers; allStations[stId].rows = dataRows; }
-                        else { allStations[stId] = { name: sample[nameIdx] || name, lat: parseFloat(sample[latIdx]), lon: parseFloat(sample[lonIdx]), headers, rows: dataRows }; }
+                        allStations[stId] = { id: stId, name: sample[nameIdx] || name, lat: parseFloat(sample[latIdx]), lon: parseFloat(sample[lonIdx]), headers, rows: dataRows };
                     }
                 });
                 renderMarkers();
@@ -130,23 +154,52 @@
     }
 
     function renderMarkers() {
-        mapMarkers.forEach(m => window.myMap.removeLayer(m));
-        mapMarkers = [];
-        Object.values(allStations).forEach(st => {
-            const m = L.marker([st.lat, st.lon]).addTo(window.myMap).bindTooltip(st.name).on('click', () => loadStation(st.name));
-            mapMarkers.push(m);
+        Object.values(mapMarkers).forEach(m => window.myMap.removeLayer(m));
+        mapMarkers = {};
+        Object.keys(allStations).forEach(id => {
+            const st = allStations[id];
+            const icon = st.isVirtual ? L.divIcon({className: 'v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>', iconSize: [25,25]}) : new L.Icon.Default();
+            const m = L.marker([st.lat, st.lon], {icon}).addTo(window.myMap);
+            
+            // 使用 Popup 增加管理功能
+            const popupContent = `
+                <div style="min-width:150px;">
+                    <b>${st.name}</b><br>
+                    <button class="btn-update" style="padding:4px; font-size:11px;" onclick="loadStation('${st.name}')">載入數據分析</button>
+                    <button class="btn-delete-pop" onclick="deleteStation('${id}')">🗑️ 刪除此測站</button>
+                </div>
+            `;
+            m.bindPopup(popupContent);
+            mapMarkers[id] = m;
         });
+    }
+
+    function deleteStation(id) {
+        if (!confirm(`確定要刪除測站「${allStations[id].name}」嗎？`)) return;
+        if (currentActiveStation === allStations[id].name) {
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('station-info-bar').innerHTML = "測站已刪除，請選擇其他站點。";
+            currentActiveStation = null;
+        }
+        window.myMap.removeLayer(mapMarkers[id]);
+        delete mapMarkers[id];
+        delete allStations[id];
+        renderMarkers(); // 重新渲染以確保 Popup 同步
     }
 
     function loadStation(name) {
         const st = Object.values(allStations).find(s => s.name === name);
+        if(!st) return;
+        currentActiveStation = name;
         currentHeaders = st.headers; currentRows = st.rows;
         processStats();
-        document.getElementById('station-info-bar').innerHTML = `<h3>📍 測站：${st.name}</h3>`;
+        document.getElementById('station-info-bar').innerHTML = `<h3>📍 測站：${st.name} ${st.isVirtual?'(虛擬)':''}</h3>`;
         document.getElementById('dashboard').style.display = 'block';
         renderDashboard();
+        window.myMap.closePopup(); // 點擊載入後關閉泡泡
     }
 
+    // --- 其餘處理邏輯 (processStats, drawCharts 等) 保持 v24.1 優化後的邏輯 ---
     function processStats() {
         const yIdx = currentHeaders.indexOf("年"), mIdx = currentHeaders.indexOf("月");
         const store = {};
@@ -161,9 +214,11 @@
     }
 
     function hasDataForField(fieldName) {
-        if(fieldName === "[計算] 體感溫度 (Apparent Temp)") return currentHeaders.some(h => h.includes("氣溫")) && currentHeaders.some(h => h.includes("相對溼度")) && currentHeaders.some(h => h.includes("風速"));
-        if(fieldName === "[計算] THI 熱指數") return currentHeaders.some(h => h.includes("氣溫")) && currentHeaders.some(h => h.includes("相對溼度"));
-        if(fieldName === "[計算] 平均每小時雨量") return currentHeaders.some(h => h.includes("降水量")) && currentHeaders.some(h => h.includes("降水時數"));
+        if(fieldName.includes("[計算]")) {
+            if(fieldName.includes("體感")) return currentHeaders.some(h => h.includes("氣溫")) && currentHeaders.some(h => h.includes("相對溼度")) && currentHeaders.some(h => h.includes("風速"));
+            if(fieldName.includes("THI")) return currentHeaders.some(h => h.includes("氣溫")) && currentHeaders.some(h => h.includes("相對溼度"));
+            if(fieldName.includes("雨量")) return currentHeaders.some(h => h.includes("降水量")) && currentHeaders.some(h => h.includes("降水時數"));
+        }
         const idx = currentHeaders.indexOf(fieldName);
         return idx !== -1 && currentRows.some(r => !isNaN(parseFloat(r[idx])) && parseFloat(r[idx]) !== 0);
     }
@@ -176,7 +231,6 @@
             const fields = CATEGORY_MAP[cat].filter(k => k.startsWith("[計算]") ? hasDataForField(k) : currentHeaders.some(h => h.includes(k) && hasDataForField(h)))
                            .map(k => k.startsWith("[計算]") ? k : currentHeaders.find(h => h.includes(k) && hasDataForField(h))).filter(f => f);
             if (!fields.length) return;
-            chartModes[cat] = chartModes[cat] || "overlay";
             const catSafe = cat.replace(/\s/g,''), div = document.createElement('div');
             div.className = 'card category-section';
             div.innerHTML = `<div class="control-panel"><h4>${cat}</h4>
@@ -210,10 +264,9 @@
         box.innerHTML = `<div id="${cId}" class="chart-container"></div><div id="${lId}" class="individual-legend"></div>`;
         parent.appendChild(box);
         const isWind = cat === "風場分析", wsIdx = currentHeaders.findIndex(h => h.includes("風速") || h === "WS"), wdIdx = currentHeaders.findIndex(h => h.includes("風向") || h === "WD");
-        const options = { chart: { polar: isWind, type: isWind ? 'column' : (cat.includes("降雨") ? 'column' : 'line') }, title: { text: title }, xAxis: { categories: isWind ? WIND_DIRECTIONS : Array.from({length:12}, (_,i)=>(i+1)+'月') }, yAxis: { min: 0, title: { text: isWind ? '頻率 (%)' : (cat.includes("舒適度") ? '指標值 / ℃' : '平均值') } }, plotOptions: { column: { stacking: isWind ? 'normal' : undefined } }, series: [], credits: { enabled: false }, legend: { enabled: false } };
-        
+        const options = { chart: { polar: isWind, type: isWind ? 'column' : (cat.includes("降雨") ? 'column' : 'line') }, title: { text: title }, xAxis: { categories: isWind ? WIND_DIRECTIONS : Array.from({length:12}, (_,i)=>(i+1)+'月') }, yAxis: { min: 0, title: { text: isWind ? '頻率 (%)' : '平均值' } }, plotOptions: { column: { stacking: isWind ? 'normal' : undefined } }, series: [], credits: { enabled: false }, legend: { enabled: false } };
         datasets.forEach(ds => {
-            if(isWind) {
+            if(isWind && wsIdx !== -1 && wdIdx !== -1) {
                 const matrix = Array.from({length:16}, () => new Array(5).fill(0)); let total = 0;
                 ds.rows.forEach(r => {
                     const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
@@ -221,7 +274,7 @@
                 });
                 SPEED_LABELS.forEach((label, i) => options.series.push({ name: isSplit ? label : `${ds.title} ${label}`, data: matrix.map(d => total > 0 ? (d[i]/total*100) : 0), color: customColorMap[`${ds.title}_${label}`] || ds.palette[i], stack: ds.title, _dsTitle: ds.title, _sLabel: label }));
                 const table = document.createElement('table'); table.className = 'wind-table';
-                let html = `<thead><tr><th rowspan="2">風向</th><th colspan="5">${ds.title} 頻率(%)</th></tr><tr>${SPEED_LABELS.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>`;
+                let html = `<thead><tr><th rowspan="2">風向</th><th colspan="5">${ds.title} (%)</th></tr><tr>${SPEED_LABELS.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>`;
                 WIND_DIRECTIONS.forEach((dir, dIdx) => html += `<tr><td>${dir}</td>${matrix[dIdx].map(c=>`<td>${total>0?(c/total*100).toFixed(1):0}%</td>`).join('')}</tr>`);
                 table.innerHTML = html + `</tbody>`; box.appendChild(table);
             } else {
@@ -231,31 +284,24 @@
                         if(!mRows.length) return null;
                         const tIdx = currentHeaders.findIndex(h => h.includes("氣溫")), rhIdx = currentHeaders.findIndex(h => h.includes("相對溼度"));
                         const tAvg = mRows.reduce((s,r)=>s+(parseFloat(r[tIdx])||0),0)/mRows.length, rhAvg = mRows.reduce((s,r)=>s+(parseFloat(r[rhIdx])||0),0)/mRows.length;
-
-                        if(f === "[計算] 體感溫度 (Apparent Temp)") {
+                        if(f.includes("體感")) {
                             const wsIdxLocal = currentHeaders.findIndex(h => h.includes("風速") || h === "WS");
                             const wsAvg = mRows.reduce((s,r)=>s+(parseFloat(r[wsIdxLocal])||0),0)/mRows.length;
                             const e = (rhAvg / 100) * 6.105 * Math.exp(17.27 * tAvg / (237.7 + tAvg));
                             return parseFloat((tAvg + 0.33 * e - 0.70 * wsAvg - 4.00).toFixed(2));
                         }
-                        if(f === "[計算] THI 熱指數") return parseFloat(((1.8*tAvg+32)-(0.55-0.0055*rhAvg)*(1.8*tAvg-26)).toFixed(2));
-                        if(f === "[計算] 平均每小時雨量") {
-                            const pSum = mRows.reduce((s,r)=>s+(parseFloat(r[currentHeaders.findIndex(h=>h.includes("降水量"))])||0),0), hSum = mRows.reduce((s,r)=>s+(parseFloat(r[currentHeaders.findIndex(h=>h.includes("降水時數"))])||0),0);
+                        if(f.includes("THI")) return parseFloat(((1.8*tAvg+32)-(0.55-0.0055*rhAvg)*(1.8*tAvg-26)).toFixed(2));
+                        if(f.includes("時雨量")) {
+                            const pIdx = currentHeaders.findIndex(h=>h.includes("降水量")), hIdx = currentHeaders.findIndex(h=>h.includes("降水時數"));
+                            const pSum = mRows.reduce((s,r)=>s+(parseFloat(r[pIdx])||0),0), hSum = mRows.reduce((s,r)=>s+(parseFloat(r[hIdx])||0),0);
                             return hSum > 0 ? parseFloat((pSum/hSum).toFixed(2)) : null;
                         }
-                        const vals = mRows.map(r => parseFloat(r[currentHeaders.indexOf(f)])).filter(v => !isNaN(v));
+                        const fIdx = currentHeaders.indexOf(f);
+                        const vals = mRows.map(r => parseFloat(r[fIdx])).filter(v => !isNaN(v));
                         return vals.length ? parseFloat((vals.reduce((a,b)=>a+b, 0)/vals.length).toFixed(2)) : null;
                     });
                     options.series.push({ name: isSplit ? f : `${ds.title} ${f}`, data, color: customColorMap[`${ds.title}_${f}`] || ds.palette[2], _dsTitle: ds.title, _sLabel: f });
                 });
-                if(cat === "環境舒適度分析") {
-                    const thiRef = document.createElement('table'); thiRef.className = 'thi-table';
-                    thiRef.innerHTML = `<thead><tr><th>級別</th><th>THI (溫濕)</th><th>體感溫度 (風修正)</th><th>感官程度</th></tr></thead><tbody>
-                        <tr><td>低</td><td>< 60</td><td>< 10</td><td>寒冷 / 極不適</td></tr><tr><td>中下</td><td>60-70</td><td>10-20</td><td>舒適 / 涼爽</td></tr>
-                        <tr><td>中上</td><td>70-75</td><td>20-27</td><td>清涼 / 極舒適</td></tr><tr><td>高</td><td>75-80</td><td>27-32</td><td>悶熱 / 稍熱</td></tr>
-                        <tr><td>極高</td><td>> 80</td><td>> 32</td><td>極不適 / 炎熱</td></tr></tbody>`;
-                    box.appendChild(thiRef);
-                }
             }
         });
         const chart = Highcharts.chart(cId, options);
@@ -284,8 +330,8 @@
 
     function exportToJson() {
         if (!Object.keys(allStations).length) return alert("無資料！");
-        const blob = new Blob([JSON.stringify({ version: "24.0", stations: allStations, colors: customColorMap }, null, 2)], { type: "application/json" });
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `氣象體感分析備份_${new Date().toISOString().slice(0,10)}.json`; a.click();
+        const blob = new Blob([JSON.stringify({ version: "24.2", stations: allStations, colors: customColorMap }, null, 2)], { type: "application/json" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `氣象管理備份_${new Date().toISOString().slice(0,10)}.json`; a.click();
     }
 </script>
 </body>
