@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V60 (預彙整防重複版)</title>
+    <title>氣候資料智慧工具 V62 (第一區預彙整版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -32,7 +32,8 @@
 <body>
 
     <div class="card">
-        <h2>📂 第一區：彙整與地理資訊注入 (免登入/離線版)</h2>
+        <h2>📂 第一區：彙整與地理資訊注入 (免登入/按測站合併)</h2>
+        <p class="desc">同測站的多個 CSV 會自動合併為單一 XLSX 下載。</p>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行彙整下載</button>
     </div>
@@ -40,6 +41,7 @@
     <div class="card cleaner">
         <h2>🧹 第二區：10 年滾動清理 (智慧日期對位)</h2>
         <div class="section">
+            <label>清理基準：</label>
             <select id="cleanBasis">
                 <option value="year">以年份為基準</option>
                 <option value="month">以月份為基準</option>
@@ -52,7 +54,7 @@
 
     <div class="card cloud">
         <h2>☁️ 第三區：智慧同步 (終極防重複版)</h2>
-        <p class="desc">系統會先在本地合併同站資料，再統一同步至雲端，徹底防止重複建檔。</p>
+        <p class="desc">系統會先在本地合併同站資料，再統一同步至雲端。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
         </div>
@@ -78,7 +80,7 @@
                     const id = String(r.c[0]?.v || "").trim();
                     if (id) STATION_DB[id] = { city: r.c[6]?.v || "", name: r.c[1]?.v || "", alt: r.c[3]?.v || "", lon: r.c[4]?.v || "", lat: r.c[5]?.v || "", addr: r.c[7]?.v || "" };
                 });
-                status.innerText = "✅ 測站對照表載入完成。";
+                status.innerText = "✅ 系統就緒。測站對照表載入完成。";
             }
         };
         const s = document.createElement('script');
@@ -122,41 +124,77 @@
                 });
                 return { stnId, headers: [['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...chHeaders], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...enHeaders]], rows };
             } else {
-                return { stnId, headers: [results[0], results[1]], rows: results.slice(2) };
+                return { stnId, headers: [results[0] || [], results[1] || []], rows: results.slice(2) };
             }
         }
 
+        // --- 第一區：按測站合併下載 ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
-        document.getElementById('mergeBtn').onclick = async () => { /* 保留原本邏輯 */ };
+        document.getElementById('mergeBtn').onclick = async () => {
+            const files = Array.from(document.getElementById('mergeInput').files);
+            const bundle = {};
+            status.innerText = "⏳ 正在本地預彙整資料...";
 
+            for (const f of files) {
+                const res = await parseFile(f);
+                if (!bundle[res.stnId]) bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
+                res.rows.forEach(r => { if(r[9]) bundle[res.stnId].dataMap.set(r[9], r); });
+            }
+
+            for (const stnId in bundle) {
+                const sortedRows = Array.from(bundle[stnId].dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => bundle[stnId].dataMap.get(k));
+                const wb = XLSX.utils.book_new();
+                const sheetData = [bundle[stnId].headers[0], bundle[stnId].headers[1], ...sortedRows];
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), stnId);
+                XLSX.writeFile(wb, `${stnId}.xlsx`);
+            }
+            status.innerText = "✅ 彙整完成。所有年份資料已合併至單一檔案。";
+        };
+
+        // --- 第二區：清理功能 ---
+        document.getElementById('cleanInput').onchange = () => document.getElementById('cleanBtn').disabled = false;
+        document.getElementById('cleanBtn').onclick = async () => {
+            const basis = document.getElementById('cleanBasis').value;
+            const now = new Date();
+            let dynamicCutoff = (basis === 'year') ? new Date(now.getFullYear()-10, 0, 1) : (basis === 'month') ? new Date(now.getFullYear(), now.getMonth()-120, 1) : new Date(now.getFullYear()-10, now.getMonth(), now.getDate());
+            const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
+            const outWb = XLSX.utils.book_new();
+            wb.SheetNames.forEach(name => {
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
+                if (rows.length < 2) return;
+                const idx = rows[0][0] === "站碼" ? 9 : 0;
+                const filtered = rows.slice(2).filter(r => new Date(r[idx]) >= dynamicCutoff);
+                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], rows[1], ...filtered]), name);
+            });
+            XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
+        };
+
+        // --- 第三區：智慧同步 (預彙整防重複) ---
         document.getElementById('syncInput').onchange = () => {
             if (document.getElementById('syncInput').files.length > 0) document.getElementById('syncBtn').disabled = false;
         };
 
         document.getElementById('syncBtn').onclick = () => {
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 正在處理本地資料...<br>`;
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 準備同步資料包...<br>`;
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'none'});
         };
 
         async function startFolderSync() {
             const files = Array.from(document.getElementById('syncInput').files);
-            const bundle = {}; // 用於存放本地合併後的資料包
+            const bundle = {}; 
 
             try {
-                // 1. 本地預彙整 (Pre-Merge in memory)
                 for (const f of files) {
                     const res = await parseFile(f);
                     if (!bundle[res.stnId]) bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
                     res.rows.forEach(r => { if(r[9]) bundle[res.stnId].dataMap.set(r[9], r); });
                 }
 
-                // 2. 獲取雲端目錄
                 const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
                     headers: { 'Authorization': `Bearer ${accessToken}` }
                 });
                 const driveFiles = (await driveRes.json()).files || [];
 
-                // 3. 逐一測站執行同步
                 for (const stnId in bundle) {
                     diag.innerHTML += `<span class="diag-info">🚀 同步測站 [${stnId}]...</span><br>`;
                     const targetFileName = `${stnId}.xlsx`;
@@ -168,7 +206,7 @@
                         const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                         existingData = (await getRes.json()).values || [];
                     } else {
-                        diag.innerHTML += `   └─ ➕ 雲端尚無此站，建立新檔案...<br>`;
+                        diag.innerHTML += `   └─ ➕ 建立新檔案...<br>`;
                         const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
                             method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: targetFileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
@@ -176,7 +214,6 @@
                         ssid = (await create.json()).id;
                     }
 
-                    // 智慧合併
                     const finalMap = new Map();
                     existingData.slice(2).forEach(r => { if(r[9]) finalMap.set(r[9], JSON.stringify(r)); });
                     
@@ -199,7 +236,7 @@
 
                     if(updateRes.ok) diag.innerHTML += `<span class="diag-success">   └─ ✅ 完成：新增 ${add} / 更新 ${upd} / 總筆數 ${sortedRows.length}。</span><br>`;
                 }
-                status.innerText = "✅ 程序完成，重複建檔問題已排除。";
+                status.innerText = "✅ 同步程序執行完畢。";
             } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 錯誤: ${err.message}</span>`; }
         }
     </script>
