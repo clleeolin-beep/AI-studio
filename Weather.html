@@ -2,15 +2,17 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.14 - 內部透視除錯完全體</title>
+    <title>氣象全測站分析 v62.15 - 防火牆穿透完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
-    <script src="https://code.highcharts.com/highcharts-more.js"></script>
-    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts-more.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/modules/exporting.min.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
@@ -35,7 +37,6 @@
         .st-Ag { background: var(--purple) !important; }
         .v-marker { display: flex; justify-content: center; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
-        /* 左下角主監視器 */
         #diag-panel {
             position: fixed; bottom: 20px; left: 20px; width: 600px;
             background: rgba(13, 13, 13, 0.95); color: #00ff00; font-family: 'Consolas', 'Courier New', monospace;
@@ -69,7 +70,6 @@
             justify-content: center; align-items: center; backdrop-filter: blur(15px);
         }
         
-        /* 🌟 重構：跳窗改為左右分割佈局 */
         .modal-content { background: #fff; width: 98%; max-width: 1800px; height: 95%; border-radius: 25px; display: flex; flex-direction: row; overflow: hidden; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }
         
         .category-section { display: grid; grid-template-columns: 300px 1fr; gap: 35px; margin-bottom: 50px; border-top: 6px solid var(--accent); padding-top: 30px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
@@ -103,8 +103,8 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.14 【內部透視除錯完全體】</h2>
-        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：雙視窗即時監測 | Try-Catch 防崩潰網 | 雙層標題強制熔合</div>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.15 【內部透視除錯完全體】</h2>
+        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：雙視窗即時監測 | 雲端高可用 CDN 穿透 | 雙層標題強制熔合</div>
     </div>
     <div style="display:flex; gap:15px;">
         <button class="btn-update" style="background:var(--purple); width:auto; padding: 8px 15px;" id="authBtn">🔗 授權 Google 雲端</button>
@@ -140,7 +140,7 @@
                 <span style="cursor:pointer; color:#aaa;" onclick="document.getElementById('modal-diag-panel').innerHTML=''">[清除]</span>
             </div>
             <div id="modal-diag-panel" style="flex-grow: 1; padding: 20px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.8; word-break: break-all;">
-                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -178,17 +178,12 @@
     const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
     const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
 
-    // 🌟 全新雙開監視器日誌系統
     function log(msg, type = '') {
         const time = new Date().toLocaleTimeString();
         let cls = type === 'hit' ? 'log-hit' : (type === 'google' ? 'log-google' : (type === 'err' ? 'log-err' : (type === 'debug' ? 'log-debug' : '')));
         const html = `<div><span style="color:#666;">[${time}]</span> <span class="${cls}">${msg}</span></div>`;
-        
-        // 寫入主面板
         const p1 = document.getElementById('diag-panel');
         if(p1) { p1.innerHTML += html; p1.scrollTop = p1.scrollHeight; }
-        
-        // 寫入彈窗內面板
         const p2 = document.getElementById('modal-diag-panel');
         if(p2) { p2.innerHTML += html; p2.scrollTop = p2.scrollHeight; }
     }
@@ -265,7 +260,6 @@
         }
     };
 
-    // 🌟 絕對防禦解析引擎：強制將中文與英文標題黏合
     async function loadCloudFile(file) {
         log(`[DOWNLOAD] 解析檔案: ${file.name}`, "google");
         try {
@@ -293,7 +287,6 @@
     function processRawDataBlock(raw, sourceName = "資料") {
         if (!raw || raw.length < 3) return log(`[ERR] ${sourceName} 資料列數不足。`, "err");
         
-        // 將第1列(中文)與第2列(英文)強制黏合在一起，不怕亂碼
         const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
         const id = String(raw[2][0]).trim();
         
@@ -369,12 +362,12 @@
         const st = allStations[id];
         currentHeaders = st.headers; currentRows = Array.from(st.dataMap.keys()).sort().map(k => st.dataMap.get(k));
         
-        log(`[SYSTEM] 打開大跳窗，開始準備渲染分析報表...`, "hit");
-        document.getElementById('modal-diag-panel').innerHTML = ''; // 清空右側終端
+        log(`[SYSTEM] 打開大跳窗，準備渲染分析報表...`, "hit");
+        document.getElementById('modal-diag-panel').innerHTML = ''; 
         document.getElementById('modal-title').innerText = `📈 ${st.name} 深度分析報告`;
         document.getElementById('analysis-modal').style.display = 'flex';
         
-        setTimeout(renderDashboard, 100); // 給予 UI 更新時間
+        setTimeout(renderDashboard, 100); 
     };
 
     function renderDashboard() {
@@ -382,12 +375,8 @@
         container.innerHTML = "";
         
         Object.keys(CATEGORY_MAP).forEach(cat => {
-            // 尋找有效欄位
             const fields = CATEGORY_MAP[cat].filter(f => f.startsWith("[計算]") || currentHeaders.some(h => String(h).match(new RegExp(f, 'i'))));
-            if (!fields.length && cat !== "風場分析") {
-                log(`[SKIP] 模組 [${cat}] 找不到對應標題，略過繪製。`, "err");
-                return;
-            }
+            if (!fields.length && cat !== "風場分析") return;
 
             log(`[INIT] 準備渲染模組 [${cat}]...`, "google");
 
@@ -447,9 +436,12 @@
         else createChartWrapper(mount, `${cat} 年度對照`, datasets, gridId, cat, selFields, false);
     }
 
-    // 🌟 最強除錯防護區：所有繪圖邏輯包進 try-catch
     function createChartWrapper(parent, title, datasets, cid, cat, fields, isSplit) {
         try {
+            if (typeof Highcharts === 'undefined') {
+                throw new Error("Highcharts 尚未載入！請檢查網路連線或防毒軟體設定。");
+            }
+
             const wrapper = document.createElement('div');
             wrapper.className = 'chart-box-wrapper';
             const chartId = `canvas-${cid}`, legendId = `leg-${cid}`, tableId = `tbl-${cid}`;
@@ -476,14 +468,12 @@
                     const wdIdx = currentHeaders.findIndex(h => String(h).match(/風向|WD/i));
                     
                     if (wsIdx === -1 || wdIdx === -1) throw new Error(`找不到風場索引！(風速:${wsIdx}, 風向:${wdIdx})`);
-                    log(`[CHART] 渲染風場 -> 風速在第 ${wsIdx} 欄，風向在第 ${wdIdx} 欄。`, "debug");
 
                     const matrix = Array.from({length: 16}, () => new Array(5).fill(0));
                     let total = 0;
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
-                        // 🛡️ 阻絕 -99 崩潰陷阱
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
@@ -502,7 +492,6 @@
                             const mRows = ds.rows.filter(r => parseInt(r[mIdxLocal]) === (m+1));
                             if(!mRows.length) return null;
                             
-                            // 複雜運算保護區
                             if(f.includes("體感") || f.includes("THI")) {
                                 const tIdx = currentHeaders.findIndex(h => String(h).match(/氣溫|Temperature|Temp/i));
                                 const rhIdx = currentHeaders.findIndex(h => String(h).match(/相對溼度|RH/i));
@@ -548,7 +537,6 @@
             if(tableHTML) document.getElementById(tableId).innerHTML = tableHTML;
         } catch (error) {
             log(`[CRITICAL] 模組 [${cat}] 發生致命崩潰: ${error.message}`, "err");
-            console.error(error);
         }
     }
 
