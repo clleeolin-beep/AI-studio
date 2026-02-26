@@ -2,15 +2,16 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站大數據分析系統 v24.2 - 測站管理強化版</title>
+    <title>氣象全測站大數據分析系統 v24.4 - 雲端聯動完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://code.highcharts.com/highcharts.js"></script>
     <script src="https://code.highcharts.com/highcharts-more.js"></script>
     <script src="https://code.highcharts.com/modules/exporting.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        :root { --nav-bg: #1a2a3a; --accent: #007bff; --success: #28a745; --orange: #e67e22; --danger: #dc3545; }
+        :root { --nav-bg: #1a2a3a; --accent: #007bff; --success: #28a745; --orange: #e67e22; --danger: #dc3545; --purple: #9b59b6; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f9; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         #top-nav { background: var(--nav-bg); color: white; padding: 12px 25px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
         #main-layout { display: flex; flex: 1; overflow: hidden; }
@@ -26,30 +27,48 @@
         .multi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
         .chart-box-wrapper { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box;}
         .chart-container { width: 100%; height: 400px; }
-        .wind-table, .thi-table { width: 95%; margin-top: 15px; border-collapse: collapse; font-size: 11px; text-align: center; background: #fff; }
-        .wind-table th, .thi-table th { background: #f0f0f0; padding: 5px; border: 1px solid #ccc; }
-        .wind-table td, .thi-table td { padding: 4px; border: 1px solid #eee; }
-        .btn-update { background: var(--success); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px; }
+        .wind-table { width: 95%; margin-top: 15px; border-collapse: collapse; font-size: 11px; text-align: center; background: #fff; }
+        .wind-table th, .wind-table td { border: 1px solid #eee; padding: 4px; }
+        .btn-update { background: var(--success); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px; transition: 0.3s; }
+        .btn-cloud { background: var(--purple); }
         .btn-delete-pop { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-top: 8px; width: 100%; }
+        #cloud-status { font-size: 12px; color: #ecf0f1; margin-top: 5px; }
         #color-picker-popover { position: fixed; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); z-index: 9999; display: none; width: 240px; border: 1px solid #ccc; }
+        .individual-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 11px; }
+        .leg-item { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        .leg-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .hidden-series { opacity: 0.3; text-decoration: line-through; }
     </style>
 </head>
 <body>
 
 <div id="top-nav">
-    <h2 style="margin:0;">🌍 氣象分析系統 v24.2</h2>
+    <div>
+        <h2 style="margin:0;">🌍 氣象分析系統 v24.4</h2>
+        <div id="cloud-status">☁️ 雲端狀態：尚未連線</div>
+    </div>
     <div style="display:flex; gap:10px;">
-        <button class="btn-update" style="background:var(--orange); width:auto;" onclick="exportToJson()">💾 導出 JSON 備份</button>
-        <button class="btn-update" style="width:auto;" onclick="document.getElementById('fileInput').click()">📁 匯入資料</button>
+        <button class="btn-update btn-cloud" id="authBtn" style="width:auto;">🔗 登入雲端庫</button>
+        <button class="btn-update" style="background:var(--orange); width:auto;" onclick="exportToJson()">💾 備份 JSON</button>
+        <button class="btn-update" style="width:auto;" onclick="document.getElementById('fileInput').click()">📁 本地匯入</button>
         <input type="file" id="fileInput" multiple accept=".xlsx, .xls, .csv, .json" style="display:none;" onchange="handleFileUpload(event)">
     </div>
 </div>
 
 <div id="main-layout">
-    <div id="map-container"><div id="map"></div></div>
+    <div id="map-container">
+        <div id="map"></div>
+        <div id="cloud-list-overlay" style="position:absolute; bottom:0; width:100%; background:rgba(255,255,255,0.95); max-height:250px; overflow-y:auto; z-index:1000; display:none; border-top:3px solid var(--purple); box-shadow: 0 -2px 10px rgba(0,0,0,0.2);">
+            <div style="padding:10px; font-weight:bold; font-size:12px; background:var(--purple); color:white; display:flex; justify-content:space-between;">
+                <span>☁️ 雲端庫測站檔案 (XLSX)</span>
+                <span style="cursor:pointer;" onclick="document.getElementById('cloud-list-overlay').style.display='none'">✖</span>
+            </div>
+            <div id="cloud-files-container" style="padding:5px;"></div>
+        </div>
+    </div>
     <div id="content-area">
         <div id="station-info-bar" class="card" style="background:#e7f3ff; border-left:5px solid var(--accent);">
-            <b>測站管理：</b>點擊地圖標記可選擇「載入數據」或「刪除測站」。
+            <b>使用指引：</b>登入雲端後可直接抓取 Drive XLSX 檔案，或點擊地圖產生虛擬測站。
         </div>
         <div id="dashboard" style="display:none;">
             <div id="categoryContainer"></div>
@@ -67,6 +86,12 @@
 </div>
 
 <script>
+    // --- 核心與雲端配置 ---
+    const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
+    const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F';
+    let accessToken = null, tokenClient;
+
+    // --- 完整分析參數 ---
     const CATEGORY_MAP = { 
         "風場分析": ["風速", "風向", "WD", "WS"], 
         "氣溫分析": ["氣溫", "Temperature", "Temp"], 
@@ -79,80 +104,96 @@
         "地溫分析": ["地溫", "Soil"],
         "雲量與能見度": ["雲量", "能見度", "Cloud", "Visb"]
     };
-    const WIND_DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
+    const WIND_DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北東'];
     const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
     const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
 
-    let allStations = {}, currentHeaders = [], currentRows = [], currentYearly = {}, chartModes = {}, currentActiveStation = null;
-    let activeColorTarget = null, customColorMap = {}, mapMarkers = {}, virtualStationCount = 0;
+    let allStations = {}, mapMarkers = {}, currentActiveStation = null, currentHeaders = [], currentRows = [], currentYearly = {}, chartModes = {}, customColorMap = {}, activeColorTarget = null, virtualStationCount = 0;
 
-    (function init() {
+    // --- 1. 初始化與 Google Auth ---
+    window.onload = () => {
         const map = L.map('map').setView([23.6, 121], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         window.myMap = map;
-        map.on('click', (e) => {
-            if (Object.keys(allStations).length < 2) return alert("請先匯入資料。");
-            createVirtualStation(e.latlng.lat, e.latlng.lng);
+        map.on('click', (e) => { if (Object.keys(allStations).length >= 2) createVirtualStation(e.latlng.lat, e.latlng.lng); });
+
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly',
+            callback: (resp) => {
+                accessToken = resp.access_token;
+                document.getElementById('cloud-status').innerText = "✅ 雲端已連線";
+                fetchCloudFileList();
+            }
         });
+        document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
         document.getElementById('cp-apply').onclick = applyIndividualColor;
         document.getElementById('cp-close').onclick = () => document.getElementById('color-picker-popover').style.display='none';
-    })();
+    };
 
-    function createVirtualStation(lat, lon) {
-        const stations = Object.values(allStations).map(st => ({
-            ...st, dist: Math.sqrt(Math.pow(st.lat - lat, 2) + Math.pow(st.lon - lon, 2))
-        })).sort((a, b) => a.dist - b.dist);
-        const nearby = stations.slice(0, 3);
-        const vId = "V_" + (++virtualStationCount);
-        const virtualRows = nearby[0].rows.map((row, rIdx) => {
-            const newRow = [...row];
-            for(let i=11; i<row.length; i++) {
-                let sum = 0, count = 0;
-                nearby.forEach(st => {
-                    const val = parseFloat(st.rows[rIdx] ? st.rows[rIdx][i] : NaN);
-                    if(!isNaN(val)) { sum += val; count++; }
-                });
-                newRow[i] = count > 0 ? (sum / count).toFixed(2) : "--";
-            }
-            return newRow;
-        });
-        allStations[vId] = { 
-            id: vId, name: `虛擬測站_${vId}`, lat, lon, headers: nearby[0].headers, rows: virtualRows, isVirtual: true, source: nearby.map(s=>s.name).join(',') 
-        };
-        renderMarkers();
-        loadStation(allStations[vId].name);
+    // --- 2. 檔案處理 (雲端與本地) ---
+    async function fetchCloudFileList() {
+        const container = document.getElementById('cloud-files-container');
+        document.getElementById('cloud-list-overlay').style.display = 'block';
+        container.innerHTML = "⏳ 正在檢索雲端 XLSX 檔案...";
+        try {
+            const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            const data = await resp.json();
+            const files = data.files.filter(f => f.name.endsWith('.xlsx'));
+            container.innerHTML = files.map(f => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee; font-size:12px;">
+                    <span>📊 ${f.name}</span>
+                    <button onclick="loadCloudFile('${f.id}', '${f.name}')" style="cursor:pointer; background:var(--purple); color:white; border:none; border-radius:4px; padding:3px 8px;">載入分析</button>
+                </div>
+            `).join('') || "資料夾內無 XLSX 檔案";
+        } catch (err) { container.innerHTML = "❌ 讀取失敗: " + err.message; }
+    }
+
+    async function loadCloudFile(fileId, fileName) {
+        document.getElementById('cloud-status').innerText = `⏳ 下載中: ${fileName}`;
+        try {
+            const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${fileId}/values/A1:ZZ20000`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            const data = await resp.json();
+            processRawData(data.values, fileName);
+            document.getElementById('cloud-status').innerText = `✅ 已同步: ${fileName}`;
+        } catch (err) { alert("讀取雲端表單失敗，請確保該檔案是 Google 試算表格式。"); }
     }
 
     async function handleFileUpload(event) {
-        const files = event.target.files;
-        for (let file of files) {
+        for (let file of event.target.files) {
             if (file.name.endsWith('.json')) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const data = JSON.parse(e.target.result);
-                    Object.assign(allStations, data.stations || {});
-                    Object.assign(customColorMap, data.colors || {});
-                    renderMarkers();
-                };
-                reader.readAsText(file);
-            } else {
-                const data = await file.arrayBuffer(), workbook = XLSX.read(data, { type: 'array' });
-                workbook.SheetNames.forEach(name => {
-                    const raw = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
-                    if (raw.length < 3) return;
-                    const headers = raw[0], dataRows = raw.slice(2), sample = dataRows[0], stId = String(sample[0]);
-                    const latIdx = headers.indexOf("緯度") !== -1 ? headers.indexOf("緯度") : 4;
-                    const lonIdx = headers.indexOf("經度") !== -1 ? headers.indexOf("經度") : 5;
-                    const nameIdx = headers.indexOf("站名") !== -1 ? headers.indexOf("站名") : 2;
-                    if (!isNaN(parseFloat(sample[latIdx]))) {
-                        allStations[stId] = { id: stId, name: sample[nameIdx] || name, lat: parseFloat(sample[latIdx]), lon: parseFloat(sample[lonIdx]), headers, rows: dataRows };
-                    }
-                });
+                const text = await file.text();
+                const data = JSON.parse(text);
+                Object.assign(allStations, data.stations || {});
+                Object.assign(customColorMap, data.colors || {});
                 renderMarkers();
+            } else {
+                const ab = await file.arrayBuffer();
+                const wb = XLSX.read(ab, { type: 'array' });
+                wb.SheetNames.forEach(name => {
+                    const raw = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1 });
+                    processRawData(raw, name);
+                });
             }
         }
     }
 
+    function processRawData(raw, defaultName) {
+        if (raw.length < 3) return;
+        const headers = raw[0], dataRows = raw.slice(2), sample = dataRows[0];
+        const stId = String(sample[0]);
+        const latIdx = headers.indexOf("緯度") !== -1 ? headers.indexOf("緯度") : 4;
+        const lonIdx = headers.indexOf("經度") !== -1 ? headers.indexOf("經度") : 5;
+        const nameIdx = headers.indexOf("站名") !== -1 ? headers.indexOf("站名") : 2;
+        allStations[stId] = { id: stId, name: sample[nameIdx] || defaultName, lat: parseFloat(sample[latIdx]), lon: parseFloat(sample[lonIdx]), headers, rows: dataRows };
+        renderMarkers();
+    }
+
+    // --- 3. 測站管理與地圖 ---
     function renderMarkers() {
         Object.values(mapMarkers).forEach(m => window.myMap.removeLayer(m));
         mapMarkers = {};
@@ -160,33 +201,41 @@
             const st = allStations[id];
             const icon = st.isVirtual ? L.divIcon({className: 'v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>', iconSize: [25,25]}) : new L.Icon.Default();
             const m = L.marker([st.lat, st.lon], {icon}).addTo(window.myMap);
-            
-            // 使用 Popup 增加管理功能
-            const popupContent = `
-                <div style="min-width:150px;">
-                    <b>${st.name}</b><br>
-                    <button class="btn-update" style="padding:4px; font-size:11px;" onclick="loadStation('${st.name}')">載入數據分析</button>
-                    <button class="btn-delete-pop" onclick="deleteStation('${id}')">🗑️ 刪除此測站</button>
-                </div>
-            `;
-            m.bindPopup(popupContent);
+            m.bindPopup(`
+                <div style="min-width:140px;"><b>${st.name}</b><br>
+                <button class="btn-update" style="padding:4px; font-size:11px;" onclick="loadStation('${st.name}')">載入數據分析</button>
+                <button class="btn-delete-pop" onclick="deleteStation('${id}')">🗑️ 刪除</button></div>
+            `);
             mapMarkers[id] = m;
         });
     }
 
     function deleteStation(id) {
-        if (!confirm(`確定要刪除測站「${allStations[id].name}」嗎？`)) return;
-        if (currentActiveStation === allStations[id].name) {
-            document.getElementById('dashboard').style.display = 'none';
-            document.getElementById('station-info-bar').innerHTML = "測站已刪除，請選擇其他站點。";
-            currentActiveStation = null;
-        }
+        if (!confirm("確定刪除？")) return;
         window.myMap.removeLayer(mapMarkers[id]);
-        delete mapMarkers[id];
         delete allStations[id];
-        renderMarkers(); // 重新渲染以確保 Popup 同步
+        renderMarkers();
     }
 
+    function createVirtualStation(lat, lon) {
+        const stations = Object.values(allStations).map(st => ({ ...st, dist: Math.sqrt(Math.pow(st.lat-lat,2)+Math.pow(st.lon-lon,2)) })).sort((a,b)=>a.dist-b.dist);
+        const nearby = stations.slice(0,3);
+        const vId = "V_"+(++virtualStationCount);
+        const virtualRows = nearby[0].rows.map((row, rIdx) => {
+            const newRow = [...row];
+            for(let i=11; i<row.length; i++) {
+                let sum=0, count=0;
+                nearby.forEach(st => { const v=parseFloat(st.rows[rIdx]?.[i]); if(!isNaN(v)){sum+=v; count++;} });
+                newRow[i] = count > 0 ? (sum/count).toFixed(2) : "--";
+            }
+            return newRow;
+        });
+        allStations[vId] = { id: vId, name: `虛擬_${vId}`, lat, lon, headers: nearby[0].headers, rows: virtualRows, isVirtual: true };
+        renderMarkers();
+        loadStation(allStations[vId].name);
+    }
+
+    // --- 4. 數據分析與繪圖核心 ---
     function loadStation(name) {
         const st = Object.values(allStations).find(s => s.name === name);
         if(!st) return;
@@ -196,10 +245,9 @@
         document.getElementById('station-info-bar').innerHTML = `<h3>📍 測站：${st.name} ${st.isVirtual?'(虛擬)':''}</h3>`;
         document.getElementById('dashboard').style.display = 'block';
         renderDashboard();
-        window.myMap.closePopup(); // 點擊載入後關閉泡泡
+        window.myMap.closePopup();
     }
 
-    // --- 其餘處理邏輯 (processStats, drawCharts 等) 保持 v24.1 優化後的邏輯 ---
     function processStats() {
         const yIdx = currentHeaders.indexOf("年"), mIdx = currentHeaders.indexOf("月");
         const store = {};
@@ -237,8 +285,10 @@
                 <div class="mode-switch"><button class="mode-btn mode-btn-${catSafe} ${chartModes[cat]==='overlay'?'active':''}" onclick="setMode('${cat}','overlay')">疊加</button>
                     <button class="mode-btn mode-btn-${catSafe} ${chartModes[cat]==='split'?'active':''}" onclick="setMode('${cat}','split')">並列</button></div>
                 <div id="fields-${catSafe}">${fields.map((f,i)=>`<label style="display:block;"><input type="checkbox" value="${f}" ${i===0?'checked':''}> ${f}</label>`).join('')}</div>
-                <div class="dimension-box"><label><input type="checkbox" id="avg-chk-${catSafe}" checked> 歷史平均</label>
-                <div class="year-grid">${years.map(y=>`<label><input type="checkbox" class="y-chk-${catSafe}" value="${y}"> ${y}</label>`).join('')}</div></div>
+                <div class="dimension-box" style="margin-top:10px; border-top:1px solid #ddd; padding-top:10px;">
+                    <label><input type="checkbox" id="avg-chk-${catSafe}" checked> 歷史平均</label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:3px; margin-top:5px;">${years.map(y=>`<label><input type="checkbox" class="y-chk-${catSafe}" value="${y}"> ${y}</label>`).join('')}</div>
+                </div>
                 <button class="btn-update" onclick="drawCharts('${cat}')">🔄 更新圖表</button></div>
                 <div id="charts-mount-${catSafe}" class="multi-grid"></div>`;
             container.appendChild(div); drawCharts(cat);
@@ -265,6 +315,7 @@
         parent.appendChild(box);
         const isWind = cat === "風場分析", wsIdx = currentHeaders.findIndex(h => h.includes("風速") || h === "WS"), wdIdx = currentHeaders.findIndex(h => h.includes("風向") || h === "WD");
         const options = { chart: { polar: isWind, type: isWind ? 'column' : (cat.includes("降雨") ? 'column' : 'line') }, title: { text: title }, xAxis: { categories: isWind ? WIND_DIRECTIONS : Array.from({length:12}, (_,i)=>(i+1)+'月') }, yAxis: { min: 0, title: { text: isWind ? '頻率 (%)' : '平均值' } }, plotOptions: { column: { stacking: isWind ? 'normal' : undefined } }, series: [], credits: { enabled: false }, legend: { enabled: false } };
+        
         datasets.forEach(ds => {
             if(isWind && wsIdx !== -1 && wdIdx !== -1) {
                 const matrix = Array.from({length:16}, () => new Array(5).fill(0)); let total = 0;
@@ -273,10 +324,6 @@
                     if(!isNaN(s) && !isNaN(d)) { matrix[Math.floor((d + 11.25) / 22.5) % 16][[0,1,2,4,6].findLastIndex(v => s >= v)]++; total++; }
                 });
                 SPEED_LABELS.forEach((label, i) => options.series.push({ name: isSplit ? label : `${ds.title} ${label}`, data: matrix.map(d => total > 0 ? (d[i]/total*100) : 0), color: customColorMap[`${ds.title}_${label}`] || ds.palette[i], stack: ds.title, _dsTitle: ds.title, _sLabel: label }));
-                const table = document.createElement('table'); table.className = 'wind-table';
-                let html = `<thead><tr><th rowspan="2">風向</th><th colspan="5">${ds.title} (%)</th></tr><tr>${SPEED_LABELS.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>`;
-                WIND_DIRECTIONS.forEach((dir, dIdx) => html += `<tr><td>${dir}</td>${matrix[dIdx].map(c=>`<td>${total>0?(c/total*100).toFixed(1):0}%</td>`).join('')}</tr>`);
-                table.innerHTML = html + `</tbody>`; box.appendChild(table);
             } else {
                 fields.forEach(f => {
                     const data = Array.from({length:12}, (_, m) => {
@@ -285,53 +332,57 @@
                         const tIdx = currentHeaders.findIndex(h => h.includes("氣溫")), rhIdx = currentHeaders.findIndex(h => h.includes("相對溼度"));
                         const tAvg = mRows.reduce((s,r)=>s+(parseFloat(r[tIdx])||0),0)/mRows.length, rhAvg = mRows.reduce((s,r)=>s+(parseFloat(r[rhIdx])||0),0)/mRows.length;
                         if(f.includes("體感")) {
-                            const wsIdxLocal = currentHeaders.findIndex(h => h.includes("風速") || h === "WS");
-                            const wsAvg = mRows.reduce((s,r)=>s+(parseFloat(r[wsIdxLocal])||0),0)/mRows.length;
+                            const wsIdxLocal = currentHeaders.findIndex(h => h.includes("風速") || h === "WS"), wsAvg = mRows.reduce((s,r)=>s+(parseFloat(r[wsIdxLocal])||0),0)/mRows.length;
                             const e = (rhAvg / 100) * 6.105 * Math.exp(17.27 * tAvg / (237.7 + tAvg));
                             return parseFloat((tAvg + 0.33 * e - 0.70 * wsAvg - 4.00).toFixed(2));
                         }
                         if(f.includes("THI")) return parseFloat(((1.8*tAvg+32)-(0.55-0.0055*rhAvg)*(1.8*tAvg-26)).toFixed(2));
-                        if(f.includes("時雨量")) {
+                        if(f.includes("雨量")) {
                             const pIdx = currentHeaders.findIndex(h=>h.includes("降水量")), hIdx = currentHeaders.findIndex(h=>h.includes("降水時數"));
                             const pSum = mRows.reduce((s,r)=>s+(parseFloat(r[pIdx])||0),0), hSum = mRows.reduce((s,r)=>s+(parseFloat(r[hIdx])||0),0);
                             return hSum > 0 ? parseFloat((pSum/hSum).toFixed(2)) : null;
                         }
-                        const fIdx = currentHeaders.indexOf(f);
-                        const vals = mRows.map(r => parseFloat(r[fIdx])).filter(v => !isNaN(v));
+                        const fIdx = currentHeaders.indexOf(f), vals = mRows.map(r => parseFloat(r[fIdx])).filter(v => !isNaN(v));
                         return vals.length ? parseFloat((vals.reduce((a,b)=>a+b, 0)/vals.length).toFixed(2)) : null;
                     });
                     options.series.push({ name: isSplit ? f : `${ds.title} ${f}`, data, color: customColorMap[`${ds.title}_${f}`] || ds.palette[2], _dsTitle: ds.title, _sLabel: f });
                 });
             }
         });
+
         const chart = Highcharts.chart(cId, options);
         const legMount = document.getElementById(lId);
         chart.series.forEach((s, sIdx) => {
             const item = document.createElement('div'); item.className = 'leg-item';
             item.innerHTML = `<div class="leg-dot" style="background:${s.color}"></div><span>${s.name}</span>`;
-            item.onclick = (e) => { if(e.target.className === 'leg-dot') openPicker(chart, sIdx, e); else { s.visible ? s.hide() : s.show(); item.classList.toggle('hidden-series'); } };
+            item.onclick = (e) => {
+                if(e.target.className === 'leg-dot') openPicker(chart, sIdx, e);
+                else { s.visible ? s.hide() : s.show(); item.classList.toggle('hidden-series'); }
+            };
             legMount.appendChild(item);
         });
     }
 
     function openPicker(chart, sIdx, e) {
-        activeColorTarget = { chart, sIdx }; const s = chart.series[sIdx], pop = document.getElementById('color-picker-popover');
+        activeColorTarget = { chart, sIdx };
+        const s = chart.series[sIdx], pop = document.getElementById('color-picker-popover');
         pop.style.display = 'block'; pop.style.left = Math.min(window.innerWidth - 260, e.pageX) + 'px'; pop.style.top = (e.pageY - 120) + 'px';
-        document.getElementById('cp-target-title').innerText = `${s.options._dsTitle} - ${s.options._sLabel}`;
+        document.getElementById('cp-target-title').innerText = `${s.options._dsTitle || ""} ${s.options._sLabel || s.name}`;
         document.getElementById('cp-color').value = s.color;
     }
 
     function applyIndividualColor() {
-        const { chart, sIdx } = activeColorTarget; const color = document.getElementById('cp-color').value, s = chart.series[sIdx];
-        s.update({ color }); customColorMap[`${s.options._dsTitle}_${s.options._sLabel}`] = color;
+        const { chart, sIdx } = activeColorTarget;
+        const color = document.getElementById('cp-color').value, s = chart.series[sIdx];
+        s.update({ color });
+        customColorMap[`${s.options._dsTitle}_${s.options._sLabel}`] = color;
         chart.renderTo.parentElement.querySelectorAll('.leg-dot')[sIdx].style.background = color;
         document.getElementById('color-picker-popover').style.display = 'none';
     }
 
     function exportToJson() {
-        if (!Object.keys(allStations).length) return alert("無資料！");
-        const blob = new Blob([JSON.stringify({ version: "24.2", stations: allStations, colors: customColorMap }, null, 2)], { type: "application/json" });
-        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `氣象管理備份_${new Date().toISOString().slice(0,10)}.json`; a.click();
+        const blob = new Blob([JSON.stringify({ stations: allStations, colors: customColorMap }, null, 2)], { type: "application/json" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `分析備份_${new Date().getTime()}.json`; a.click();
     }
 </script>
 </body>
