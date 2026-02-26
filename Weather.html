@@ -2,17 +2,15 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.15 - 防火牆穿透完全體</title>
+    <title>氣象全測站分析 v62.16 - 雲端通道修復完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/highcharts-more.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.4.0/modules/exporting.min.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     
@@ -103,8 +101,8 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.15 【內部透視除錯完全體】</h2>
-        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：雙視窗即時監測 | 雲端高可用 CDN 穿透 | 雙層標題強制熔合</div>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.16 【雲端通道修復完全體】</h2>
+        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：V3雙通道解析回歸 | Try-Catch 防護網 | 智慧日期稽核</div>
     </div>
     <div style="display:flex; gap:15px;">
         <button class="btn-update" style="background:var(--purple); width:auto; padding: 8px 15px;" id="authBtn">🔗 授權 Google 雲端</button>
@@ -160,14 +158,15 @@
     const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
     let accessToken = null, tokenClient, STATION_DB = {}, allStations = {}, clusterGroup, mapMarkers = {};
     let currentActiveStation = null, currentHeaders = [], currentRows = [], chartModes = {}, customColorMap = {}, activeColorTarget = null, virtualStationCount = 0;
+    
     let cloudFilesList = []; 
 
     const CATEGORY_MAP = { 
         "風場分析": ["風速", "風向", "WD", "WS"], 
-        "氣溫分析": ["氣溫", "Temperature", "Temp", "T Max", "T Min"], 
+        "氣溫分析": ["氣溫", "Temperature", "Temp"], 
         "環境舒適度指標": ["[計算] 體感溫度 (Apparent Temp)", "[計算] THI 熱指數"],
-        "降雨時空分佈": ["降水量", "Precp", "雨量", "降水時數", "PrecpHour"],
-        "大氣氣壓觀測": ["氣壓", "Pres", "StnPres"],
+        "降雨時空分佈": ["降水量", "Precp", "雨量", "降雨時數"],
+        "大氣氣壓觀測": ["氣壓", "Pres"],
         "濕度與蒸發量": ["相對溼度", "RH", "蒸發量"],
         "日照紫外線輻射": ["日照", "SunShine", "紫外線", "UVI"],
         "地底觀測 (地溫)": ["地溫", "Soil"],
@@ -201,7 +200,7 @@
             client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly',
             callback: (resp) => { 
                 accessToken = resp.access_token; 
-                log("[AUTH] 授權成功！啟動雲端雷達...", "google"); 
+                log("[AUTH] 授權成功！啟動雲端雷達掃描...", "google"); 
                 fetchCloudFileList(); 
             }
         });
@@ -231,9 +230,10 @@
         });
     };
 
+    // 🌟 修正：補回 mimeType 欄位請求，讓系統能辨識 Google Sheets
     async function fetchCloudFileList() {
         try {
-            const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
+            const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name, mimeType)`, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
             const data = await resp.json();
@@ -253,21 +253,58 @@
             return alert(`雲端沒有這個檔案！`);
         }
         await loadCloudFile(file);
-        const menu = document.getElementById('marker-menu');
-        if (menu.style.display === 'block') {
-            const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
-            showMarkerMenu(id, pt);
-        }
     };
 
+    // 🌟 V3 原版雙通道下載引擎回歸 (完整保留 Google Sheets 與 XLSX 雙支援)
     async function loadCloudFile(file) {
-        log(`[DOWNLOAD] 解析檔案: ${file.name}`, "google");
+        log(`[DOWNLOAD] 開始下載與解析: ${file.name}... (類型: ${file.mimeType})`, "google");
         try {
-            const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            const ab = await resp.arrayBuffer();
-            const wb = XLSX.read(ab, { type: 'array' });
-            const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-            processRawDataBlock(raw, file.name);
+            let raw;
+            // 通道 A: Google Sheets 專用讀取
+            if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+                const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${file.id}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const data = await resp.json();
+                raw = data.values;
+            } else {
+                // 通道 B: 實體 XLSX / CSV 檔案下載
+                const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const ab = await resp.arrayBuffer();
+                const wb = XLSX.read(ab, { type: 'array' });
+                raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            }
+
+            if (!raw || raw.length < 3) {
+                log(`[ERR] 資料列數不足`, "err");
+                return;
+            }
+
+            // V3 原汁原味的標題對接法，最穩定
+            const headers = raw[0];
+            const id = String(raw[2][0]);
+            
+            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
+            if (dateIdx === -1) dateIdx = 9;
+            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
+            if (yIdx === -1) yIdx = 7;
+            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
+            if (mIdx === -1) mIdx = 8;
+            
+            const dataMap = new Map();
+            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
+            
+            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
+            if (nameIdx === -1) nameIdx = 2;
+            const stName = raw[2][nameIdx] || id;
+
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            log(`✅ [${id}] 同步成功：共 ${dataMap.size} 筆日資料。`, "hit");
+
+            // 下載成功後刷新選單狀態
+            const menu = document.getElementById('marker-menu');
+            if (menu.style.display === 'block') {
+                const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
+                showMarkerMenu(id, pt);
+            }
         } catch (err) {
             log(`[ERR] 解析失敗: ${err.message}`, "err");
         }
@@ -279,37 +316,30 @@
             const ab = await file.arrayBuffer();
             const wb = XLSX.read(ab, { type: 'array' });
             const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-            processRawDataBlock(raw, file.name);
+            
+            if (!raw || raw.length < 3) continue;
+            
+            const headers = raw[0];
+            const id = String(raw[2][0]);
+            
+            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
+            if (dateIdx === -1) dateIdx = 9;
+            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
+            if (yIdx === -1) yIdx = 7;
+            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
+            if (mIdx === -1) mIdx = 8;
+            
+            const dataMap = new Map();
+            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
+            
+            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
+            if (nameIdx === -1) nameIdx = 2;
+            const stName = raw[2][nameIdx] || id;
+
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            log(`✅ [${id}] 匯入成功：共 ${dataMap.size} 筆日資料。`, "hit");
         }
         alert("資料處理完畢，請看監視器狀態。");
-    }
-
-    function processRawDataBlock(raw, sourceName = "資料") {
-        if (!raw || raw.length < 3) return log(`[ERR] ${sourceName} 資料列數不足。`, "err");
-        
-        const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
-        const id = String(raw[2][0]).trim();
-        
-        log(`[PARSE] 最終萃取的標題列: ${headers.join(', ')}`, "debug");
-
-        let dateIdx = headers.findIndex(h => h.match(/日期|Date/i));
-        let yIdx = headers.findIndex(h => h.match(/年|Yr/i));
-        let mIdx = headers.findIndex(h => h.match(/月|Mo/i));
-        
-        if (dateIdx === -1) { log(`[WARN] 找不到日期欄位，預設為索引 9`, "err"); dateIdx = 9; }
-        if (yIdx === -1) { log(`[WARN] 找不到年欄位，預設為索引 7`, "err"); yIdx = 7; }
-        if (mIdx === -1) { log(`[WARN] 找不到月欄位，預設為索引 8`, "err"); mIdx = 8; }
-        
-        const dataMap = new Map();
-        raw.slice(2).forEach(r => { 
-            if(r && r.length > 5 && r[dateIdx]) dataMap.set(String(r[dateIdx]).trim(), r); 
-        });
-        
-        let nameIdx = headers.findIndex(h => h.match(/站名|Station/i));
-        const stName = nameIdx !== -1 ? raw[2][nameIdx] : id;
-
-        allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
-        log(`✅ [${id}] 匯入成功：共 ${dataMap.size} 筆日資料。`, "hit");
     }
 
     function showMarkerMenu(id, point) {
@@ -362,7 +392,7 @@
         const st = allStations[id];
         currentHeaders = st.headers; currentRows = Array.from(st.dataMap.keys()).sort().map(k => st.dataMap.get(k));
         
-        log(`[SYSTEM] 打開大跳窗，準備渲染分析報表...`, "hit");
+        log(`[SYSTEM] 準備渲染分析報表...`, "hit");
         document.getElementById('modal-diag-panel').innerHTML = ''; 
         document.getElementById('modal-title').innerText = `📈 ${st.name} 深度分析報告`;
         document.getElementById('analysis-modal').style.display = 'flex';
@@ -376,9 +406,12 @@
         
         Object.keys(CATEGORY_MAP).forEach(cat => {
             const fields = CATEGORY_MAP[cat].filter(f => f.startsWith("[計算]") || currentHeaders.some(h => String(h).match(new RegExp(f, 'i'))));
-            if (!fields.length && cat !== "風場分析") return;
+            if (!fields.length && cat !== "風場分析") {
+                log(`[SKIP] 模組 [${cat}] 找不到對應標題，略過繪製。`, "err");
+                return;
+            }
 
-            log(`[INIT] 準備渲染模組 [${cat}]...`, "google");
+            log(`[INIT] 正在部署模組 [${cat}]...`, "google");
 
             const div = document.createElement('div');
             div.className = 'category-section';
@@ -409,7 +442,7 @@
             container.appendChild(div);
             drawCharts(cat, chartGridId);
         });
-        log(`[SUCCESS] 所有可能模組部署完畢！`, "success");
+        log(`[SUCCESS] 分析報表載入完畢！`, "success");
     }
 
     function setMode(cat, gridId, mode, btn) {
@@ -436,11 +469,10 @@
         else createChartWrapper(mount, `${cat} 年度對照`, datasets, gridId, cat, selFields, false);
     }
 
+    // 🌟 陣列防護盾：全面過濾 -99 等無效值，保證繪圖引擎不崩潰
     function createChartWrapper(parent, title, datasets, cid, cat, fields, isSplit) {
         try {
-            if (typeof Highcharts === 'undefined') {
-                throw new Error("Highcharts 尚未載入！請檢查網路連線或防毒軟體設定。");
-            }
+            if (typeof Highcharts === 'undefined') throw new Error("Highcharts 未載入！");
 
             const wrapper = document.createElement('div');
             wrapper.className = 'chart-box-wrapper';
@@ -467,13 +499,14 @@
                     const wsIdx = currentHeaders.findIndex(h => String(h).match(/風速|WS/i));
                     const wdIdx = currentHeaders.findIndex(h => String(h).match(/風向|WD/i));
                     
-                    if (wsIdx === -1 || wdIdx === -1) throw new Error(`找不到風場索引！(風速:${wsIdx}, 風向:${wdIdx})`);
-
+                    if (wsIdx === -1 || wdIdx === -1) throw new Error(`找不到風場欄位！`);
+                    
                     const matrix = Array.from({length: 16}, () => new Array(5).fill(0));
                     let total = 0;
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
+                        // 🛡️ 阻擋 -99
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
@@ -520,7 +553,7 @@
             });
 
             Highcharts.chart(chartId, options);
-            log(`[CHART] ${cat} 模組 (${title}) 繪製完成！`, "hit");
+            log(`[CHART] ${cat} 模組繪製完成！`, "hit");
 
             const legMount = document.getElementById(legendId);
             options.series.forEach((s, sIdx) => {
@@ -537,6 +570,7 @@
             if(tableHTML) document.getElementById(tableId).innerHTML = tableHTML;
         } catch (error) {
             log(`[CRITICAL] 模組 [${cat}] 發生致命崩潰: ${error.message}`, "err");
+            console.error(error);
         }
     }
 
@@ -564,12 +598,6 @@
         customColorMap[`${s.options._dsTitle}_${s.options._sLabel}`] = color;
         chart.renderTo.parentElement.querySelectorAll('.leg-dot')[sIdx].style.background = color;
         document.getElementById('color-picker-popover').style.display = 'none';
-    }
-
-    function exportToJson() {
-        const a = document.createElement("a"); 
-        a.href = URL.createObjectURL(new Blob([JSON.stringify({ stations: allStations, colors: customColorMap, timestamp: new Date().toISOString() }, null, 2)], { type: "application/json" })); 
-        a.download = `氣象系統備份_${Date.now()}.json`; a.click();
     }
 
     function closeModal() { 
