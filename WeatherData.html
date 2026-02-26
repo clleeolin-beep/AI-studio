@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V62 (第一區預彙整版)</title>
+    <title>氣候資料智慧工具 V64 (純淨矩陣展開版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -33,7 +33,7 @@
 
     <div class="card">
         <h2>📂 第一區：彙整與地理資訊注入 (免登入/按測站合併)</h2>
-        <p class="desc">同測站的多個 CSV 會自動合併為單一 XLSX 下載。</p>
+        <p class="desc">透過全展開矩陣鎖定欄位格式，產出完全相容 JSON 解析標準的 XLSX 檔案。</p>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行彙整下載</button>
     </div>
@@ -53,8 +53,8 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (終極防重複版)</h2>
-        <p class="desc">系統會先在本地合併同站資料，再統一同步至雲端。</p>
+        <h2>☁️ 第三區：智慧同步 (防重複與純淨寫入)</h2>
+        <p class="desc">本地預合併同站資料，並採用原生字串矩陣將資料精準寫入雲端。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
         </div>
@@ -76,10 +76,22 @@
 
         window.stationLoader = (json) => {
             if (json?.table) {
-                json.table.rows.forEach(r => {
-                    const id = String(r.c[0]?.v || "").trim();
-                    if (id) STATION_DB[id] = { city: r.c[6]?.v || "", name: r.c[1]?.v || "", alt: r.c[3]?.v || "", lon: r.c[4]?.v || "", lat: r.c[5]?.v || "", addr: r.c[7]?.v || "" };
-                });
+                let rows = json.table.rows;
+                let rowsCount = rows.length;
+                for (let i = 0; i < rowsCount; i++) {
+                    let r = rows[i];
+                    let id = String(r.c[0]?.v || "").trim();
+                    if (id) {
+                        STATION_DB[id] = { 
+                            city: String(r.c[6]?.v || ""), 
+                            name: String(r.c[1]?.v || ""), 
+                            alt: String(r.c[3]?.v || ""), 
+                            lon: String(r.c[4]?.v || ""), 
+                            lat: String(r.c[5]?.v || ""), 
+                            addr: String(r.c[7]?.v || "") 
+                        };
+                    }
+                }
                 status.innerText = "✅ 系統就緒。測站對照表載入完成。";
             }
         };
@@ -95,60 +107,347 @@
             });
         };
 
-        const cleanVal = (v) => ['/', '-', 'X', '...', 'T'].includes(String(v).trim()) ? '' : v;
+        // 獨立數值處理邏輯
+        function cleanVal(v) {
+            let strV = String(v).trim();
+            if (strV === '/' || strV === '-' || strV === 'X' || strV === '...' || strV === 'T') {
+                return '';
+            }
+            return strV;
+        }
 
+        // 核心解析器：完全棄用 Map 迴圈，純手工矩陣展開
         async function parseFile(file) {
-            const m = file.name.match(/(\d+)-/);
-            const stnId = m ? m[1] : file.name.replace('.xlsx', '');
-            const isCsv = file.name.toLowerCase().endsWith('.csv');
+            let m = file.name.match(/(\d+)-/);
+            let stnId = m ? m[1] : file.name.replace('.xlsx', '');
+            let isCsv = file.name.toLowerCase().endsWith('.csv');
             
-            const results = await new Promise(res => {
+            let results = await new Promise(res => {
                 if(isCsv) Papa.parse(file, { complete: r => res(r.data) });
                 else {
-                    const reader = new FileReader();
-                    reader.onload = e => { const wb = XLSX.read(e.target.result); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1})); };
+                    let reader = new FileReader();
+                    reader.onload = e => { 
+                        let wb = XLSX.read(e.target.result); 
+                        // 設定 raw: false 強制以文字讀取現有 XLSX，避免日期失真
+                        res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, defval: ""})); 
+                    };
                     reader.readAsArrayBuffer(file);
                 }
             });
 
             if (isCsv && m && results.length >= 2) {
-                const yr = file.name.split('-')[1];
-                const mo = file.name.split('-')[2]?.split('.')[0] || "";
-                const info = STATION_DB[stnId] || { city: "-", name: "-", alt: "-", lon: "-", lat: "-", addr: "-" };
-                const enHeaders = results[1].filter(h => h);
-                const chHeaders = results[0].slice(0, enHeaders.length);
-                const rows = results.slice(2).filter(r => r[0]).map(row => {
-                    const dRaw = row[0];
-                    const date = String(dRaw).includes('/') ? dRaw : `${yr}/${mo}/${String(dRaw).padStart(2, '0')}`;
-                    return [stnId, info.city, info.name, info.alt, info.lat, info.lon, info.addr, date.split('/')[0], date.split('/')[1], date, ...enHeaders.map((_, i) => cleanVal(row[i]))];
-                });
-                return { stnId, headers: [['站碼', '縣市', '站名', '海拔高度', '緯度', '經度', '地址位置', '年', '月', '日期', ...chHeaders], ['ID', 'City', 'Station', 'Alt', 'Lat', 'Lon', 'Addr', 'Yr', 'Mo', 'Date', ...enHeaders]], rows };
+                let yr = file.name.split('-')[1];
+                let mo = file.name.split('-')[2]?.split('.')[0] || "";
+                let info = STATION_DB[stnId] || { city: "-", name: "-", alt: "-", lon: "-", lat: "-", addr: "-" };
+                
+                let rawChHeaders = results[0] || [];
+                let rawEnHeaders = results[1] || [];
+                
+                // 展開中文標題矩陣
+                let header1 = new Array();
+                header1.push(String('站碼'));
+                header1.push(String('縣市'));
+                header1.push(String('站名'));
+                header1.push(String('海拔高度'));
+                header1.push(String('緯度'));
+                header1.push(String('經度'));
+                header1.push(String('地址位置'));
+                header1.push(String('年'));
+                header1.push(String('月'));
+                header1.push(String('日期'));
+                
+                let dataLength = rawEnHeaders.length;
+                if (dataLength > 0) header1.push(String(rawChHeaders[0] || ""));
+                if (dataLength > 1) header1.push(String(rawChHeaders[1] || ""));
+                if (dataLength > 2) header1.push(String(rawChHeaders[2] || ""));
+                if (dataLength > 3) header1.push(String(rawChHeaders[3] || ""));
+                if (dataLength > 4) header1.push(String(rawChHeaders[4] || ""));
+                if (dataLength > 5) header1.push(String(rawChHeaders[5] || ""));
+                if (dataLength > 6) header1.push(String(rawChHeaders[6] || ""));
+                if (dataLength > 7) header1.push(String(rawChHeaders[7] || ""));
+                if (dataLength > 8) header1.push(String(rawChHeaders[8] || ""));
+                if (dataLength > 9) header1.push(String(rawChHeaders[9] || ""));
+                if (dataLength > 10) header1.push(String(rawChHeaders[10] || ""));
+                if (dataLength > 11) header1.push(String(rawChHeaders[11] || ""));
+                if (dataLength > 12) header1.push(String(rawChHeaders[12] || ""));
+                if (dataLength > 13) header1.push(String(rawChHeaders[13] || ""));
+                if (dataLength > 14) header1.push(String(rawChHeaders[14] || ""));
+                if (dataLength > 15) header1.push(String(rawChHeaders[15] || ""));
+                if (dataLength > 16) header1.push(String(rawChHeaders[16] || ""));
+                if (dataLength > 17) header1.push(String(rawChHeaders[17] || ""));
+                if (dataLength > 18) header1.push(String(rawChHeaders[18] || ""));
+                if (dataLength > 19) header1.push(String(rawChHeaders[19] || ""));
+                if (dataLength > 20) header1.push(String(rawChHeaders[20] || ""));
+                if (dataLength > 21) header1.push(String(rawChHeaders[21] || ""));
+                if (dataLength > 22) header1.push(String(rawChHeaders[22] || ""));
+                if (dataLength > 23) header1.push(String(rawChHeaders[23] || ""));
+                if (dataLength > 24) header1.push(String(rawChHeaders[24] || ""));
+                if (dataLength > 25) header1.push(String(rawChHeaders[25] || ""));
+                if (dataLength > 26) header1.push(String(rawChHeaders[26] || ""));
+                if (dataLength > 27) header1.push(String(rawChHeaders[27] || ""));
+                if (dataLength > 28) header1.push(String(rawChHeaders[28] || ""));
+                if (dataLength > 29) header1.push(String(rawChHeaders[29] || ""));
+                if (dataLength > 30) header1.push(String(rawChHeaders[30] || ""));
+                if (dataLength > 31) header1.push(String(rawChHeaders[31] || ""));
+                if (dataLength > 32) header1.push(String(rawChHeaders[32] || ""));
+                if (dataLength > 33) header1.push(String(rawChHeaders[33] || ""));
+                if (dataLength > 34) header1.push(String(rawChHeaders[34] || ""));
+                if (dataLength > 35) header1.push(String(rawChHeaders[35] || ""));
+                if (dataLength > 36) header1.push(String(rawChHeaders[36] || ""));
+                if (dataLength > 37) header1.push(String(rawChHeaders[37] || ""));
+                if (dataLength > 38) header1.push(String(rawChHeaders[38] || ""));
+                if (dataLength > 39) header1.push(String(rawChHeaders[39] || ""));
+                if (dataLength > 40) header1.push(String(rawChHeaders[40] || ""));
+                if (dataLength > 41) header1.push(String(rawChHeaders[41] || ""));
+                if (dataLength > 42) header1.push(String(rawChHeaders[42] || ""));
+                if (dataLength > 43) header1.push(String(rawChHeaders[43] || ""));
+                if (dataLength > 44) header1.push(String(rawChHeaders[44] || ""));
+                if (dataLength > 45) header1.push(String(rawChHeaders[45] || ""));
+                if (dataLength > 46) header1.push(String(rawChHeaders[46] || ""));
+                if (dataLength > 47) header1.push(String(rawChHeaders[47] || ""));
+                if (dataLength > 48) header1.push(String(rawChHeaders[48] || ""));
+                if (dataLength > 49) header1.push(String(rawChHeaders[49] || ""));
+                if (dataLength > 50) header1.push(String(rawChHeaders[50] || ""));
+                if (dataLength > 51) header1.push(String(rawChHeaders[51] || ""));
+                if (dataLength > 52) header1.push(String(rawChHeaders[52] || ""));
+                if (dataLength > 53) header1.push(String(rawChHeaders[53] || ""));
+                if (dataLength > 54) header1.push(String(rawChHeaders[54] || ""));
+                if (dataLength > 55) header1.push(String(rawChHeaders[55] || ""));
+
+                // 展開英文標題矩陣
+                let header2 = new Array();
+                header2.push(String('ID'));
+                header2.push(String('City'));
+                header2.push(String('Station'));
+                header2.push(String('Alt'));
+                header2.push(String('Lat'));
+                header2.push(String('Lon'));
+                header2.push(String('Addr'));
+                header2.push(String('Yr'));
+                header2.push(String('Mo'));
+                header2.push(String('Date'));
+                
+                if (dataLength > 0) header2.push(String(rawEnHeaders[0] || ""));
+                if (dataLength > 1) header2.push(String(rawEnHeaders[1] || ""));
+                if (dataLength > 2) header2.push(String(rawEnHeaders[2] || ""));
+                if (dataLength > 3) header2.push(String(rawEnHeaders[3] || ""));
+                if (dataLength > 4) header2.push(String(rawEnHeaders[4] || ""));
+                if (dataLength > 5) header2.push(String(rawEnHeaders[5] || ""));
+                if (dataLength > 6) header2.push(String(rawEnHeaders[6] || ""));
+                if (dataLength > 7) header2.push(String(rawEnHeaders[7] || ""));
+                if (dataLength > 8) header2.push(String(rawEnHeaders[8] || ""));
+                if (dataLength > 9) header2.push(String(rawEnHeaders[9] || ""));
+                if (dataLength > 10) header2.push(String(rawEnHeaders[10] || ""));
+                if (dataLength > 11) header2.push(String(rawEnHeaders[11] || ""));
+                if (dataLength > 12) header2.push(String(rawEnHeaders[12] || ""));
+                if (dataLength > 13) header2.push(String(rawEnHeaders[13] || ""));
+                if (dataLength > 14) header2.push(String(rawEnHeaders[14] || ""));
+                if (dataLength > 15) header2.push(String(rawEnHeaders[15] || ""));
+                if (dataLength > 16) header2.push(String(rawEnHeaders[16] || ""));
+                if (dataLength > 17) header2.push(String(rawEnHeaders[17] || ""));
+                if (dataLength > 18) header2.push(String(rawEnHeaders[18] || ""));
+                if (dataLength > 19) header2.push(String(rawEnHeaders[19] || ""));
+                if (dataLength > 20) header2.push(String(rawEnHeaders[20] || ""));
+                if (dataLength > 21) header2.push(String(rawEnHeaders[21] || ""));
+                if (dataLength > 22) header2.push(String(rawEnHeaders[22] || ""));
+                if (dataLength > 23) header2.push(String(rawEnHeaders[23] || ""));
+                if (dataLength > 24) header2.push(String(rawEnHeaders[24] || ""));
+                if (dataLength > 25) header2.push(String(rawEnHeaders[25] || ""));
+                if (dataLength > 26) header2.push(String(rawEnHeaders[26] || ""));
+                if (dataLength > 27) header2.push(String(rawEnHeaders[27] || ""));
+                if (dataLength > 28) header2.push(String(rawEnHeaders[28] || ""));
+                if (dataLength > 29) header2.push(String(rawEnHeaders[29] || ""));
+                if (dataLength > 30) header2.push(String(rawEnHeaders[30] || ""));
+                if (dataLength > 31) header2.push(String(rawEnHeaders[31] || ""));
+                if (dataLength > 32) header2.push(String(rawEnHeaders[32] || ""));
+                if (dataLength > 33) header2.push(String(rawEnHeaders[33] || ""));
+                if (dataLength > 34) header2.push(String(rawEnHeaders[34] || ""));
+                if (dataLength > 35) header2.push(String(rawEnHeaders[35] || ""));
+                if (dataLength > 36) header2.push(String(rawEnHeaders[36] || ""));
+                if (dataLength > 37) header2.push(String(rawEnHeaders[37] || ""));
+                if (dataLength > 38) header2.push(String(rawEnHeaders[38] || ""));
+                if (dataLength > 39) header2.push(String(rawEnHeaders[39] || ""));
+                if (dataLength > 40) header2.push(String(rawEnHeaders[40] || ""));
+                if (dataLength > 41) header2.push(String(rawEnHeaders[41] || ""));
+                if (dataLength > 42) header2.push(String(rawEnHeaders[42] || ""));
+                if (dataLength > 43) header2.push(String(rawEnHeaders[43] || ""));
+                if (dataLength > 44) header2.push(String(rawEnHeaders[44] || ""));
+                if (dataLength > 45) header2.push(String(rawEnHeaders[45] || ""));
+                if (dataLength > 46) header2.push(String(rawEnHeaders[46] || ""));
+                if (dataLength > 47) header2.push(String(rawEnHeaders[47] || ""));
+                if (dataLength > 48) header2.push(String(rawEnHeaders[48] || ""));
+                if (dataLength > 49) header2.push(String(rawEnHeaders[49] || ""));
+                if (dataLength > 50) header2.push(String(rawEnHeaders[50] || ""));
+                if (dataLength > 51) header2.push(String(rawEnHeaders[51] || ""));
+                if (dataLength > 52) header2.push(String(rawEnHeaders[52] || ""));
+                if (dataLength > 53) header2.push(String(rawEnHeaders[53] || ""));
+                if (dataLength > 54) header2.push(String(rawEnHeaders[54] || ""));
+                if (dataLength > 55) header2.push(String(rawEnHeaders[55] || ""));
+
+                // 展開內容矩陣
+                let explicitRows = new Array();
+                let resultsCount = results.length;
+                for (let rIndex = 2; rIndex < resultsCount; rIndex++) {
+                    let currentRow = results[rIndex];
+                    if (!currentRow || !currentRow[0]) continue;
+
+                    let rawDateString = String(currentRow[0]);
+                    let parsedDate = "";
+                    let parsedYear = "";
+                    let parsedMonth = "";
+
+                    if (rawDateString.includes('/')) {
+                        parsedDate = rawDateString;
+                        let dateParts = parsedDate.split('/');
+                        parsedYear = dateParts[0];
+                        parsedMonth = dateParts[1];
+                    } else {
+                        let paddedDay = String(rawDateString).length === 1 ? '0' + String(rawDateString) : String(rawDateString);
+                        parsedDate = yr + '/' + mo + '/' + paddedDay;
+                        parsedYear = yr;
+                        parsedMonth = mo;
+                    }
+
+                    let rowMatrix = new Array();
+                    rowMatrix.push(String(stnId));
+                    rowMatrix.push(String(info.city));
+                    rowMatrix.push(String(info.name));
+                    rowMatrix.push(String(info.alt));
+                    rowMatrix.push(String(info.lat));
+                    rowMatrix.push(String(info.lon));
+                    rowMatrix.push(String(info.addr));
+                    rowMatrix.push(String(parsedYear));
+                    rowMatrix.push(String(parsedMonth));
+                    rowMatrix.push(String(parsedDate));
+
+                    if (dataLength > 0) rowMatrix.push(String(cleanVal(currentRow[0])));
+                    if (dataLength > 1) rowMatrix.push(String(cleanVal(currentRow[1])));
+                    if (dataLength > 2) rowMatrix.push(String(cleanVal(currentRow[2])));
+                    if (dataLength > 3) rowMatrix.push(String(cleanVal(currentRow[3])));
+                    if (dataLength > 4) rowMatrix.push(String(cleanVal(currentRow[4])));
+                    if (dataLength > 5) rowMatrix.push(String(cleanVal(currentRow[5])));
+                    if (dataLength > 6) rowMatrix.push(String(cleanVal(currentRow[6])));
+                    if (dataLength > 7) rowMatrix.push(String(cleanVal(currentRow[7])));
+                    if (dataLength > 8) rowMatrix.push(String(cleanVal(currentRow[8])));
+                    if (dataLength > 9) rowMatrix.push(String(cleanVal(currentRow[9])));
+                    if (dataLength > 10) rowMatrix.push(String(cleanVal(currentRow[10])));
+                    if (dataLength > 11) rowMatrix.push(String(cleanVal(currentRow[11])));
+                    if (dataLength > 12) rowMatrix.push(String(cleanVal(currentRow[12])));
+                    if (dataLength > 13) rowMatrix.push(String(cleanVal(currentRow[13])));
+                    if (dataLength > 14) rowMatrix.push(String(cleanVal(currentRow[14])));
+                    if (dataLength > 15) rowMatrix.push(String(cleanVal(currentRow[15])));
+                    if (dataLength > 16) rowMatrix.push(String(cleanVal(currentRow[16])));
+                    if (dataLength > 17) rowMatrix.push(String(cleanVal(currentRow[17])));
+                    if (dataLength > 18) rowMatrix.push(String(cleanVal(currentRow[18])));
+                    if (dataLength > 19) rowMatrix.push(String(cleanVal(currentRow[19])));
+                    if (dataLength > 20) rowMatrix.push(String(cleanVal(currentRow[20])));
+                    if (dataLength > 21) rowMatrix.push(String(cleanVal(currentRow[21])));
+                    if (dataLength > 22) rowMatrix.push(String(cleanVal(currentRow[22])));
+                    if (dataLength > 23) rowMatrix.push(String(cleanVal(currentRow[23])));
+                    if (dataLength > 24) rowMatrix.push(String(cleanVal(currentRow[24])));
+                    if (dataLength > 25) rowMatrix.push(String(cleanVal(currentRow[25])));
+                    if (dataLength > 26) rowMatrix.push(String(cleanVal(currentRow[26])));
+                    if (dataLength > 27) rowMatrix.push(String(cleanVal(currentRow[27])));
+                    if (dataLength > 28) rowMatrix.push(String(cleanVal(currentRow[28])));
+                    if (dataLength > 29) rowMatrix.push(String(cleanVal(currentRow[29])));
+                    if (dataLength > 30) rowMatrix.push(String(cleanVal(currentRow[30])));
+                    if (dataLength > 31) rowMatrix.push(String(cleanVal(currentRow[31])));
+                    if (dataLength > 32) rowMatrix.push(String(cleanVal(currentRow[32])));
+                    if (dataLength > 33) rowMatrix.push(String(cleanVal(currentRow[33])));
+                    if (dataLength > 34) rowMatrix.push(String(cleanVal(currentRow[34])));
+                    if (dataLength > 35) rowMatrix.push(String(cleanVal(currentRow[35])));
+                    if (dataLength > 36) rowMatrix.push(String(cleanVal(currentRow[36])));
+                    if (dataLength > 37) rowMatrix.push(String(cleanVal(currentRow[37])));
+                    if (dataLength > 38) rowMatrix.push(String(cleanVal(currentRow[38])));
+                    if (dataLength > 39) rowMatrix.push(String(cleanVal(currentRow[39])));
+                    if (dataLength > 40) rowMatrix.push(String(cleanVal(currentRow[40])));
+                    if (dataLength > 41) rowMatrix.push(String(cleanVal(currentRow[41])));
+                    if (dataLength > 42) rowMatrix.push(String(cleanVal(currentRow[42])));
+                    if (dataLength > 43) rowMatrix.push(String(cleanVal(currentRow[43])));
+                    if (dataLength > 44) rowMatrix.push(String(cleanVal(currentRow[44])));
+                    if (dataLength > 45) rowMatrix.push(String(cleanVal(currentRow[45])));
+                    if (dataLength > 46) rowMatrix.push(String(cleanVal(currentRow[46])));
+                    if (dataLength > 47) rowMatrix.push(String(cleanVal(currentRow[47])));
+                    if (dataLength > 48) rowMatrix.push(String(cleanVal(currentRow[48])));
+                    if (dataLength > 49) rowMatrix.push(String(cleanVal(currentRow[49])));
+                    if (dataLength > 50) rowMatrix.push(String(cleanVal(currentRow[50])));
+                    if (dataLength > 51) rowMatrix.push(String(cleanVal(currentRow[51])));
+                    if (dataLength > 52) rowMatrix.push(String(cleanVal(currentRow[52])));
+                    if (dataLength > 53) rowMatrix.push(String(cleanVal(currentRow[53])));
+                    if (dataLength > 54) rowMatrix.push(String(cleanVal(currentRow[54])));
+                    if (dataLength > 55) rowMatrix.push(String(cleanVal(currentRow[55])));
+
+                    explicitRows.push(rowMatrix);
+                }
+                
+                return { stnId: String(stnId), headers: [header1, header2], rows: explicitRows };
             } else {
-                return { stnId, headers: [results[0] || [], results[1] || []], rows: results.slice(2) };
+                let existingHeader1 = new Array();
+                let existingHeader2 = new Array();
+                let existingRows = new Array();
+                
+                let rawRow1 = results[0] || [];
+                let rawRow2 = results[1] || [];
+                
+                let r1Len = rawRow1.length;
+                for (let i = 0; i < r1Len; i++) { existingHeader1.push(String(rawRow1[i] || "")); }
+                
+                let r2Len = rawRow2.length;
+                for (let j = 0; j < r2Len; j++) { existingHeader2.push(String(rawRow2[j] || "")); }
+                
+                let resLen = results.length;
+                for (let k = 2; k < resLen; k++) {
+                    let rMatrix = new Array();
+                    let rLen = results[k].length;
+                    for (let x = 0; x < rLen; x++) { rMatrix.push(String(results[k][x] || "")); }
+                    existingRows.push(rMatrix);
+                }
+
+                return { stnId: String(stnId), headers: [existingHeader1, existingHeader2], rows: existingRows };
             }
         }
 
-        // --- 第一區：按測站合併下載 ---
+        // --- 第一區：強制嚴格字串輸出 ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
             const bundle = {};
-            status.innerText = "⏳ 正在本地預彙整資料...";
+            status.innerText = "⏳ 正在本地展開矩陣並預彙整...";
 
-            for (const f of files) {
-                const res = await parseFile(f);
-                if (!bundle[res.stnId]) bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
-                res.rows.forEach(r => { if(r[9]) bundle[res.stnId].dataMap.set(r[9], r); });
+            let filesCount = files.length;
+            for (let i = 0; i < filesCount; i++) {
+                let res = await parseFile(files[i]);
+                if (!bundle[res.stnId]) {
+                    bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
+                }
+                let rowsCount = res.rows.length;
+                for (let j = 0; j < rowsCount; j++) {
+                    let r = res.rows[j];
+                    if(r[9]) bundle[res.stnId].dataMap.set(String(r[9]), r);
+                }
             }
 
             for (const stnId in bundle) {
-                const sortedRows = Array.from(bundle[stnId].dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => bundle[stnId].dataMap.get(k));
+                let keys = Array.from(bundle[stnId].dataMap.keys()).sort((a,b) => new Date(a) - new Date(b));
+                let keysCount = keys.length;
+                let sortedRows = new Array();
+                for (let k = 0; k < keysCount; k++) {
+                    sortedRows.push(bundle[stnId].dataMap.get(keys[k]));
+                }
+                
+                let sheetData = new Array();
+                sheetData.push(bundle[stnId].headers[0]);
+                sheetData.push(bundle[stnId].headers[1]);
+                for (let r = 0; r < keysCount; r++) {
+                    sheetData.push(sortedRows[r]);
+                }
+
                 const wb = XLSX.utils.book_new();
-                const sheetData = [bundle[stnId].headers[0], bundle[stnId].headers[1], ...sortedRows];
+                // 通過強制字串化陣列傳入，阻斷自動轉型
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), stnId);
                 XLSX.writeFile(wb, `${stnId}.xlsx`);
             }
-            status.innerText = "✅ 彙整完成。所有年份資料已合併至單一檔案。";
+            status.innerText = "✅ 彙整完成。已產出包含完整字串定義的純淨 XLSX。";
         };
 
         // --- 第二區：清理功能 ---
@@ -157,25 +456,47 @@
             const basis = document.getElementById('cleanBasis').value;
             const now = new Date();
             let dynamicCutoff = (basis === 'year') ? new Date(now.getFullYear()-10, 0, 1) : (basis === 'month') ? new Date(now.getFullYear(), now.getMonth()-120, 1) : new Date(now.getFullYear()-10, now.getMonth(), now.getDate());
+            
             const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
             const outWb = XLSX.utils.book_new();
-            wb.SheetNames.forEach(name => {
-                const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1});
-                if (rows.length < 2) return;
-                const idx = rows[0][0] === "站碼" ? 9 : 0;
-                const filtered = rows.slice(2).filter(r => new Date(r[idx]) >= dynamicCutoff);
-                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet([rows[0], rows[1], ...filtered]), name);
-            });
+            
+            let sheetNames = wb.SheetNames;
+            let snCount = sheetNames.length;
+            for (let s = 0; s < snCount; s++) {
+                let name = sheetNames[s];
+                // raw: false 確保讀取為字串
+                let rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: false, defval: ""});
+                if (rows.length < 2) continue;
+                
+                let idx = rows[0][0] === "站碼" ? 9 : 0;
+                let filtered = new Array();
+                let rCount = rows.length;
+                for (let r = 2; r < rCount; r++) {
+                    if (new Date(rows[r][idx]) >= dynamicCutoff) {
+                        filtered.push(rows[r]);
+                    }
+                }
+                
+                let sheetData = new Array();
+                sheetData.push(rows[0]);
+                sheetData.push(rows[1]);
+                let fCount = filtered.length;
+                for (let f = 0; f < fCount; f++) {
+                    sheetData.push(filtered[f]);
+                }
+                
+                XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet(sheetData), name);
+            }
             XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
         };
 
-        // --- 第三區：智慧同步 (預彙整防重複) ---
+        // --- 第三區：智慧同步 ---
         document.getElementById('syncInput').onchange = () => {
             if (document.getElementById('syncInput').files.length > 0) document.getElementById('syncBtn').disabled = false;
         };
 
         document.getElementById('syncBtn').onclick = () => {
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 準備同步資料包...<br>`;
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 準備同步字串矩陣...<br>`;
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'none'});
         };
 
@@ -184,10 +505,17 @@
             const bundle = {}; 
 
             try {
-                for (const f of files) {
-                    const res = await parseFile(f);
-                    if (!bundle[res.stnId]) bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
-                    res.rows.forEach(r => { if(r[9]) bundle[res.stnId].dataMap.set(r[9], r); });
+                let filesCount = files.length;
+                for (let i = 0; i < filesCount; i++) {
+                    let res = await parseFile(files[i]);
+                    if (!bundle[res.stnId]) {
+                        bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
+                    }
+                    let rowsCount = res.rows.length;
+                    for (let j = 0; j < rowsCount; j++) {
+                        let r = res.rows[j];
+                        if(r[9]) bundle[res.stnId].dataMap.set(String(r[9]), r);
+                    }
                 }
 
                 const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
@@ -215,18 +543,44 @@
                     }
 
                     const finalMap = new Map();
-                    existingData.slice(2).forEach(r => { if(r[9]) finalMap.set(r[9], JSON.stringify(r)); });
+                    let exCount = existingData.length;
+                    for (let ex = 2; ex < exCount; ex++) {
+                        let r = existingData[ex];
+                        if (r[9]) finalMap.set(String(r[9]), JSON.stringify(r));
+                    }
                     
                     let add = 0, upd = 0;
-                    bundle[stnId].dataMap.forEach((row, date) => {
-                        const old = finalMap.get(date);
-                        const neo = JSON.stringify(row);
-                        if (!old) { add++; finalMap.set(date, neo); }
-                        else if (old !== neo) { upd++; finalMap.set(date, neo); }
-                    });
+                    let bKeys = Array.from(bundle[stnId].dataMap.keys());
+                    let bKeysCount = bKeys.length;
+                    
+                    for (let bk = 0; bk < bKeysCount; bk++) {
+                        let date = bKeys[bk];
+                        let row = bundle[stnId].dataMap.get(date);
+                        let old = finalMap.get(date);
+                        let neo = JSON.stringify(row);
+                        
+                        if (!old) { 
+                            add++; 
+                            finalMap.set(date, neo); 
+                        } else if (old !== neo) { 
+                            upd++; 
+                            finalMap.set(date, neo); 
+                        }
+                    }
 
-                    const sortedRows = Array.from(finalMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => JSON.parse(finalMap.get(k)));
-                    const finalOutput = [bundle[stnId].headers[0], bundle[stnId].headers[1], ...sortedRows];
+                    let sortedKeys = Array.from(finalMap.keys()).sort((a,b)=>new Date(a)-new Date(b));
+                    let skCount = sortedKeys.length;
+                    let sortedRows = new Array();
+                    for (let sk = 0; sk < skCount; sk++) {
+                        sortedRows.push(JSON.parse(finalMap.get(sortedKeys[sk])));
+                    }
+                    
+                    let finalOutput = new Array();
+                    finalOutput.push(bundle[stnId].headers[0]);
+                    finalOutput.push(bundle[stnId].headers[1]);
+                    for (let fo = 0; fo < skCount; fo++) {
+                        finalOutput.push(sortedRows[fo]);
+                    }
 
                     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
                     const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
