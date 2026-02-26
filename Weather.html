@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.16 - 雲端通道修復完全體</title>
+    <title>氣象全測站分析 v62.17 - 虛擬站點控制完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
@@ -101,8 +101,8 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.16 【雲端通道修復完全體】</h2>
-        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：V3雙通道解析回歸 | Try-Catch 防護網 | 智慧日期稽核</div>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.17 【虛擬站點控制完全體】</h2>
+        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：模擬站更名系統 | 雙軌刪除機制 | 終極防護網</div>
     </div>
     <div style="display:flex; gap:15px;">
         <button class="btn-update" style="background:var(--purple); width:auto; padding: 8px 15px;" id="authBtn">🔗 授權 Google 雲端</button>
@@ -163,10 +163,10 @@
 
     const CATEGORY_MAP = { 
         "風場分析": ["風速", "風向", "WD", "WS"], 
-        "氣溫分析": ["氣溫", "Temperature", "Temp"], 
+        "氣溫分析": ["氣溫", "Temperature", "Temp", "T Max", "T Min"], 
         "環境舒適度指標": ["[計算] 體感溫度 (Apparent Temp)", "[計算] THI 熱指數"],
-        "降雨時空分佈": ["降水量", "Precp", "雨量", "降雨時數"],
-        "大氣氣壓觀測": ["氣壓", "Pres"],
+        "降雨時空分佈": ["降水量", "Precp", "雨量", "降水時數", "PrecpHour"],
+        "大氣氣壓觀測": ["氣壓", "Pres", "StnPres"],
         "濕度與蒸發量": ["相對溼度", "RH", "蒸發量"],
         "日照紫外線輻射": ["日照", "SunShine", "紫外線", "UVI"],
         "地底觀測 (地溫)": ["地溫", "Soil"],
@@ -193,6 +193,17 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         window.myMap = map;
         clusterGroup = L.markerClusterGroup({ maxClusterRadius: 40 }).addTo(map);
+        
+        map.on('click', (e) => { 
+            // 必須至少有兩個「已經載入資料」的站點才能插值
+            const loadedStations = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
+            if (loadedStations.length >= 2) {
+                createVirtualStation(e.latlng.lat, e.latlng.lng);
+            } else {
+                log("[VIRTUAL] ⚠️ 請至少先載入 2 個測站的資料，才能進行虛擬空間插值！", "err");
+            }
+        });
+
         map.on('mousedown', () => document.getElementById('marker-menu').style.display='none');
         loadStationIndex();
 
@@ -230,7 +241,6 @@
         });
     };
 
-    // 🌟 修正：補回 mimeType 欄位請求，讓系統能辨識 Google Sheets
     async function fetchCloudFileList() {
         try {
             const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name, mimeType)`, {
@@ -245,7 +255,7 @@
     }
 
     window.fetchSingleStationFromCloud = async (id) => {
-        if (!accessToken) return alert("請先授權 Google 雲端！");
+        if (!accessToken) return alert("請先點擊上方「🔗 授權 Google 雲端」按鈕！");
         log(`[SEARCH] 正在雲端尋找測站：${id}...`, "google");
         const file = cloudFilesList.find(f => f.name.includes(id));
         if (!file) {
@@ -255,30 +265,23 @@
         await loadCloudFile(file);
     };
 
-    // 🌟 V3 原版雙通道下載引擎回歸 (完整保留 Google Sheets 與 XLSX 雙支援)
     async function loadCloudFile(file) {
         log(`[DOWNLOAD] 開始下載與解析: ${file.name}... (類型: ${file.mimeType})`, "google");
         try {
             let raw;
-            // 通道 A: Google Sheets 專用讀取
             if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
                 const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${file.id}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                 const data = await resp.json();
                 raw = data.values;
             } else {
-                // 通道 B: 實體 XLSX / CSV 檔案下載
                 const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
                 const ab = await resp.arrayBuffer();
                 const wb = XLSX.read(ab, { type: 'array' });
                 raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
             }
 
-            if (!raw || raw.length < 3) {
-                log(`[ERR] 資料列數不足`, "err");
-                return;
-            }
+            if (!raw || raw.length < 3) return log(`[ERR] 資料列數不足`, "err");
 
-            // V3 原汁原味的標題對接法，最穩定
             const headers = raw[0];
             const id = String(raw[2][0]);
             
@@ -299,7 +302,6 @@
             allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
             log(`✅ [${id}] 同步成功：共 ${dataMap.size} 筆日資料。`, "hit");
 
-            // 下載成功後刷新選單狀態
             const menu = document.getElementById('marker-menu');
             if (menu.style.display === 'block') {
                 const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
@@ -342,9 +344,73 @@
         alert("資料處理完畢，請看監視器狀態。");
     }
 
+    function createVirtualStation(lat, lon) {
+        const stationsWithData = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
+        const stations = stationsWithData.map(st => ({ ...st, dist: Math.sqrt(Math.pow(st.lat-lat,2)+Math.pow(st.lon-lon,2)) })).sort((a,b)=>a.dist-b.dist);
+        const nearby = stations.slice(0,3);
+        const vId = "V_"+(++virtualStationCount);
+        
+        const virtualRows = nearby[0].rawData.map((row, rIdx) => {
+            const newRow = [...row];
+            for(let i=10; i<row.length; i++) {
+                let sum=0, count=0;
+                nearby.forEach(st => { 
+                    if(st.rawData[rIdx]){
+                        const v=parseFloat(st.rawData[rIdx][i]); 
+                        if(!isNaN(v) && v > -50){sum+=v; count++;} 
+                    }
+                });
+                newRow[i] = count > 0 ? (sum/count).toFixed(2) : "--";
+            }
+            return newRow;
+        });
+        
+        const dataMap = new Map();
+        virtualRows.forEach(r => { dataMap.set(String(r[nearby[0].dateIdx]), r); });
+        
+        allStations[vId] = { id: vId, name: `虛擬站_${vId}`, lat, lon, headers: nearby[0].headers, dataMap, rawData: virtualRows, isVirtual: true, dateIdx: nearby[0].dateIdx, yIdx: nearby[0].yIdx, mIdx: nearby[0].mIdx };
+        const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
+        
+        m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(vId, e.containerPoint); });
+        
+        mapMarkers[vId] = m; 
+        clusterGroup.addLayer(m);
+        log(`[VIRTUAL] ${vId} 已透過最近 ${nearby.length} 站執行插值計算。`, "hit");
+    }
+
+    // 🌟 新增：修改站名功能
+    window.renameStation = (id, px, py) => {
+        const st = allStations[id];
+        if(!st) return;
+        const newName = prompt("請輸入新的測站名稱：", st.name);
+        if(newName && newName.trim() !== "") {
+            st.name = newName.trim();
+            log(`[RENAME] 測站 ${id} 已更名為 ${st.name}`, "hit");
+            showMarkerMenu(id, {x: px, y: py}); // 重新整理選單
+        }
+    }
+
+    // 🌟 修正：區分實體與虛擬站的刪除邏輯
+    window.deleteStationData = (id, isVirtual) => {
+        if(!confirm(isVirtual ? "確定要徹底刪除此模擬測站嗎？" : "確定要清除此測站的快取資料嗎？")) return;
+        
+        if(isVirtual) {
+            if(mapMarkers[id]) {
+                clusterGroup.removeLayer(mapMarkers[id]); 
+                delete mapMarkers[id];
+            }
+        }
+        if(allStations[id]) {
+            delete allStations[id];
+        }
+        document.getElementById('marker-menu').style.display = 'none';
+        log(`[DELETE] 已清除資料：${id}`, "hit");
+    };
+
     function showMarkerMenu(id, point) {
         const menu = document.getElementById('marker-menu');
         const hasData = allStations[id] ? true : false;
+        const isVirtual = id.startsWith('V_'); 
         const stName = allStations[id]?.name || STATION_DB[id]?.name || id; 
         let dateInfoHtml = "";
         
@@ -377,12 +443,26 @@
             }
         }
 
+        let buttonsHtml = "";
+        if (hasData) {
+            buttonsHtml += `<button class="btn-update" onclick="window.launchAnalysis('${id}')">📈 開啟分析報告</button>`;
+        }
+        if (!isVirtual) {
+            buttonsHtml += `<button class="btn-update" style="background:var(--purple); margin-top:10px;" onclick="window.fetchSingleStationFromCloud('${id}')" ${!accessToken?'disabled':''}>☁️ 從雲端下載/更新</button>`;
+        }
+        if (isVirtual && hasData) {
+            buttonsHtml += `<button class="btn-update" style="background:#f39c12; margin-top:10px;" onclick="window.renameStation('${id}', ${point.x}, ${point.y})">✏️ 修改虛擬站名</button>`;
+        }
+        if (hasData || isVirtual) {
+            const btnText = isVirtual ? "🗑️ 徹底刪除模擬站" : "🗑️ 清除資料快取";
+            buttonsHtml += `<button class="btn-update" style="background:var(--danger); margin-top:10px;" onclick="window.deleteStationData('${id}', ${isVirtual})">${btnText}</button>`;
+        }
+
         document.getElementById('menu-content').innerHTML = `
             <b style="font-size:20px;">${stName}</b> <small>(${id})</small><hr style="margin:15px 0;">
             ${dateInfoHtml}
-            ${hasData ? `<button class="btn-update" onclick="window.launchAnalysis('${id}')">📈 開啟分析報告</button>` : ''}
-            <button class="btn-update" style="background:var(--purple); margin-top:10px;" onclick="window.fetchSingleStationFromCloud('${id}')">☁️ 從雲端下載/更新</button>
-            ${hasData ? `<button class="btn-update" style="background:#888; margin-top:10px;" onclick="if(confirm('刪除快取?')){delete allStations['${id}'];showMarkerMenu('${id}', {x:${point.x},y:${point.y}}); }">🗑️ 清除快取</button>` : ''}
+            <div style="font-size:14px; margin-bottom:15px;">數據庫狀態：${hasData ? '<span style="color:var(--success);font-weight:bold;">✅ 已載入</span>' : '<span style="color:var(--danger);">⚪ 待匯入</span>'}</div>
+            ${buttonsHtml}
         `;
         menu.style.display = 'block'; menu.style.left = (point.x - 170) + 'px'; menu.style.top = (point.y - 200) + 'px';
     }
@@ -406,10 +486,7 @@
         
         Object.keys(CATEGORY_MAP).forEach(cat => {
             const fields = CATEGORY_MAP[cat].filter(f => f.startsWith("[計算]") || currentHeaders.some(h => String(h).match(new RegExp(f, 'i'))));
-            if (!fields.length && cat !== "風場分析") {
-                log(`[SKIP] 模組 [${cat}] 找不到對應標題，略過繪製。`, "err");
-                return;
-            }
+            if (!fields.length && cat !== "風場分析") return;
 
             log(`[INIT] 正在部署模組 [${cat}]...`, "google");
 
@@ -469,7 +546,6 @@
         else createChartWrapper(mount, `${cat} 年度對照`, datasets, gridId, cat, selFields, false);
     }
 
-    // 🌟 陣列防護盾：全面過濾 -99 等無效值，保證繪圖引擎不崩潰
     function createChartWrapper(parent, title, datasets, cid, cat, fields, isSplit) {
         try {
             if (typeof Highcharts === 'undefined') throw new Error("Highcharts 未載入！");
@@ -506,7 +582,7 @@
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
-                        // 🛡️ 阻擋 -99
+                        // 🛡️ 阻擋異常值
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
@@ -570,7 +646,6 @@
             if(tableHTML) document.getElementById(tableId).innerHTML = tableHTML;
         } catch (error) {
             log(`[CRITICAL] 模組 [${cat}] 發生致命崩潰: ${error.message}`, "err");
-            console.error(error);
         }
     }
 
@@ -598,6 +673,12 @@
         customColorMap[`${s.options._dsTitle}_${s.options._sLabel}`] = color;
         chart.renderTo.parentElement.querySelectorAll('.leg-dot')[sIdx].style.background = color;
         document.getElementById('color-picker-popover').style.display = 'none';
+    }
+
+    function exportToJson() {
+        const a = document.createElement("a"); 
+        a.href = URL.createObjectURL(new Blob([JSON.stringify({ stations: allStations, colors: customColorMap, timestamp: new Date().toISOString() }, null, 2)], { type: "application/json" })); 
+        a.download = `氣象系統備份_${Date.now()}.json`; a.click();
     }
 
     function closeModal() { 
