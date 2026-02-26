@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.5 - 舒適度分離與版面比例優化版</title>
+    <title>氣象全測站分析 v62.6 - 雲端自動同步回歸版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
@@ -65,16 +65,13 @@
             background: rgba(0,0,0,0.9); z-index: 100000; display: none; 
             justify-content: center; align-items: center; backdrop-filter: blur(15px);
         }
-        /* 🌟 優化：限制視窗最大寬度、適度縮小高度比例 */
         .modal-content { background: #fff; width: 95%; max-width: 1500px; height: 92%; border-radius: 25px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }
         .modal-body { padding: 30px 40px; overflow-y: auto; flex-grow: 1; background: #fdfdfe; }
 
-        /* 🌟 優化：左側控制欄從 400px 縮小至 300px，間距微調 */
         .category-section { display: grid; grid-template-columns: 300px 1fr; gap: 35px; margin-bottom: 50px; border-top: 6px solid var(--accent); padding-top: 30px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
         .control-panel { background: #fafafa; padding: 20px; border-radius: 15px; border: 1px solid #eee; }
         .multi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; }
         .chart-box-wrapper { background: #fff; border: 1px solid #eee; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
-        /* 🌟 優化：圖表高度縮小至 400px */
         .chart-container { width: 100%; height: 400px; }
 
         .mode-switch { display: flex; gap: 8px; margin: 15px 0; }
@@ -102,14 +99,14 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.5 【舒適度分離與版面比例優化版】</h2>
-        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：視窗自適應縮放 | THI與體感雙矩陣 | 圖例圖層防遮擋修復</div>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.6 【雲端自動同步回歸版】</h2>
+        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：自動化雲端流檢索 | 視窗自適應縮放 | THI與體感雙矩陣</div>
     </div>
     <div style="display:flex; gap:15px;">
         <button class="btn-update" style="background:var(--purple); width:auto; padding: 8px 15px;" id="authBtn">🔗 連結 Google 雲端</button>
         <button class="btn-update" style="background:var(--orange); width:auto; padding: 8px 15px;" onclick="exportToJson()">💾 備份配色與測站</button>
-        <button class="btn-update" style="width:auto; padding: 8px 15px;" onclick="document.getElementById('fileInput').click()">📁 匯入 XLSX 資料</button>
-        <input type="file" id="fileInput" multiple accept=".xlsx" style="display:none;" onchange="handleLocalUpload(event)">
+        <button class="btn-update" style="width:auto; padding: 8px 15px;" onclick="document.getElementById('fileInput').click()">📁 匯入 XLSX/CSV 資料</button>
+        <input type="file" id="fileInput" multiple accept=".xlsx, .csv" style="display:none;" onchange="handleLocalUpload(event)">
     </div>
 </div>
 
@@ -144,6 +141,8 @@
 </div>
 
 <script>
+    // 🌟 保留你 v24.4 原始的資料夾 ID
+    const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F'; 
     const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
     const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
     let accessToken = null, tokenClient, STATION_DB = {}, allStations = {}, clusterGroup, mapMarkers = {};
@@ -168,7 +167,7 @@
 
     function log(msg, type = '') {
         const p = document.getElementById('diag-panel');
-        let cls = type === 'hit' ? 'log-hit' : (type === 'google' ? 'log-google' : '');
+        let cls = type === 'hit' ? 'log-hit' : (type === 'google' ? 'log-google' : (type === 'err' ? 'log-err' : ''));
         p.innerHTML += `<div>[${new Date().toLocaleTimeString()}] <span class="${cls}">${msg}</span></div>`;
         p.scrollTop = p.scrollHeight;
     }
@@ -192,7 +191,11 @@
 
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly',
-            callback: (resp) => { accessToken = resp.access_token; log("[AUTH] Google 雲端權限獲取成功。", "google"); }
+            callback: (resp) => { 
+                accessToken = resp.access_token; 
+                log("[AUTH] Google 雲端權限獲取成功，開始檢索雲端資料夾...", "google"); 
+                fetchCloudFileList(); // 🌟 啟動自動下載引擎
+            }
         });
         document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
         document.getElementById('cp-apply').onclick = applyIndividualColor;
@@ -222,6 +225,70 @@
             clusterGroup.addLayer(m);
         });
     };
+
+    // 🌟 雲端自動下載與解析模組
+    async function fetchCloudFileList() {
+        try {
+            const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name, mimeType)`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            const data = await resp.json();
+            const files = data.files;
+            
+            if(!files || files.length === 0) {
+                log("[CLOUD] ⚠️ 資料夾內找不到任何檔案，請確認內容或權限。", "err"); 
+                return;
+            }
+            log(`[CLOUD] 🔎 尋獲 ${files.length} 個雲端檔案，啟動批次同步...`, "hit");
+            
+            for (let f of files) {
+                await loadCloudFile(f);
+            }
+            log("[CLOUD] 🎉 所有雲端測站資料同步完畢！您可以點擊地圖標記查看。", "hit");
+        } catch (err) {
+            log("[ERR] 讀取雲端清單失敗: " + err.message, "err");
+        }
+    }
+
+    async function loadCloudFile(file) {
+        log(`[DOWNLOAD] ⬇️ 正在下載與解析: ${file.name}...`, "google");
+        try {
+            let raw;
+            // 判斷是否為 Google Sheets
+            if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+                const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${file.id}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const data = await resp.json();
+                raw = data.values;
+            } else {
+                // 處理 XLSX 或 CSV
+                const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const ab = await resp.arrayBuffer();
+                const wb = XLSX.read(ab, { type: 'array' });
+                raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            }
+
+            if (!raw || raw.length < 3) return;
+
+            const headers = raw[0];
+            const id = String(raw[2][0]);
+            
+            const dateIdx = headers.findIndex(h => /日期|Date/i.test(h)) || 9;
+            const yIdx = headers.findIndex(h => h === "年") || 7;
+            const mIdx = headers.findIndex(h => h === "月") || 8;
+            
+            const dataMap = new Map();
+            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
+            
+            const nameIdx = headers.findIndex(h => /站名/i.test(h)) !== -1 ? headers.findIndex(h => /站名/i.test(h)) : 2;
+            const stName = raw[2][nameIdx] || id;
+
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            log(`✅ [${id}] 同步完成：共匯入 ${dataMap.size} 筆觀測紀錄。`, "hit");
+            
+        } catch (err) {
+            log(`[ERR] ${file.name} 解析失敗: ` + err.message, "err");
+        }
+    }
 
     function showMarkerMenu(id, point) {
         const menu = document.getElementById('marker-menu');
@@ -299,7 +366,7 @@
     window.launchAnalysis = (id) => {
         document.getElementById('marker-menu').style.display='none';
         const st = allStations[id];
-        if(!st) return alert("系統提示：請先匯入該站 XLSX 資料！");
+        if(!st) return alert("系統提示：請先匯入該站 XLSX/CSV 資料！");
 
         const sorted = Array.from(st.dataMap.keys()).sort((a,b)=>new Date(a)-new Date(b)).map(k => st.dataMap.get(k));
         currentHeaders = st.headers; currentRows = sorted;
@@ -449,7 +516,6 @@
                     });
                     options.series.push({ name: isSplit ? f : `${ds.title} ${f}`, data, color: customColorMap[`${ds.title}_${f}`] || ds.palette[2], _dsTitle: ds.title, _sLabel: f });
 
-                    // --- 1. 體感溫度 (Apparent Temp) 舒適度彙整表 ---
                     if(f.includes("體感")) {
                         const levels = [0, 0, 0, 0, 0]; 
                         ds.rows.forEach(r => {
@@ -486,7 +552,6 @@
                         </div>`;
                     }
 
-                    // --- 2. THI 熱指數彙整表 ---
                     if(f.includes("THI")) {
                         const levels = [0, 0, 0, 0]; 
                         ds.rows.forEach(r => {
