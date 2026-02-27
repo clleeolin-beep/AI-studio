@@ -2,16 +2,17 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V64 (純淨矩陣展開版)</title>
+    <title>氣候資料智慧工具 V65 (雲端健康偵測版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #27ae60; --blue: #3498db; --danger: #e74c3c; --purple: #8e44ad; }
+        :root { --primary: #2c3e50; --accent: #27ae60; --blue: #3498db; --danger: #e74c3c; --purple: #8e44ad; --orange: #e67e22; }
         body { font-family: "Microsoft JhengHei", sans-serif; max-width: 950px; margin: 40px auto; padding: 20px; background-color: #f4f7f6; }
         .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; border-top: 5px solid var(--primary); }
         .card.cleaner { border-top-color: var(--danger); }
         .card.cloud { border-top-color: var(--purple); }
+        .card.scan { border-top-color: var(--orange); }
         h2 { margin: 0 0 10px 0; color: var(--primary); font-size: 1.4em; }
         .desc { color: #7f8c8d; font-size: 0.85em; margin-bottom: 15px; }
         .section { margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
@@ -22,11 +23,13 @@
         .btn-merge { background: var(--blue); }
         .btn-clean { background: var(--danger); }
         .btn-cloud { background: var(--purple); }
+        .btn-scan { background: var(--orange); }
         #status { margin-top: 20px; padding: 15px; border-radius: 6px; background: #2c3e50; color: #ecf0f1; font-size: 0.9em; white-space: pre-line; border-left: 5px solid var(--accent); }
         .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 350px; overflow-y: auto; }
         .diag-err { color: #ff5555; }
         .diag-info { color: #3498db; }
         .diag-success { color: #55ff55; }
+        .diag-warn { color: #f1c40f; }
     </style>
 </head>
 <body>
@@ -62,6 +65,13 @@
         <div id="diag" class="diag-box">診斷：等待匯入檔案...</div>
     </div>
 
+    <div class="card scan">
+        <h2>🔍 第四區：雲端資料庫健康偵測 (起迄與缺漏分析)</h2>
+        <p class="desc">一鍵掃描雲端指定資料夾內所有測站，精準算出資料起迄時間，並揪出中間缺失的月份。</p>
+        <button id="scanBtn" class="btn-scan">授權並執行雲端健康掃描</button>
+        <div id="diagScan" class="diag-box">偵測報告：等待啟動...</div>
+    </div>
+
     <div id="status">準備中...</div>
 
     <script>
@@ -73,6 +83,7 @@
         let tokenClient, accessToken = null;
         const status = document.getElementById('status');
         const diag = document.getElementById('diag');
+        const diagScan = document.getElementById('diagScan');
 
         window.stationLoader = (json) => {
             if (json?.table) {
@@ -103,11 +114,18 @@
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CLIENT_ID,
                 scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata https://www.googleapis.com/auth/drive.readonly',
-                callback: (resp) => { accessToken = resp.access_token; startFolderSync(); }
+                callback: (resp) => { 
+                    accessToken = resp.access_token; 
+                    // 根據是點擊哪一個按鈕來觸發對應的邏輯
+                    if (window.pendingAction === 'sync') {
+                        startFolderSync(); 
+                    } else if (window.pendingAction === 'scan') {
+                        startCloudScan();
+                    }
+                }
             });
         };
 
-        // 獨立數值處理邏輯
         function cleanVal(v) {
             let strV = String(v).trim();
             if (strV === '/' || strV === '-' || strV === 'X' || strV === '...' || strV === 'T') {
@@ -116,7 +134,6 @@
             return strV;
         }
 
-        // 核心解析器：完全棄用 Map 迴圈，純手工矩陣展開
         async function parseFile(file) {
             let m = file.name.match(/(\d+)-/);
             let stnId = m ? m[1] : file.name.replace('.xlsx', '');
@@ -128,7 +145,6 @@
                     let reader = new FileReader();
                     reader.onload = e => { 
                         let wb = XLSX.read(e.target.result); 
-                        // 設定 raw: false 強制以文字讀取現有 XLSX，避免日期失真
                         res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, defval: ""})); 
                     };
                     reader.readAsArrayBuffer(file);
@@ -143,148 +159,17 @@
                 let rawChHeaders = results[0] || [];
                 let rawEnHeaders = results[1] || [];
                 
-                // 展開中文標題矩陣
                 let header1 = new Array();
-                header1.push(String('站碼'));
-                header1.push(String('縣市'));
-                header1.push(String('站名'));
-                header1.push(String('海拔高度'));
-                header1.push(String('緯度'));
-                header1.push(String('經度'));
-                header1.push(String('地址位置'));
-                header1.push(String('年'));
-                header1.push(String('月'));
-                header1.push(String('日期'));
+                header1.push(String('站碼')); header1.push(String('縣市')); header1.push(String('站名')); header1.push(String('海拔高度')); header1.push(String('緯度')); header1.push(String('經度')); header1.push(String('地址位置')); header1.push(String('年')); header1.push(String('月')); header1.push(String('日期'));
                 
                 let dataLength = rawEnHeaders.length;
-                if (dataLength > 0) header1.push(String(rawChHeaders[0] || ""));
-                if (dataLength > 1) header1.push(String(rawChHeaders[1] || ""));
-                if (dataLength > 2) header1.push(String(rawChHeaders[2] || ""));
-                if (dataLength > 3) header1.push(String(rawChHeaders[3] || ""));
-                if (dataLength > 4) header1.push(String(rawChHeaders[4] || ""));
-                if (dataLength > 5) header1.push(String(rawChHeaders[5] || ""));
-                if (dataLength > 6) header1.push(String(rawChHeaders[6] || ""));
-                if (dataLength > 7) header1.push(String(rawChHeaders[7] || ""));
-                if (dataLength > 8) header1.push(String(rawChHeaders[8] || ""));
-                if (dataLength > 9) header1.push(String(rawChHeaders[9] || ""));
-                if (dataLength > 10) header1.push(String(rawChHeaders[10] || ""));
-                if (dataLength > 11) header1.push(String(rawChHeaders[11] || ""));
-                if (dataLength > 12) header1.push(String(rawChHeaders[12] || ""));
-                if (dataLength > 13) header1.push(String(rawChHeaders[13] || ""));
-                if (dataLength > 14) header1.push(String(rawChHeaders[14] || ""));
-                if (dataLength > 15) header1.push(String(rawChHeaders[15] || ""));
-                if (dataLength > 16) header1.push(String(rawChHeaders[16] || ""));
-                if (dataLength > 17) header1.push(String(rawChHeaders[17] || ""));
-                if (dataLength > 18) header1.push(String(rawChHeaders[18] || ""));
-                if (dataLength > 19) header1.push(String(rawChHeaders[19] || ""));
-                if (dataLength > 20) header1.push(String(rawChHeaders[20] || ""));
-                if (dataLength > 21) header1.push(String(rawChHeaders[21] || ""));
-                if (dataLength > 22) header1.push(String(rawChHeaders[22] || ""));
-                if (dataLength > 23) header1.push(String(rawChHeaders[23] || ""));
-                if (dataLength > 24) header1.push(String(rawChHeaders[24] || ""));
-                if (dataLength > 25) header1.push(String(rawChHeaders[25] || ""));
-                if (dataLength > 26) header1.push(String(rawChHeaders[26] || ""));
-                if (dataLength > 27) header1.push(String(rawChHeaders[27] || ""));
-                if (dataLength > 28) header1.push(String(rawChHeaders[28] || ""));
-                if (dataLength > 29) header1.push(String(rawChHeaders[29] || ""));
-                if (dataLength > 30) header1.push(String(rawChHeaders[30] || ""));
-                if (dataLength > 31) header1.push(String(rawChHeaders[31] || ""));
-                if (dataLength > 32) header1.push(String(rawChHeaders[32] || ""));
-                if (dataLength > 33) header1.push(String(rawChHeaders[33] || ""));
-                if (dataLength > 34) header1.push(String(rawChHeaders[34] || ""));
-                if (dataLength > 35) header1.push(String(rawChHeaders[35] || ""));
-                if (dataLength > 36) header1.push(String(rawChHeaders[36] || ""));
-                if (dataLength > 37) header1.push(String(rawChHeaders[37] || ""));
-                if (dataLength > 38) header1.push(String(rawChHeaders[38] || ""));
-                if (dataLength > 39) header1.push(String(rawChHeaders[39] || ""));
-                if (dataLength > 40) header1.push(String(rawChHeaders[40] || ""));
-                if (dataLength > 41) header1.push(String(rawChHeaders[41] || ""));
-                if (dataLength > 42) header1.push(String(rawChHeaders[42] || ""));
-                if (dataLength > 43) header1.push(String(rawChHeaders[43] || ""));
-                if (dataLength > 44) header1.push(String(rawChHeaders[44] || ""));
-                if (dataLength > 45) header1.push(String(rawChHeaders[45] || ""));
-                if (dataLength > 46) header1.push(String(rawChHeaders[46] || ""));
-                if (dataLength > 47) header1.push(String(rawChHeaders[47] || ""));
-                if (dataLength > 48) header1.push(String(rawChHeaders[48] || ""));
-                if (dataLength > 49) header1.push(String(rawChHeaders[49] || ""));
-                if (dataLength > 50) header1.push(String(rawChHeaders[50] || ""));
-                if (dataLength > 51) header1.push(String(rawChHeaders[51] || ""));
-                if (dataLength > 52) header1.push(String(rawChHeaders[52] || ""));
-                if (dataLength > 53) header1.push(String(rawChHeaders[53] || ""));
-                if (dataLength > 54) header1.push(String(rawChHeaders[54] || ""));
-                if (dataLength > 55) header1.push(String(rawChHeaders[55] || ""));
+                if (dataLength > 0) header1.push(String(rawChHeaders[0] || "")); if (dataLength > 1) header1.push(String(rawChHeaders[1] || "")); if (dataLength > 2) header1.push(String(rawChHeaders[2] || "")); if (dataLength > 3) header1.push(String(rawChHeaders[3] || "")); if (dataLength > 4) header1.push(String(rawChHeaders[4] || "")); if (dataLength > 5) header1.push(String(rawChHeaders[5] || "")); if (dataLength > 6) header1.push(String(rawChHeaders[6] || "")); if (dataLength > 7) header1.push(String(rawChHeaders[7] || "")); if (dataLength > 8) header1.push(String(rawChHeaders[8] || "")); if (dataLength > 9) header1.push(String(rawChHeaders[9] || "")); if (dataLength > 10) header1.push(String(rawChHeaders[10] || "")); if (dataLength > 11) header1.push(String(rawChHeaders[11] || "")); if (dataLength > 12) header1.push(String(rawChHeaders[12] || "")); if (dataLength > 13) header1.push(String(rawChHeaders[13] || "")); if (dataLength > 14) header1.push(String(rawChHeaders[14] || "")); if (dataLength > 15) header1.push(String(rawChHeaders[15] || "")); if (dataLength > 16) header1.push(String(rawChHeaders[16] || "")); if (dataLength > 17) header1.push(String(rawChHeaders[17] || "")); if (dataLength > 18) header1.push(String(rawChHeaders[18] || "")); if (dataLength > 19) header1.push(String(rawChHeaders[19] || "")); if (dataLength > 20) header1.push(String(rawChHeaders[20] || "")); if (dataLength > 21) header1.push(String(rawChHeaders[21] || "")); if (dataLength > 22) header1.push(String(rawChHeaders[22] || "")); if (dataLength > 23) header1.push(String(rawChHeaders[23] || "")); if (dataLength > 24) header1.push(String(rawChHeaders[24] || "")); if (dataLength > 25) header1.push(String(rawChHeaders[25] || "")); if (dataLength > 26) header1.push(String(rawChHeaders[26] || "")); if (dataLength > 27) header1.push(String(rawChHeaders[27] || "")); if (dataLength > 28) header1.push(String(rawChHeaders[28] || "")); if (dataLength > 29) header1.push(String(rawChHeaders[29] || "")); if (dataLength > 30) header1.push(String(rawChHeaders[30] || "")); if (dataLength > 31) header1.push(String(rawChHeaders[31] || "")); if (dataLength > 32) header1.push(String(rawChHeaders[32] || "")); if (dataLength > 33) header1.push(String(rawChHeaders[33] || "")); if (dataLength > 34) header1.push(String(rawChHeaders[34] || "")); if (dataLength > 35) header1.push(String(rawChHeaders[35] || "")); if (dataLength > 36) header1.push(String(rawChHeaders[36] || "")); if (dataLength > 37) header1.push(String(rawChHeaders[37] || "")); if (dataLength > 38) header1.push(String(rawChHeaders[38] || "")); if (dataLength > 39) header1.push(String(rawChHeaders[39] || "")); if (dataLength > 40) header1.push(String(rawChHeaders[40] || "")); if (dataLength > 41) header1.push(String(rawChHeaders[41] || "")); if (dataLength > 42) header1.push(String(rawChHeaders[42] || "")); if (dataLength > 43) header1.push(String(rawChHeaders[43] || "")); if (dataLength > 44) header1.push(String(rawChHeaders[44] || "")); if (dataLength > 45) header1.push(String(rawChHeaders[45] || "")); if (dataLength > 46) header1.push(String(rawChHeaders[46] || "")); if (dataLength > 47) header1.push(String(rawChHeaders[47] || "")); if (dataLength > 48) header1.push(String(rawChHeaders[48] || "")); if (dataLength > 49) header1.push(String(rawChHeaders[49] || "")); if (dataLength > 50) header1.push(String(rawChHeaders[50] || "")); if (dataLength > 51) header1.push(String(rawChHeaders[51] || "")); if (dataLength > 52) header1.push(String(rawChHeaders[52] || "")); if (dataLength > 53) header1.push(String(rawChHeaders[53] || "")); if (dataLength > 54) header1.push(String(rawChHeaders[54] || "")); if (dataLength > 55) header1.push(String(rawChHeaders[55] || ""));
 
-                // 展開英文標題矩陣
                 let header2 = new Array();
-                header2.push(String('ID'));
-                header2.push(String('City'));
-                header2.push(String('Station'));
-                header2.push(String('Alt'));
-                header2.push(String('Lat'));
-                header2.push(String('Lon'));
-                header2.push(String('Addr'));
-                header2.push(String('Yr'));
-                header2.push(String('Mo'));
-                header2.push(String('Date'));
+                header2.push(String('ID')); header2.push(String('City')); header2.push(String('Station')); header2.push(String('Alt')); header2.push(String('Lat')); header2.push(String('Lon')); header2.push(String('Addr')); header2.push(String('Yr')); header2.push(String('Mo')); header2.push(String('Date'));
                 
-                if (dataLength > 0) header2.push(String(rawEnHeaders[0] || ""));
-                if (dataLength > 1) header2.push(String(rawEnHeaders[1] || ""));
-                if (dataLength > 2) header2.push(String(rawEnHeaders[2] || ""));
-                if (dataLength > 3) header2.push(String(rawEnHeaders[3] || ""));
-                if (dataLength > 4) header2.push(String(rawEnHeaders[4] || ""));
-                if (dataLength > 5) header2.push(String(rawEnHeaders[5] || ""));
-                if (dataLength > 6) header2.push(String(rawEnHeaders[6] || ""));
-                if (dataLength > 7) header2.push(String(rawEnHeaders[7] || ""));
-                if (dataLength > 8) header2.push(String(rawEnHeaders[8] || ""));
-                if (dataLength > 9) header2.push(String(rawEnHeaders[9] || ""));
-                if (dataLength > 10) header2.push(String(rawEnHeaders[10] || ""));
-                if (dataLength > 11) header2.push(String(rawEnHeaders[11] || ""));
-                if (dataLength > 12) header2.push(String(rawEnHeaders[12] || ""));
-                if (dataLength > 13) header2.push(String(rawEnHeaders[13] || ""));
-                if (dataLength > 14) header2.push(String(rawEnHeaders[14] || ""));
-                if (dataLength > 15) header2.push(String(rawEnHeaders[15] || ""));
-                if (dataLength > 16) header2.push(String(rawEnHeaders[16] || ""));
-                if (dataLength > 17) header2.push(String(rawEnHeaders[17] || ""));
-                if (dataLength > 18) header2.push(String(rawEnHeaders[18] || ""));
-                if (dataLength > 19) header2.push(String(rawEnHeaders[19] || ""));
-                if (dataLength > 20) header2.push(String(rawEnHeaders[20] || ""));
-                if (dataLength > 21) header2.push(String(rawEnHeaders[21] || ""));
-                if (dataLength > 22) header2.push(String(rawEnHeaders[22] || ""));
-                if (dataLength > 23) header2.push(String(rawEnHeaders[23] || ""));
-                if (dataLength > 24) header2.push(String(rawEnHeaders[24] || ""));
-                if (dataLength > 25) header2.push(String(rawEnHeaders[25] || ""));
-                if (dataLength > 26) header2.push(String(rawEnHeaders[26] || ""));
-                if (dataLength > 27) header2.push(String(rawEnHeaders[27] || ""));
-                if (dataLength > 28) header2.push(String(rawEnHeaders[28] || ""));
-                if (dataLength > 29) header2.push(String(rawEnHeaders[29] || ""));
-                if (dataLength > 30) header2.push(String(rawEnHeaders[30] || ""));
-                if (dataLength > 31) header2.push(String(rawEnHeaders[31] || ""));
-                if (dataLength > 32) header2.push(String(rawEnHeaders[32] || ""));
-                if (dataLength > 33) header2.push(String(rawEnHeaders[33] || ""));
-                if (dataLength > 34) header2.push(String(rawEnHeaders[34] || ""));
-                if (dataLength > 35) header2.push(String(rawEnHeaders[35] || ""));
-                if (dataLength > 36) header2.push(String(rawEnHeaders[36] || ""));
-                if (dataLength > 37) header2.push(String(rawEnHeaders[37] || ""));
-                if (dataLength > 38) header2.push(String(rawEnHeaders[38] || ""));
-                if (dataLength > 39) header2.push(String(rawEnHeaders[39] || ""));
-                if (dataLength > 40) header2.push(String(rawEnHeaders[40] || ""));
-                if (dataLength > 41) header2.push(String(rawEnHeaders[41] || ""));
-                if (dataLength > 42) header2.push(String(rawEnHeaders[42] || ""));
-                if (dataLength > 43) header2.push(String(rawEnHeaders[43] || ""));
-                if (dataLength > 44) header2.push(String(rawEnHeaders[44] || ""));
-                if (dataLength > 45) header2.push(String(rawEnHeaders[45] || ""));
-                if (dataLength > 46) header2.push(String(rawEnHeaders[46] || ""));
-                if (dataLength > 47) header2.push(String(rawEnHeaders[47] || ""));
-                if (dataLength > 48) header2.push(String(rawEnHeaders[48] || ""));
-                if (dataLength > 49) header2.push(String(rawEnHeaders[49] || ""));
-                if (dataLength > 50) header2.push(String(rawEnHeaders[50] || ""));
-                if (dataLength > 51) header2.push(String(rawEnHeaders[51] || ""));
-                if (dataLength > 52) header2.push(String(rawEnHeaders[52] || ""));
-                if (dataLength > 53) header2.push(String(rawEnHeaders[53] || ""));
-                if (dataLength > 54) header2.push(String(rawEnHeaders[54] || ""));
-                if (dataLength > 55) header2.push(String(rawEnHeaders[55] || ""));
+                if (dataLength > 0) header2.push(String(rawEnHeaders[0] || "")); if (dataLength > 1) header2.push(String(rawEnHeaders[1] || "")); if (dataLength > 2) header2.push(String(rawEnHeaders[2] || "")); if (dataLength > 3) header2.push(String(rawEnHeaders[3] || "")); if (dataLength > 4) header2.push(String(rawEnHeaders[4] || "")); if (dataLength > 5) header2.push(String(rawEnHeaders[5] || "")); if (dataLength > 6) header2.push(String(rawEnHeaders[6] || "")); if (dataLength > 7) header2.push(String(rawEnHeaders[7] || "")); if (dataLength > 8) header2.push(String(rawEnHeaders[8] || "")); if (dataLength > 9) header2.push(String(rawEnHeaders[9] || "")); if (dataLength > 10) header2.push(String(rawEnHeaders[10] || "")); if (dataLength > 11) header2.push(String(rawEnHeaders[11] || "")); if (dataLength > 12) header2.push(String(rawEnHeaders[12] || "")); if (dataLength > 13) header2.push(String(rawEnHeaders[13] || "")); if (dataLength > 14) header2.push(String(rawEnHeaders[14] || "")); if (dataLength > 15) header2.push(String(rawEnHeaders[15] || "")); if (dataLength > 16) header2.push(String(rawEnHeaders[16] || "")); if (dataLength > 17) header2.push(String(rawEnHeaders[17] || "")); if (dataLength > 18) header2.push(String(rawEnHeaders[18] || "")); if (dataLength > 19) header2.push(String(rawEnHeaders[19] || "")); if (dataLength > 20) header2.push(String(rawEnHeaders[20] || "")); if (dataLength > 21) header2.push(String(rawEnHeaders[21] || "")); if (dataLength > 22) header2.push(String(rawEnHeaders[22] || "")); if (dataLength > 23) header2.push(String(rawEnHeaders[23] || "")); if (dataLength > 24) header2.push(String(rawEnHeaders[24] || "")); if (dataLength > 25) header2.push(String(rawEnHeaders[25] || "")); if (dataLength > 26) header2.push(String(rawEnHeaders[26] || "")); if (dataLength > 27) header2.push(String(rawEnHeaders[27] || "")); if (dataLength > 28) header2.push(String(rawEnHeaders[28] || "")); if (dataLength > 29) header2.push(String(rawEnHeaders[29] || "")); if (dataLength > 30) header2.push(String(rawEnHeaders[30] || "")); if (dataLength > 31) header2.push(String(rawEnHeaders[31] || "")); if (dataLength > 32) header2.push(String(rawEnHeaders[32] || "")); if (dataLength > 33) header2.push(String(rawEnHeaders[33] || "")); if (dataLength > 34) header2.push(String(rawEnHeaders[34] || "")); if (dataLength > 35) header2.push(String(rawEnHeaders[35] || "")); if (dataLength > 36) header2.push(String(rawEnHeaders[36] || "")); if (dataLength > 37) header2.push(String(rawEnHeaders[37] || "")); if (dataLength > 38) header2.push(String(rawEnHeaders[38] || "")); if (dataLength > 39) header2.push(String(rawEnHeaders[39] || "")); if (dataLength > 40) header2.push(String(rawEnHeaders[40] || "")); if (dataLength > 41) header2.push(String(rawEnHeaders[41] || "")); if (dataLength > 42) header2.push(String(rawEnHeaders[42] || "")); if (dataLength > 43) header2.push(String(rawEnHeaders[43] || "")); if (dataLength > 44) header2.push(String(rawEnHeaders[44] || "")); if (dataLength > 45) header2.push(String(rawEnHeaders[45] || "")); if (dataLength > 46) header2.push(String(rawEnHeaders[46] || "")); if (dataLength > 47) header2.push(String(rawEnHeaders[47] || "")); if (dataLength > 48) header2.push(String(rawEnHeaders[48] || "")); if (dataLength > 49) header2.push(String(rawEnHeaders[49] || "")); if (dataLength > 50) header2.push(String(rawEnHeaders[50] || "")); if (dataLength > 51) header2.push(String(rawEnHeaders[51] || "")); if (dataLength > 52) header2.push(String(rawEnHeaders[52] || "")); if (dataLength > 53) header2.push(String(rawEnHeaders[53] || "")); if (dataLength > 54) header2.push(String(rawEnHeaders[54] || "")); if (dataLength > 55) header2.push(String(rawEnHeaders[55] || ""));
 
-                // 展開內容矩陣
                 let explicitRows = new Array();
                 let resultsCount = results.length;
                 for (let rIndex = 2; rIndex < resultsCount; rIndex++) {
@@ -309,73 +194,9 @@
                     }
 
                     let rowMatrix = new Array();
-                    rowMatrix.push(String(stnId));
-                    rowMatrix.push(String(info.city));
-                    rowMatrix.push(String(info.name));
-                    rowMatrix.push(String(info.alt));
-                    rowMatrix.push(String(info.lat));
-                    rowMatrix.push(String(info.lon));
-                    rowMatrix.push(String(info.addr));
-                    rowMatrix.push(String(parsedYear));
-                    rowMatrix.push(String(parsedMonth));
-                    rowMatrix.push(String(parsedDate));
+                    rowMatrix.push(String(stnId)); rowMatrix.push(String(info.city)); rowMatrix.push(String(info.name)); rowMatrix.push(String(info.alt)); rowMatrix.push(String(info.lat)); rowMatrix.push(String(info.lon)); rowMatrix.push(String(info.addr)); rowMatrix.push(String(parsedYear)); rowMatrix.push(String(parsedMonth)); rowMatrix.push(String(parsedDate));
 
-                    if (dataLength > 0) rowMatrix.push(String(cleanVal(currentRow[0])));
-                    if (dataLength > 1) rowMatrix.push(String(cleanVal(currentRow[1])));
-                    if (dataLength > 2) rowMatrix.push(String(cleanVal(currentRow[2])));
-                    if (dataLength > 3) rowMatrix.push(String(cleanVal(currentRow[3])));
-                    if (dataLength > 4) rowMatrix.push(String(cleanVal(currentRow[4])));
-                    if (dataLength > 5) rowMatrix.push(String(cleanVal(currentRow[5])));
-                    if (dataLength > 6) rowMatrix.push(String(cleanVal(currentRow[6])));
-                    if (dataLength > 7) rowMatrix.push(String(cleanVal(currentRow[7])));
-                    if (dataLength > 8) rowMatrix.push(String(cleanVal(currentRow[8])));
-                    if (dataLength > 9) rowMatrix.push(String(cleanVal(currentRow[9])));
-                    if (dataLength > 10) rowMatrix.push(String(cleanVal(currentRow[10])));
-                    if (dataLength > 11) rowMatrix.push(String(cleanVal(currentRow[11])));
-                    if (dataLength > 12) rowMatrix.push(String(cleanVal(currentRow[12])));
-                    if (dataLength > 13) rowMatrix.push(String(cleanVal(currentRow[13])));
-                    if (dataLength > 14) rowMatrix.push(String(cleanVal(currentRow[14])));
-                    if (dataLength > 15) rowMatrix.push(String(cleanVal(currentRow[15])));
-                    if (dataLength > 16) rowMatrix.push(String(cleanVal(currentRow[16])));
-                    if (dataLength > 17) rowMatrix.push(String(cleanVal(currentRow[17])));
-                    if (dataLength > 18) rowMatrix.push(String(cleanVal(currentRow[18])));
-                    if (dataLength > 19) rowMatrix.push(String(cleanVal(currentRow[19])));
-                    if (dataLength > 20) rowMatrix.push(String(cleanVal(currentRow[20])));
-                    if (dataLength > 21) rowMatrix.push(String(cleanVal(currentRow[21])));
-                    if (dataLength > 22) rowMatrix.push(String(cleanVal(currentRow[22])));
-                    if (dataLength > 23) rowMatrix.push(String(cleanVal(currentRow[23])));
-                    if (dataLength > 24) rowMatrix.push(String(cleanVal(currentRow[24])));
-                    if (dataLength > 25) rowMatrix.push(String(cleanVal(currentRow[25])));
-                    if (dataLength > 26) rowMatrix.push(String(cleanVal(currentRow[26])));
-                    if (dataLength > 27) rowMatrix.push(String(cleanVal(currentRow[27])));
-                    if (dataLength > 28) rowMatrix.push(String(cleanVal(currentRow[28])));
-                    if (dataLength > 29) rowMatrix.push(String(cleanVal(currentRow[29])));
-                    if (dataLength > 30) rowMatrix.push(String(cleanVal(currentRow[30])));
-                    if (dataLength > 31) rowMatrix.push(String(cleanVal(currentRow[31])));
-                    if (dataLength > 32) rowMatrix.push(String(cleanVal(currentRow[32])));
-                    if (dataLength > 33) rowMatrix.push(String(cleanVal(currentRow[33])));
-                    if (dataLength > 34) rowMatrix.push(String(cleanVal(currentRow[34])));
-                    if (dataLength > 35) rowMatrix.push(String(cleanVal(currentRow[35])));
-                    if (dataLength > 36) rowMatrix.push(String(cleanVal(currentRow[36])));
-                    if (dataLength > 37) rowMatrix.push(String(cleanVal(currentRow[37])));
-                    if (dataLength > 38) rowMatrix.push(String(cleanVal(currentRow[38])));
-                    if (dataLength > 39) rowMatrix.push(String(cleanVal(currentRow[39])));
-                    if (dataLength > 40) rowMatrix.push(String(cleanVal(currentRow[40])));
-                    if (dataLength > 41) rowMatrix.push(String(cleanVal(currentRow[41])));
-                    if (dataLength > 42) rowMatrix.push(String(cleanVal(currentRow[42])));
-                    if (dataLength > 43) rowMatrix.push(String(cleanVal(currentRow[43])));
-                    if (dataLength > 44) rowMatrix.push(String(cleanVal(currentRow[44])));
-                    if (dataLength > 45) rowMatrix.push(String(cleanVal(currentRow[45])));
-                    if (dataLength > 46) rowMatrix.push(String(cleanVal(currentRow[46])));
-                    if (dataLength > 47) rowMatrix.push(String(cleanVal(currentRow[47])));
-                    if (dataLength > 48) rowMatrix.push(String(cleanVal(currentRow[48])));
-                    if (dataLength > 49) rowMatrix.push(String(cleanVal(currentRow[49])));
-                    if (dataLength > 50) rowMatrix.push(String(cleanVal(currentRow[50])));
-                    if (dataLength > 51) rowMatrix.push(String(cleanVal(currentRow[51])));
-                    if (dataLength > 52) rowMatrix.push(String(cleanVal(currentRow[52])));
-                    if (dataLength > 53) rowMatrix.push(String(cleanVal(currentRow[53])));
-                    if (dataLength > 54) rowMatrix.push(String(cleanVal(currentRow[54])));
-                    if (dataLength > 55) rowMatrix.push(String(cleanVal(currentRow[55])));
+                    if (dataLength > 0) rowMatrix.push(String(cleanVal(currentRow[0]))); if (dataLength > 1) rowMatrix.push(String(cleanVal(currentRow[1]))); if (dataLength > 2) rowMatrix.push(String(cleanVal(currentRow[2]))); if (dataLength > 3) rowMatrix.push(String(cleanVal(currentRow[3]))); if (dataLength > 4) rowMatrix.push(String(cleanVal(currentRow[4]))); if (dataLength > 5) rowMatrix.push(String(cleanVal(currentRow[5]))); if (dataLength > 6) rowMatrix.push(String(cleanVal(currentRow[6]))); if (dataLength > 7) rowMatrix.push(String(cleanVal(currentRow[7]))); if (dataLength > 8) rowMatrix.push(String(cleanVal(currentRow[8]))); if (dataLength > 9) rowMatrix.push(String(cleanVal(currentRow[9]))); if (dataLength > 10) rowMatrix.push(String(cleanVal(currentRow[10]))); if (dataLength > 11) rowMatrix.push(String(cleanVal(currentRow[11]))); if (dataLength > 12) rowMatrix.push(String(cleanVal(currentRow[12]))); if (dataLength > 13) rowMatrix.push(String(cleanVal(currentRow[13]))); if (dataLength > 14) rowMatrix.push(String(cleanVal(currentRow[14]))); if (dataLength > 15) rowMatrix.push(String(cleanVal(currentRow[15]))); if (dataLength > 16) rowMatrix.push(String(cleanVal(currentRow[16]))); if (dataLength > 17) rowMatrix.push(String(cleanVal(currentRow[17]))); if (dataLength > 18) rowMatrix.push(String(cleanVal(currentRow[18]))); if (dataLength > 19) rowMatrix.push(String(cleanVal(currentRow[19]))); if (dataLength > 20) rowMatrix.push(String(cleanVal(currentRow[20]))); if (dataLength > 21) rowMatrix.push(String(cleanVal(currentRow[21]))); if (dataLength > 22) rowMatrix.push(String(cleanVal(currentRow[22]))); if (dataLength > 23) rowMatrix.push(String(cleanVal(currentRow[23]))); if (dataLength > 24) rowMatrix.push(String(cleanVal(currentRow[24]))); if (dataLength > 25) rowMatrix.push(String(cleanVal(currentRow[25]))); if (dataLength > 26) rowMatrix.push(String(cleanVal(currentRow[26]))); if (dataLength > 27) rowMatrix.push(String(cleanVal(currentRow[27]))); if (dataLength > 28) rowMatrix.push(String(cleanVal(currentRow[28]))); if (dataLength > 29) rowMatrix.push(String(cleanVal(currentRow[29]))); if (dataLength > 30) rowMatrix.push(String(cleanVal(currentRow[30]))); if (dataLength > 31) rowMatrix.push(String(cleanVal(currentRow[31]))); if (dataLength > 32) rowMatrix.push(String(cleanVal(currentRow[32]))); if (dataLength > 33) rowMatrix.push(String(cleanVal(currentRow[33]))); if (dataLength > 34) rowMatrix.push(String(cleanVal(currentRow[34]))); if (dataLength > 35) rowMatrix.push(String(cleanVal(currentRow[35]))); if (dataLength > 36) rowMatrix.push(String(cleanVal(currentRow[36]))); if (dataLength > 37) rowMatrix.push(String(cleanVal(currentRow[37]))); if (dataLength > 38) rowMatrix.push(String(cleanVal(currentRow[38]))); if (dataLength > 39) rowMatrix.push(String(cleanVal(currentRow[39]))); if (dataLength > 40) rowMatrix.push(String(cleanVal(currentRow[40]))); if (dataLength > 41) rowMatrix.push(String(cleanVal(currentRow[41]))); if (dataLength > 42) rowMatrix.push(String(cleanVal(currentRow[42]))); if (dataLength > 43) rowMatrix.push(String(cleanVal(currentRow[43]))); if (dataLength > 44) rowMatrix.push(String(cleanVal(currentRow[44]))); if (dataLength > 45) rowMatrix.push(String(cleanVal(currentRow[45]))); if (dataLength > 46) rowMatrix.push(String(cleanVal(currentRow[46]))); if (dataLength > 47) rowMatrix.push(String(cleanVal(currentRow[47]))); if (dataLength > 48) rowMatrix.push(String(cleanVal(currentRow[48]))); if (dataLength > 49) rowMatrix.push(String(cleanVal(currentRow[49]))); if (dataLength > 50) rowMatrix.push(String(cleanVal(currentRow[50]))); if (dataLength > 51) rowMatrix.push(String(cleanVal(currentRow[51]))); if (dataLength > 52) rowMatrix.push(String(cleanVal(currentRow[52]))); if (dataLength > 53) rowMatrix.push(String(cleanVal(currentRow[53]))); if (dataLength > 54) rowMatrix.push(String(cleanVal(currentRow[54]))); if (dataLength > 55) rowMatrix.push(String(cleanVal(currentRow[55])));
 
                     explicitRows.push(rowMatrix);
                 }
@@ -407,7 +228,7 @@
             }
         }
 
-        // --- 第一區：強制嚴格字串輸出 ---
+        // --- 第一區邏輯 ---
         document.getElementById('mergeInput').onchange = () => document.getElementById('mergeBtn').disabled = false;
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
@@ -417,9 +238,7 @@
             let filesCount = files.length;
             for (let i = 0; i < filesCount; i++) {
                 let res = await parseFile(files[i]);
-                if (!bundle[res.stnId]) {
-                    bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
-                }
+                if (!bundle[res.stnId]) { bundle[res.stnId] = { headers: res.headers, dataMap: new Map() }; }
                 let rowsCount = res.rows.length;
                 for (let j = 0; j < rowsCount; j++) {
                     let r = res.rows[j];
@@ -431,26 +250,21 @@
                 let keys = Array.from(bundle[stnId].dataMap.keys()).sort((a,b) => new Date(a) - new Date(b));
                 let keysCount = keys.length;
                 let sortedRows = new Array();
-                for (let k = 0; k < keysCount; k++) {
-                    sortedRows.push(bundle[stnId].dataMap.get(keys[k]));
-                }
+                for (let k = 0; k < keysCount; k++) { sortedRows.push(bundle[stnId].dataMap.get(keys[k])); }
                 
                 let sheetData = new Array();
                 sheetData.push(bundle[stnId].headers[0]);
                 sheetData.push(bundle[stnId].headers[1]);
-                for (let r = 0; r < keysCount; r++) {
-                    sheetData.push(sortedRows[r]);
-                }
+                for (let r = 0; r < keysCount; r++) { sheetData.push(sortedRows[r]); }
 
                 const wb = XLSX.utils.book_new();
-                // 通過強制字串化陣列傳入，阻斷自動轉型
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), stnId);
                 XLSX.writeFile(wb, `${stnId}.xlsx`);
             }
             status.innerText = "✅ 彙整完成。已產出包含完整字串定義的純淨 XLSX。";
         };
 
-        // --- 第二區：清理功能 ---
+        // --- 第二區邏輯 ---
         document.getElementById('cleanInput').onchange = () => document.getElementById('cleanBtn').disabled = false;
         document.getElementById('cleanBtn').onclick = async () => {
             const basis = document.getElementById('cleanBasis').value;
@@ -464,7 +278,6 @@
             let snCount = sheetNames.length;
             for (let s = 0; s < snCount; s++) {
                 let name = sheetNames[s];
-                // raw: false 確保讀取為字串
                 let rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: false, defval: ""});
                 if (rows.length < 2) continue;
                 
@@ -472,30 +285,27 @@
                 let filtered = new Array();
                 let rCount = rows.length;
                 for (let r = 2; r < rCount; r++) {
-                    if (new Date(rows[r][idx]) >= dynamicCutoff) {
-                        filtered.push(rows[r]);
-                    }
+                    if (new Date(rows[r][idx]) >= dynamicCutoff) { filtered.push(rows[r]); }
                 }
                 
                 let sheetData = new Array();
                 sheetData.push(rows[0]);
                 sheetData.push(rows[1]);
                 let fCount = filtered.length;
-                for (let f = 0; f < fCount; f++) {
-                    sheetData.push(filtered[f]);
-                }
+                for (let f = 0; f < fCount; f++) { sheetData.push(filtered[f]); }
                 
                 XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet(sheetData), name);
             }
             XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
         };
 
-        // --- 第三區：智慧同步 ---
+        // --- 第三區邏輯 ---
         document.getElementById('syncInput').onchange = () => {
             if (document.getElementById('syncInput').files.length > 0) document.getElementById('syncBtn').disabled = false;
         };
 
         document.getElementById('syncBtn').onclick = () => {
+            window.pendingAction = 'sync';
             diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 準備同步字串矩陣...<br>`;
             accessToken ? startFolderSync() : tokenClient.requestAccessToken({prompt: 'none'});
         };
@@ -508,9 +318,7 @@
                 let filesCount = files.length;
                 for (let i = 0; i < filesCount; i++) {
                     let res = await parseFile(files[i]);
-                    if (!bundle[res.stnId]) {
-                        bundle[res.stnId] = { headers: res.headers, dataMap: new Map() };
-                    }
+                    if (!bundle[res.stnId]) { bundle[res.stnId] = { headers: res.headers, dataMap: new Map() }; }
                     let rowsCount = res.rows.length;
                     for (let j = 0; j < rowsCount; j++) {
                         let r = res.rows[j];
@@ -559,28 +367,19 @@
                         let old = finalMap.get(date);
                         let neo = JSON.stringify(row);
                         
-                        if (!old) { 
-                            add++; 
-                            finalMap.set(date, neo); 
-                        } else if (old !== neo) { 
-                            upd++; 
-                            finalMap.set(date, neo); 
-                        }
+                        if (!old) { add++; finalMap.set(date, neo); } 
+                        else if (old !== neo) { upd++; finalMap.set(date, neo); }
                     }
 
                     let sortedKeys = Array.from(finalMap.keys()).sort((a,b)=>new Date(a)-new Date(b));
                     let skCount = sortedKeys.length;
                     let sortedRows = new Array();
-                    for (let sk = 0; sk < skCount; sk++) {
-                        sortedRows.push(JSON.parse(finalMap.get(sortedKeys[sk])));
-                    }
+                    for (let sk = 0; sk < skCount; sk++) { sortedRows.push(JSON.parse(finalMap.get(sortedKeys[sk]))); }
                     
                     let finalOutput = new Array();
                     finalOutput.push(bundle[stnId].headers[0]);
                     finalOutput.push(bundle[stnId].headers[1]);
-                    for (let fo = 0; fo < skCount; fo++) {
-                        finalOutput.push(sortedRows[fo]);
-                    }
+                    for (let fo = 0; fo < skCount; fo++) { finalOutput.push(sortedRows[fo]); }
 
                     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
                     const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
@@ -592,6 +391,130 @@
                 }
                 status.innerText = "✅ 同步程序執行完畢。";
             } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 錯誤: ${err.message}</span>`; }
+        }
+
+        // --- 第四區：雲端資料庫健康偵測 ---
+        document.getElementById('scanBtn').onclick = () => {
+            window.pendingAction = 'scan';
+            diagScan.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 啟動雲端連線，準備獲取檔案列表...<br>`;
+            accessToken ? startCloudScan() : tokenClient.requestAccessToken({prompt: 'none'});
+        };
+
+        async function startCloudScan() {
+            try {
+                // 1. 抓取目錄下所有檔案
+                diagScan.innerHTML += `<span class="diag-info">📡 正在掃描 Google Drive 目錄...</span><br>`;
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                const driveData = await driveRes.json();
+                const driveFiles = driveData.files || [];
+                
+                let fileCount = driveFiles.length;
+                if (fileCount === 0) {
+                    diagScan.innerHTML += `<span class="diag-err">⚠️ 資料夾內目前沒有任何檔案。</span><br>`;
+                    return;
+                }
+
+                diagScan.innerHTML += `<span class="diag-success">✅ 共發現 ${fileCount} 個測站檔案，開始解析內容...</span><hr>`;
+
+                // 2. 使用純手工迴圈解析每一個檔案
+                for (let fIndex = 0; fIndex < fileCount; fIndex++) {
+                    let fileObj = driveFiles[fIndex];
+                    let fileName = fileObj.name;
+                    let fileId = fileObj.id;
+                    
+                    diagScan.innerHTML += `<span><b>測站：${fileName}</b></span><br>`;
+
+                    // 抓取試算表內容
+                    const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${fileId}/values/A1:ZZ20000`, { 
+                        headers: { 'Authorization': `Bearer ${accessToken}` } 
+                    });
+                    const sheetData = await getRes.json();
+                    let values = sheetData.values || [];
+                    let vLen = values.length;
+
+                    if (vLen <= 2) {
+                        diagScan.innerHTML += `<span class="diag-err">   └─ ❌ 檔案為空或無有效數據。</span><br><br>`;
+                        continue;
+                    }
+
+                    // 3. 矩陣運算抓取日期與月份
+                    let existingMonths = {}; // 用於記錄存在的月份 YYYY/MM
+                    let minTime = Infinity;
+                    let maxTime = -Infinity;
+                    let minDateStr = "";
+                    let maxDateStr = "";
+
+                    for (let i = 2; i < vLen; i++) {
+                        let row = values[i];
+                        let dateVal = String(row[9] || "").trim(); // 第 10 欄為日期
+                        if (dateVal !== "" && dateVal.includes('/')) {
+                            let dTime = new Date(dateVal).getTime();
+                            if (!isNaN(dTime)) {
+                                if (dTime < minTime) { minTime = dTime; minDateStr = dateVal; }
+                                if (dTime > maxTime) { maxTime = dTime; maxDateStr = dateVal; }
+                                
+                                // 提取 YYYY/MM 作為金鑰
+                                let dateParts = dateVal.split('/');
+                                if (dateParts.length >= 2) {
+                                    let yM = dateParts[0] + '/' + dateParts[1];
+                                    existingMonths[yM] = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (minDateStr === "" || maxDateStr === "") {
+                        diagScan.innerHTML += `<span class="diag-err">   └─ ❌ 無法解析有效的日期格式。</span><br><br>`;
+                        continue;
+                    }
+
+                    diagScan.innerHTML += `   └─ 📅 數據範圍：${minDateStr} ~ ${maxDateStr}<br>`;
+
+                    // 4. 計算中間是否有缺失月份 (不依賴高階函數)
+                    let minD = new Date(minTime);
+                    let maxD = new Date(maxTime);
+                    let startY = minD.getFullYear();
+                    let startM = minD.getMonth() + 1;
+                    let endY = maxD.getFullYear();
+                    let endM = maxD.getMonth() + 1;
+
+                    let currY = startY;
+                    let currM = startM;
+                    let missingMonthsArray = new Array();
+
+                    while (currY < endY || (currY === endY && currM <= endM)) {
+                        let paddedM = String(currM).length === 1 ? '0' + String(currM) : String(currM);
+                        let checkYM = String(currY) + '/' + paddedM;
+                        
+                        if (existingMonths[checkYM] !== true) {
+                            missingMonthsArray.push(checkYM);
+                        }
+                        
+                        currM++;
+                        if (currM > 12) {
+                            currM = 1;
+                            currY++;
+                        }
+                    }
+
+                    let missingCount = missingMonthsArray.length;
+                    if (missingCount === 0) {
+                        diagScan.innerHTML += `<span class="diag-success">   └─ 🟢 完美無缺！期間內無遺漏任何月份。</span><br><br>`;
+                    } else {
+                        diagScan.innerHTML += `<span class="diag-warn">   └─ ⚠️ 偵測到缺失 ${missingCount} 個月份：</span><br>`;
+                        let missingReport = "";
+                        for (let m = 0; m < missingCount; m++) {
+                            missingReport += missingMonthsArray[m] + (m < missingCount - 1 ? ", " : "");
+                        }
+                        diagScan.innerHTML += `<span style="color:#e74c3c; font-size:0.9em;">   └─ [ ${missingReport} ]</span><br><br>`;
+                    }
+                }
+                diagScan.innerHTML += `<hr><span class="diag-success">✅ 雲端資料庫掃描分析完畢。</span><br>`;
+            } catch (err) {
+                diagScan.innerHTML += `<span class="diag-err">❌ 掃描失敗: ${err.message}</span>`;
+            }
         }
     </script>
 </body>
