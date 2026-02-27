@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.19 - 視覺狀態指示完全體</title>
+    <title>氣象全測站分析 v62.19 - 時空動態完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
@@ -21,9 +21,8 @@
         }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f0f2f5; }
         
-        #map { width: 100vw; height: 100vh; z-index: 1; background: #cbd2d8; }
+        #map { width: 100vw; height: 100vh; z-index: 1; background: #cbd2d8; position: relative;}
 
-        /* 標籤基礎設計：預設為不透明白圈 */
         .st-marker { 
             width: 38px !important; height: 38px !important; 
             border: 3px solid #fff; border-radius: 50%; 
@@ -36,22 +35,15 @@
         .st-Ag { background: var(--purple) !important; }
         .v-marker { display: flex; justify-content: center; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
-        /* 👻 無資料、無雲端檔案時的半透明幽靈狀態 */
         .st-marker.no-data {
-            opacity: 0.4 !important;
-            filter: grayscale(90%);
-            box-shadow: 0 0 5px rgba(0,0,0,0.3);
-            border-color: rgba(255,255,255,0.6) !important;
+            opacity: 0.4 !important; filter: grayscale(90%);
+            box-shadow: 0 0 5px rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.6) !important;
         }
-        .st-marker.no-data:hover {
-            opacity: 0.8 !important; filter: grayscale(0%); transform: scale(1.1);
-        }
-
-        /* 🌟 載入資料後的發光綠圈狀態 */
+        .st-marker.no-data:hover { opacity: 0.8 !important; filter: grayscale(0%); transform: scale(1.1); }
         .st-marker.loaded-data {
             border-color: var(--success) !important; 
             box-shadow: 0 0 15px var(--success), inset 0 0 8px rgba(46, 213, 115, 0.8) !important;
-            z-index: 5000 !important; /* 讓有資料的標籤浮在上面 */
+            z-index: 5000 !important; 
         }
 
         #diag-panel {
@@ -61,7 +53,6 @@
             max-height: 320px; overflow-y: auto; border: 2px solid #444; line-height: 1.8;
             box-shadow: 0 15px 50px rgba(0,0,0,0.8); pointer-events: auto;
         }
-        
         .log-hit { color: #f1c40f; font-weight: bold; }
         .log-google { color: #40a9ff; }
         .log-err { color: var(--danger); background: rgba(255,0,0,0.1); padding: 2px 5px; font-weight: bold; border-left: 3px solid var(--danger); }
@@ -86,9 +77,7 @@
             background: rgba(0,0,0,0.9); z-index: 100000; display: none; 
             justify-content: center; align-items: center; backdrop-filter: blur(15px);
         }
-        
         .modal-content { background: #fff; width: 98%; max-width: 1800px; height: 95%; border-radius: 25px; display: flex; flex-direction: row; overflow: hidden; box-shadow: 0 20px 80px rgba(0,0,0,0.5); }
-        
         .category-section { display: grid; grid-template-columns: 300px 1fr; gap: 35px; margin-bottom: 50px; border-top: 6px solid var(--accent); padding-top: 30px; background: white; border-radius: 20px; padding: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
         .control-panel { background: #fafafa; padding: 20px; border-radius: 15px; border: 1px solid #eee; }
         .multi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; }
@@ -124,7 +113,8 @@
         .layer-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; margin-bottom: 12px; font-weight: bold; color: #333; }
         .layer-toggle input { transform: scale(1.2); cursor: pointer; }
         .mini-dot { width: 14px !important; height: 14px !important; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
-/* --- 動態全域時空面板 UI --- */
+
+        /* --- 動態全域時空面板 UI --- */
         #dynamic-sidebar {
             position: absolute; top: 110px; left: 20px; z-index: 4000;
             background: rgba(26, 42, 58, 0.95); color: white; padding: 20px;
@@ -162,9 +152,9 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.19 【視覺狀態指示完全體】</h2>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.19 【時空動態完全體】</h2>
         <div style="font-size:12px; opacity:0.8; margin-top:5px;">
-            📡 引擎：雲端授權狀態感知 | 發光綠圈資料標示 | 
+            📡 引擎：雲端授權感知 | 發光綠圈資料標示 | 🌡️ 時空漸層內插
             <span id="station-counter" style="color:var(--success); font-weight:bold; font-size:14px; margin-left: 8px;">📦 數據載入: 0 / 0 站</span>
         </div>
     </div>
@@ -177,28 +167,15 @@
 
 <div id="layer-control">
     <h4 style="margin: 0 0 15px 0; font-size: 15px; color: #1a2a3a; border-bottom: 2px solid #eee; padding-bottom: 8px;">📍 測站類別顯示開關</h4>
-    <label class="layer-toggle">
-        <input type="checkbox" checked onchange="toggleCategory('46', this.checked)"> 
-        <div class="mini-dot" style="background: var(--accent);"></div> 局屬氣象站 (46)
-    </label>
-    <label class="layer-toggle">
-        <input type="checkbox" checked onchange="toggleCategory('C0', this.checked)"> 
-        <div class="mini-dot" style="background: var(--success);"></div> 自動氣象站 (C0)
-    </label>
-    <label class="layer-toggle">
-        <input type="checkbox" checked onchange="toggleCategory('Ag', this.checked)"> 
-        <div class="mini-dot" style="background: var(--purple);"></div> 農業與其他站
-    </label>
-    <label class="layer-toggle" style="margin-bottom: 0;">
-        <input type="checkbox" checked onchange="toggleCategory('V', this.checked)"> 
-        <div style="font-size:14px; filter:hue-rotate(150deg);">📍</div> 虛擬空間插值站
-    </label>
+    <label class="layer-toggle"><input type="checkbox" checked onchange="toggleCategory('46', this.checked)"> <div class="mini-dot" style="background: var(--accent);"></div> 局屬氣象站 (46)</label>
+    <label class="layer-toggle"><input type="checkbox" checked onchange="toggleCategory('C0', this.checked)"> <div class="mini-dot" style="background: var(--success);"></div> 自動氣象站 (C0)</label>
+    <label class="layer-toggle"><input type="checkbox" checked onchange="toggleCategory('Ag', this.checked)"> <div class="mini-dot" style="background: var(--purple);"></div> 農業與其他站</label>
+    <label class="layer-toggle" style="margin-bottom: 0;"><input type="checkbox" checked onchange="toggleCategory('V', this.checked)"> <div style="font-size:14px; filter:hue-rotate(150deg);">📍</div> 虛擬空間插值站</label>
 </div>
+
 <div id="dynamic-sidebar">
     <h3 style="margin: 0 0 15px 0; font-size: 15px; border-bottom: 2px solid #444; padding-bottom: 10px; color: #fff;">📉 全域動態圖層 (10年期)</h3>
-    
     <button class="btn-update" style="background:var(--accent); width:100%; margin-bottom: 15px; font-size:13px;" onclick="batchLoadCloudData()">☁️ 1. 一鍵載入全部雲端資料</button>
-    
     <div style="font-size:12px; color:#aaa; margin-bottom:8px;">2. 選擇渲染項目：</div>
     <div class="data-opt" onclick="initDynamicLayer('氣溫', this)">🌡️ 氣溫空間分布</div>
     <div class="data-opt" onclick="initDynamicLayer('降水量', this)">💧 降雨量分布圖</div>
@@ -214,6 +191,7 @@
     </div>
     <button class="btn-update" style="width:auto; margin:0; padding:10px 20px; background:#ff4757;" onclick="closeDynamicMode()">⏹ 退出動態模式</button>
 </div>
+
 <div id="map"></div>
 <div id="diag-panel"><b>[Main Monitor Ready]</b><br>> 核心算力模組展開...</div>
 
@@ -240,8 +218,7 @@
                 <span>🛠️ 內部渲染終端 (Debug)</span>
                 <span style="cursor:pointer; color:#aaa;" onclick="document.getElementById('modal-diag-panel').innerHTML=''">[清除]</span>
             </div>
-            <div id="modal-diag-panel" style="flex-grow: 1; padding: 20px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.8; word-break: break-all;">
-            </div>
+            <div id="modal-diag-panel" style="flex-grow: 1; padding: 20px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.8; word-break: break-all;"></div>
         </div>
     </div>
 </div>
@@ -254,229 +231,23 @@
         <button class="btn-update" style="background:#6c757d;" id="cp-close">取消</button>
     </div>
 </div>
+
 <script>
     const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F'; 
     const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
     const CLIENT_ID = '992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com';
     let accessToken = null, tokenClient, STATION_DB = {}, allStations = {}, clusterGroup, mapMarkers = {};
     let currentActiveStation = null, currentHeaders = [], currentRows = [], chartModes = {}, customColorMap = {}, activeColorTarget = null, virtualStationCount = 0;
-    
     let cloudFilesList = []; 
     let activeCategories = { '46': true, 'C0': true, 'Ag': true, 'V': true };
-// --- 全域動態模式變數 ---
+
+    // --- 全域動態模式變數 ---
     let isDynamicMode = false;
     let isPlaying = false;
     let playInterval = null;
     let dynamicTimeline = [];
     let currentField = "";
-    let originalMarkersState = {}; // 用於退出時恢復標記狀態
-// --- 批量下載雲端資料引擎 ---
-    window.batchLoadCloudData = async () => {
-        if (!accessToken) return alert("請先點擊右上角「🔗 授權 Google 雲端」！");
-        if (cloudFilesList.length === 0) return alert("尚未掃描到雲端檔案，請稍候再試。");
-        
-        log(`[BATCH] 準備批量下載 ${cloudFilesList.length} 個測站... 啟動多執行緒可能需要十幾秒，請稍候。`, "google");
-        
-        // 循序下載每個檔案 (避免觸發 Google API 速率限制)
-        for (let i = 0; i < cloudFilesList.length; i++) {
-            const file = cloudFilesList[i];
-            // 透過檔名簡單判斷是否已載入 (假設檔名包含站號)
-            const isLoaded = Object.values(allStations).some(st => file.name.includes(st.id));
-            if(!isLoaded) { 
-                await loadCloudFile(file);
-            }
-        }
-        log(`[BATCH] ✅ 所有雲端測站數據下載完畢！現在可以點擊下方的動態圖層了。`, "success");
-        alert("資料載入完畢！請選擇下方要分析的動態圖層。");
-    };
-
-    // --- 漸層塗色 (Canvas) 基礎設定 ---
-    // 請將這段綁定放到 window.onload 裡面 (原本的 setupDynamicControllers() 之後)
-    function setupIDWCanvas() {
-        window.idwCanvas = L.DomUtil.create('canvas', 'leaflet-idw-layer');
-        let idwPane = window.myMap.createPane('idwPane');
-        idwPane.style.zIndex = 350; // 放在地圖底圖(200)之上，但測站點(600)之下
-        idwPane.appendChild(window.idwCanvas);
-        idwPane.style.pointerEvents = 'none'; // 讓滑鼠可以穿透圖層去點擊測站
-        window.idwCanvas.style.opacity = 0.55; // 漸層顏色的透明度
-
-        // 當地圖被縮放或拖曳時，重新計算漸層
-        window.myMap.on('moveend', () => {
-            if (isDynamicMode) renderIDWCanvas();
-        });
-    }
-    // 初始化動態圖層
-    window.initDynamicLayer = (fieldName, btnElement) => {
-        const loadedStations = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
-        
-        if (loadedStations.length === 0) {
-            log("⚠️ 啟動失敗：請先點擊地圖上的測站，或透過雲端/本地載入資料！", "err");
-            alert("請先載入測站資料！");
-            return;
-        }
-
-        // 視覺切換按鈕狀態
-        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
-        if(btnElement) btnElement.classList.add('active');
-
-        currentField = fieldName;
-        isDynamicMode = true;
-
-        // 1. 蒐集所有測站的日期，建立一條共同的時間軸
-        let allDates = new Set();
-        loadedStations.forEach(st => {
-            st.dataMap.forEach((val, date) => {
-                // 將 Excel 日期格式轉為易讀格式 (若為數字)
-                let n = Number(date);
-                if (!isNaN(n) && n > 30000) {
-                    let d = new Date((n - 25569) * 86400 * 1000);
-                    allDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-                } else {
-                    allDates.add(date);
-                }
-            });
-        });
-        
-        dynamicTimeline = Array.from(allDates).sort();
-        if (dynamicTimeline.length === 0) return log("⚠️ 找不到有效的日期資料", "err");
-
-        // 2. 初始化 Slider
-        const slider = document.getElementById('global-time-slider');
-        slider.max = dynamicTimeline.length - 1;
-        slider.value = 0;
-        
-        document.getElementById('play-controller').style.display = 'flex';
-        document.getElementById('current-time-label').innerText = `目前時間：${dynamicTimeline[0]}`;
-        
-        // 3. 備份原始標記樣式 (為了退出時恢復)
-        if(Object.keys(originalMarkersState).length === 0) {
-            for (let id in mapMarkers) {
-                originalMarkersState[id] = {
-                    className: mapMarkers[id].options.icon.options.className,
-                    html: mapMarkers[id].options.icon.options.html || ''
-                };
-            }
-        }
-
-        log(`[DYNAMIC] 啟動 ${fieldName} 模式，時間軸共 ${dynamicTimeline.length} 天`, "hit");
-        updateMapFrame(0);
-    };
-
-    // 關閉動態模式
-    window.closeDynamicMode = () => {
-        isDynamicMode = false;
-        clearInterval(playInterval);
-        isPlaying = false;
-        document.getElementById('play-btn').innerText = "▶";
-        document.getElementById('play-controller').style.display = 'none';
-        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
-        
-        // 恢復原始標記狀態
-        for (let id in originalMarkersState) {
-            if (mapMarkers[id]) {
-                mapMarkers[id].setIcon(L.divIcon({ 
-                    className: originalMarkersState[id].className,
-                    html: originalMarkersState[id].html
-                }));
-            }
-        }
-        originalMarkersState = {};
-if (window.idwCanvas) {
-            window.idwCanvas.getContext('2d').clearRect(0, 0, window.idwCanvas.width, window.idwCanvas.height);
-        }
-
-        log("[DYNAMIC] 已退出時空動態模式，恢復預設地圖。", "debug");
-    };
-
-    // Slider 與播放器事件綁定 (等待 window.onload 觸發)
-    function setupDynamicControllers() {
-        document.getElementById('global-time-slider').oninput = function() {
-            updateMapFrame(parseInt(this.value));
-        };
-
-        document.getElementById('play-btn').onclick = function() {
-            isPlaying = !isPlaying;
-            this.innerText = isPlaying ? "⏸" : "▶";
-            this.style.background = isPlaying ? "var(--danger)" : "var(--success)";
-            this.style.boxShadow = isPlaying ? "0 0 15px var(--danger)" : "0 0 15px var(--success)";
-            
-            if (isPlaying) {
-                playInterval = setInterval(() => {
-                    let slider = document.getElementById('global-time-slider');
-                    let nextVal = parseInt(slider.value) + 1;
-                    if (nextVal >= dynamicTimeline.length) {
-                        nextVal = 0; // 循環播放
-                        isPlaying = false;
-                        this.innerText = "▶";
-                        this.style.background = "var(--success)";
-                        clearInterval(playInterval);
-                        return;
-                    }
-                    slider.value = nextVal;
-                    updateMapFrame(nextVal);
-                }, 300); // 播放速度：300毫秒換一天
-            } else {
-                clearInterval(playInterval);
-            }
-        };
-    }
-    const CATEGORY_MAP = { 
-        "風場分析": ["風速", "風向", "WD", "WS"], 
-        "氣溫分析": ["氣溫", "Temperature", "Temp", "T Max", "T Min"], 
-        "環境舒適度指標": ["[計算] 體感溫度 (Apparent Temp)", "[計算] THI 熱指數"],
-        "降雨時空分佈": ["降水量", "Precp", "雨量", "降水時數", "PrecpHour"],
-        "大氣氣壓觀測": ["氣壓", "Pres", "StnPres"],
-        "濕度與蒸發量": ["相對溼度", "RH", "蒸發量"],
-        "日照紫外線輻射": ["日照", "SunShine", "紫外線", "UVI"],
-        "地底觀測 (地溫)": ["地溫", "Soil"],
-        "能見度與雲量分析": ["能見度", "Visb", "雲量", "Cloud"]
-    };
-
-    const WIND_DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
-    const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
-    const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
-
-    function log(msg, type = '') {
-        const time = new Date().toLocaleTimeString();
-        let cls = type === 'hit' ? 'log-hit' : (type === 'google' ? 'log-google' : (type === 'err' ? 'log-err' : (type === 'debug' ? 'log-debug' : '')));
-        const html = `<div><span style="color:#666;">[${time}]</span> <span class="${cls}">${msg}</span></div>`;
-        const p1 = document.getElementById('diag-panel');
-        if(p1) { p1.innerHTML += html; p1.scrollTop = p1.scrollHeight; }
-        const p2 = document.getElementById('modal-diag-panel');
-        if(p2) { p2.innerHTML += html; p2.scrollTop = p2.scrollHeight; }
-    }
-
-    function updateStationCount() {
-        const virtuals = Object.keys(mapMarkers).filter(k => k.startsWith('V_')).length;
-        const total = Object.keys(STATION_DB).length + virtuals;
-        const loaded = Object.keys(allStations).filter(k => allStations[k].rawData && allStations[k].rawData.length > 0).length;
-        
-        const counterEl = document.getElementById('station-counter');
-        if(counterEl) {
-            counterEl.innerHTML = `📦 數據載入: <span style="color:var(--success); font-weight:bold; font-size:15px;">${loaded}</span> / ${total} 站`;
-        }
-    }
-
-    window.toggleCategory = (cat, isShow) => {
-        activeCategories[cat] = isShow;
-        refreshMarkers();
-    };
-
-    function refreshMarkers() {
-        clusterGroup.clearLayers();
-        const layersToAdd = [];
-        for (let id in mapMarkers) {
-            let cat = 'Ag'; 
-            if (id.startsWith('46')) cat = '46';
-            else if (id.startsWith('C0')) cat = 'C0';
-            else if (id.startsWith('V_')) cat = 'V';
-            
-            if (activeCategories[cat]) {
-                layersToAdd.push(mapMarkers[id]);
-            }
-        }
-        clusterGroup.addLayers(layersToAdd);
-    }
+    let originalMarkersState = {};
 
     window.onload = () => {
         log("STEP 1: 載入 Leaflet 地圖...", "hit");
@@ -509,10 +280,67 @@ if (window.idwCanvas) {
         document.getElementById('cp-apply').onclick = applyIndividualColor;
         document.getElementById('cp-close').onclick = () => document.getElementById('color-picker-popover').style.display='none';
 
-setupDynamicControllers();
-setupIDWCanvas();
+        setupDynamicControllers();
+        setupIDWCanvas();
+    };
+const CATEGORY_MAP = { 
+        "風場分析": ["風速", "風向", "WD", "WS"], 
+        "氣溫分析": ["氣溫", "Temperature", "Temp", "T Max", "T Min"], 
+        "環境舒適度指標": ["[計算] 體感溫度 (Apparent Temp)", "[計算] THI 熱指數"],
+        "降雨時空分佈": ["降水量", "Precp", "雨量", "降水時數", "PrecpHour"],
+        "大氣氣壓觀測": ["氣壓", "Pres", "StnPres"],
+        "濕度與蒸發量": ["相對溼度", "RH", "蒸發量"],
+        "日照紫外線輻射": ["日照", "SunShine", "紫外線", "UVI"],
+        "地底觀測 (地溫)": ["地溫", "Soil"],
+        "能見度與雲量分析": ["能見度", "Visb", "雲量", "Cloud"]
     };
 
+    const WIND_DIRECTIONS = ['北', '北北東', '東北', '東北東', '東', '東南東', '東南', '南南東', '南', '南南西', '西南', '西南西', '西', '西北西', '西北', '北北西'];
+    const SPEED_LABELS = ['0-1 m/s', '1-2 m/s', '2-4 m/s', '4-6 m/s', '>6 m/s'];
+    const YEARLY_PALETTES = [['#BBDEFB','#64B5F6','#2196F3','#1976D2','#0D47A1'],['#F3E5F5','#CE93D8','#AB47BC','#8E24AA','#4A148C'],['#E8F5E9','#81C784','#4CAF50','#388E3C','#1B5E20'],['#FFF3E0','#FFB74D','#FF9800','#F57C00','#E65100']];
+
+    function log(msg, type = '') {
+        const time = new Date().toLocaleTimeString();
+        let cls = type === 'hit' ? 'log-hit' : (type === 'google' ? 'log-google' : (type === 'err' ? 'log-err' : (type === 'debug' ? 'log-debug' : '')));
+        const html = `<div><span style="color:#666;">[${time}]</span> <span class="${cls}">${msg}</span></div>`;
+        const p1 = document.getElementById('diag-panel');
+        if(p1) { p1.innerHTML += html; p1.scrollTop = p1.scrollHeight; }
+        const p2 = document.getElementById('modal-diag-panel');
+        if(p2) { p2.innerHTML += html; p2.scrollTop = p2.scrollHeight; }
+    }
+
+    function updateStationCount() {
+        const virtuals = Object.keys(mapMarkers).filter(k => k.startsWith('V_')).length;
+        const total = Object.keys(STATION_DB).length + virtuals;
+        const loaded = Object.keys(allStations).filter(k => allStations[k].rawData && allStations[k].rawData.length > 0).length;
+        const counterEl = document.getElementById('station-counter');
+        if(counterEl) {
+            counterEl.innerHTML = `📦 數據載入: <span style="color:var(--success); font-weight:bold; font-size:15px;">${loaded}</span> / ${total} 站`;
+        }
+    }
+
+    window.toggleCategory = (cat, isShow) => {
+        activeCategories[cat] = isShow;
+        refreshMarkers();
+    };
+
+    function refreshMarkers() {
+        clusterGroup.clearLayers();
+        const layersToAdd = [];
+        for (let id in mapMarkers) {
+            let cat = 'Ag'; 
+            if (id.startsWith('46')) cat = '46';
+            else if (id.startsWith('C0')) cat = 'C0';
+            else if (id.startsWith('V_')) cat = 'V';
+            
+            if (activeCategories[cat]) {
+                layersToAdd.push(mapMarkers[id]);
+            }
+        }
+        clusterGroup.addLayers(layersToAdd);
+    }
+
+    // --- 資料載入與解析引擎 ---
     function loadStationIndex() {
         const s = document.createElement('script');
         s.src = `https://docs.google.com/spreadsheets/d/${MASTER_SS_ID}/gviz/tq?tqx=responseHandler:metaLoader&t=${Date.now()}`;
@@ -528,7 +356,6 @@ setupIDWCanvas();
             STATION_DB[id] = { name: r.c[1]?.v || id, lat, lon };
             
             const cls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
-            // 🌟 預設全部加上 no-data 變成半透明幽靈
             const m = L.marker([lat, lon], { icon: L.divIcon({ className: `st-marker ${cls} no-data` }) });
             m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(id, e.containerPoint); });
             mapMarkers[id] = m;
@@ -546,7 +373,6 @@ setupIDWCanvas();
             cloudFilesList = data.files || [];
             log(`[CLOUD] 雷達發現 ${cloudFilesList.length} 份雲端檔案。正在更新地圖標示狀態...`, "hit");
 
-            // 🌟 雲端比對：如果雲端有資料，圖標自動變成「不透明白圈」(移除 no-data)
             Object.keys(mapMarkers).forEach(id => {
                 if (id.startsWith('V_')) return; 
                 const hasData = allStations[id] ? true : false;
@@ -556,14 +382,11 @@ setupIDWCanvas();
                 if (hasData) {
                     mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
                 } else if (cloudFile) {
-                    // 雲端有檔案 -> 恢復不透明(白圈)
                     mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` }));
                 } else {
-                    // 沒檔案也沒載入 -> 半透明幽靈
                     mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` }));
                 }
             });
-
         } catch (err) {
             log("[ERR] 讀取雲端清單失敗", "err");
         }
@@ -578,6 +401,24 @@ setupIDWCanvas();
             return alert(`雲端沒有這個檔案！`);
         }
         await loadCloudFile(file);
+    };
+
+    // --- 批量下載雲端資料引擎 ---
+    window.batchLoadCloudData = async () => {
+        if (!accessToken) return alert("請先點擊右上角「🔗 授權 Google 雲端」！");
+        if (cloudFilesList.length === 0) return alert("尚未掃描到雲端檔案，請稍候再試。");
+        
+        log(`[BATCH] 準備批量下載 ${cloudFilesList.length} 個測站... 啟動多執行緒可能需要十幾秒，請稍候。`, "google");
+        
+        for (let i = 0; i < cloudFilesList.length; i++) {
+            const file = cloudFilesList[i];
+            const isLoaded = Object.values(allStations).some(st => file.name.includes(st.id));
+            if(!isLoaded) { 
+                await loadCloudFile(file);
+            }
+        }
+        log(`[BATCH] ✅ 所有雲端測站數據下載完畢！現在可以點擊下方的動態圖層了。`, "success");
+        alert("資料載入完畢！請選擇下方要分析的動態圖層。");
     };
 
     async function loadCloudFile(file) {
@@ -614,10 +455,9 @@ setupIDWCanvas();
             if (nameIdx === -1) nameIdx = 2;
             const stName = raw[2][nameIdx] || id;
 
-            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx, lat: STATION_DB[id]?.lat, lon: STATION_DB[id]?.lon };
             log(`✅ [${id}] 同步成功：共 ${dataMap.size} 筆日資料。`, "hit");
 
-            // 🌟 載入成功：加上發光綠圈 (loaded-data)
             if (mapMarkers[id]) {
                 const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
                 mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
@@ -660,10 +500,9 @@ setupIDWCanvas();
             if (nameIdx === -1) nameIdx = 2;
             const stName = raw[2][nameIdx] || id;
 
-            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx, lat: STATION_DB[id]?.lat, lon: STATION_DB[id]?.lon };
             log(`✅ [${id}] 匯入成功：共 ${dataMap.size} 筆日資料。`, "hit");
 
-            // 🌟 載入成功：加上發光綠圈
             if (mapMarkers[id]) {
                 const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
                 mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
@@ -673,6 +512,7 @@ setupIDWCanvas();
         alert("資料處理完畢，請看監視器狀態。");
     }
 
+    // --- 測站選單與虛擬測站操作 ---
     window.renameStation = (id, px, py) => {
         const st = allStations[id];
         if(!st) return;
@@ -756,14 +596,13 @@ setupIDWCanvas();
             }
             document.getElementById('marker-menu').style.display = 'none';
         } else {
-            // 🌟 實體站清除快取：依據雲端狀態決定退回幽靈還是白圈
             if(mapMarkers[id]) {
                 const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
                 const cloudFile = cloudFilesList.find(f => f.name.includes(id));
                 if(cloudFile) {
-                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` })); // 退回不透明白圈
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` })); 
                 } else {
-                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` })); // 退回幽靈
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` })); 
                 }
             }
             showMarkerMenu(id, {x: px, y: py}); 
@@ -800,16 +639,150 @@ setupIDWCanvas();
         
         allStations[vId] = { id: vId, name: `虛擬站_${vId}`, lat, lon, headers: nearby[0].headers, dataMap, rawData: virtualRows, isVirtual: true, dateIdx: nearby[0].dateIdx, yIdx: nearby[0].yIdx, mIdx: nearby[0].mIdx };
         
-        // 🌟 虛擬站建立後直接上發光綠圈
         const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker loaded-data', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
         m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(vId, e.containerPoint); });
         
         mapMarkers[vId] = m; 
-        refreshMarkers(); // 重繪標記確保濾鏡生效
+        refreshMarkers(); 
         updateStationCount();
         log(`[VIRTUAL] ${vId} 已透過最近 ${nearby.length} 站執行插值計算。`, "hit");
     }
 
+    // --- 漸層塗色 (Canvas) 基礎設定 (全新螢幕覆蓋寫法) ---
+    function setupIDWCanvas() {
+        if(document.getElementById('idw-overlay')) {
+            document.getElementById('idw-overlay').remove();
+        }
+        
+        window.idwCanvas = document.createElement('canvas');
+        window.idwCanvas.id = 'idw-overlay';
+        window.idwCanvas.style.position = 'absolute';
+        window.idwCanvas.style.top = '0';
+        window.idwCanvas.style.left = '0';
+        window.idwCanvas.style.width = '100%';
+        window.idwCanvas.style.height = '100%';
+        window.idwCanvas.style.zIndex = '400'; 
+        window.idwCanvas.style.pointerEvents = 'none'; 
+        window.idwCanvas.style.opacity = '0.6'; 
+
+        document.getElementById('map').appendChild(window.idwCanvas);
+
+        window.myMap.on('move', () => {
+            if (isDynamicMode && window.renderIDWCanvas) window.renderIDWCanvas();
+        });
+    }
+
+    // --- 初始化動態圖層 ---
+    window.initDynamicLayer = (fieldName, btnElement) => {
+        const loadedStations = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
+        
+        if (loadedStations.length === 0) {
+            log("⚠️ 啟動失敗：請先點擊地圖上的測站，或透過雲端/本地載入資料！", "err");
+            alert("請先載入測站資料！");
+            return;
+        }
+
+        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
+        if(btnElement) btnElement.classList.add('active');
+
+        currentField = fieldName;
+        isDynamicMode = true;
+
+        let allDates = new Set();
+        loadedStations.forEach(st => {
+            st.dataMap.forEach((val, date) => {
+                let n = Number(date);
+                if (!isNaN(n) && n > 30000) {
+                    let d = new Date((n - 25569) * 86400 * 1000);
+                    allDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                } else {
+                    allDates.add(date);
+                }
+            });
+        });
+        
+        dynamicTimeline = Array.from(allDates).sort();
+        if (dynamicTimeline.length === 0) return log("⚠️ 找不到有效的日期資料", "err");
+
+        const slider = document.getElementById('global-time-slider');
+        slider.max = dynamicTimeline.length - 1;
+        slider.value = 0;
+        
+        document.getElementById('play-controller').style.display = 'flex';
+        document.getElementById('current-time-label').innerText = `目前時間：${dynamicTimeline[0]}`;
+        
+        if(Object.keys(originalMarkersState).length === 0) {
+            for (let id in mapMarkers) {
+                originalMarkersState[id] = {
+                    className: mapMarkers[id].options.icon.options.className,
+                    html: mapMarkers[id].options.icon.options.html || ''
+                };
+            }
+        }
+
+        log(`[DYNAMIC] 啟動 ${fieldName} 模式，時間軸共 ${dynamicTimeline.length} 天`, "hit");
+        updateMapFrame(0);
+    };
+
+    // --- 關閉動態模式 ---
+    window.closeDynamicMode = () => {
+        isDynamicMode = false;
+        clearInterval(playInterval);
+        isPlaying = false;
+        document.getElementById('play-btn').innerText = "▶";
+        document.getElementById('play-controller').style.display = 'none';
+        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
+        
+        for (let id in originalMarkersState) {
+            if (mapMarkers[id]) {
+                mapMarkers[id].setIcon(L.divIcon({ 
+                    className: originalMarkersState[id].className,
+                    html: originalMarkersState[id].html
+                }));
+            }
+        }
+        originalMarkersState = {};
+        
+        if (window.idwCanvas) {
+            window.idwCanvas.getContext('2d').clearRect(0, 0, window.idwCanvas.width, window.idwCanvas.height);
+        }
+
+        log("[DYNAMIC] 已退出時空動態模式，恢復預設地圖。", "debug");
+    };
+
+    // --- 播放器控制器綁定 ---
+    function setupDynamicControllers() {
+        document.getElementById('global-time-slider').oninput = function() {
+            updateMapFrame(parseInt(this.value));
+        };
+
+        document.getElementById('play-btn').onclick = function() {
+            isPlaying = !isPlaying;
+            this.innerText = isPlaying ? "⏸" : "▶";
+            this.style.background = isPlaying ? "var(--danger)" : "var(--success)";
+            this.style.boxShadow = isPlaying ? "0 0 15px var(--danger)" : "0 0 15px var(--success)";
+            
+            if (isPlaying) {
+                playInterval = setInterval(() => {
+                    let slider = document.getElementById('global-time-slider');
+                    let nextVal = parseInt(slider.value) + 1;
+                    if (nextVal >= dynamicTimeline.length) {
+                        nextVal = 0; 
+                        isPlaying = false;
+                        this.innerText = "▶";
+                        this.style.background = "var(--success)";
+                        clearInterval(playInterval);
+                        return;
+                    }
+                    slider.value = nextVal;
+                    updateMapFrame(nextVal);
+                }, 300); // 播放速度：300毫秒換一天
+            } else {
+                clearInterval(playInterval);
+            }
+        };
+    }
+// --- 深度分析圖表邏輯 (Highcharts) ---
     window.launchAnalysis = (id) => {
         document.getElementById('marker-menu').style.display='none';
         const st = allStations[id];
@@ -920,7 +893,6 @@ setupIDWCanvas();
                 if(isWind) {
                     const wsIdx = currentHeaders.findIndex(h => String(h).match(/風速|WS/i));
                     const wdIdx = currentHeaders.findIndex(h => String(h).match(/風向|WD/i));
-                    
                     if (wsIdx === -1 || wdIdx === -1) throw new Error(`找不到風場欄位！`);
                     
                     const matrix = Array.from({length: 16}, () => new Array(5).fill(0));
@@ -928,7 +900,6 @@ setupIDWCanvas();
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
-                        // 🛡️ 阻擋異常值
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
@@ -1031,7 +1002,8 @@ setupIDWCanvas();
         document.getElementById('analysis-modal').style.display = 'none'; 
         document.getElementById('categoryContainer').innerHTML = ""; 
     }
-// --- 第三部分：動態渲染引擎 ---
+
+    // --- 第三部分核心：動態渲染引擎 (測站變色 + IDW 漸層觸發) ---
     function updateMapFrame(index) {
         if (!isDynamicMode || dynamicTimeline.length === 0) return;
         
@@ -1072,32 +1044,43 @@ setupIDWCanvas();
                 const val = parseFloat(dayData[fIdx]);
                 if (!isNaN(val) && val > -50) {
                     const color = getVisualColor(currentField, val);
-                    // 套用我們在第一部分寫好的 CSS class
                     marker.getElement().className = 'leaflet-marker-icon st-marker dynamic-val-marker leaflet-zoom-animated leaflet-interactive';
                     marker.getElement().style.background = color;
                     marker.getElement().style.boxShadow = `0 0 15px ${color}`;
-                    // 顯示整數數值在圈圈內
                     marker.getElement().innerHTML = Math.round(val);
                 } else {
-                    // 數值異常一樣變回幽靈
                     marker.getElement().className = 'leaflet-marker-icon st-marker no-data leaflet-zoom-animated leaflet-interactive';
                     marker.getElement().style.background = '';
                     marker.getElement().innerHTML = '';
                 }
             }
         });
-if (window.renderIDWCanvas) renderIDWCanvas();
+
+        // 觸發全畫面畫布漸層
+        if (window.renderIDWCanvas) window.renderIDWCanvas();
     }
-// --- 空間內插 (IDW) 漸層演算法 ---
+
+    // --- 空間內插 (IDW) 漸層演算法 (高精度修正版) ---
     window.renderIDWCanvas = () => {
         if (!isDynamicMode || dynamicTimeline.length === 0 || !window.idwCanvas) return;
-        const targetDate = dynamicTimeline[document.getElementById('global-time-slider').value];
-        const ctx = window.idwCanvas.getContext('2d');
-        const size = window.myMap.getSize();
         
-        window.idwCanvas.width = size.x;
-        window.idwCanvas.height = size.y;
-        ctx.clearRect(0, 0, size.x, size.y); // 清空畫布
+        const slider = document.getElementById('global-time-slider');
+        if(!slider) return;
+        const targetDate = dynamicTimeline[slider.value];
+        if(!targetDate) return;
+
+        const ctx = window.idwCanvas.getContext('2d');
+        const mapContainer = document.getElementById('map');
+        
+        // 自動校正畫布解析度與視窗同步
+        const w = mapContainer.clientWidth;
+        const h = mapContainer.clientHeight;
+        if(window.idwCanvas.width !== w || window.idwCanvas.height !== h) {
+            window.idwCanvas.width = w;
+            window.idwCanvas.height = h;
+        }
+        
+        ctx.clearRect(0, 0, w, h); // 清空畫布
 
         // 1. 收集當天「有數據」的測站
         let activePoints = [];
@@ -1105,10 +1088,18 @@ if (window.renderIDWCanvas) renderIDWCanvas();
             const st = allStations[id];
             if (st.dataMap.has(targetDate)) {
                 const dayData = st.dataMap.get(targetDate);
-                let fIdx = st.headers.findIndex(h => {
-                    const fields = CATEGORY_MAP[currentField + "分析"] || CATEGORY_MAP[currentField === '降水量' ? '降雨時空分佈' : '濕度與蒸發量'] || CATEGORY_MAP["大氣氣壓觀測"];
-                    return fields && fields.some(fname => String(h).match(new RegExp(fname, 'i')));
-                });
+                
+                let fieldNamesToMatch = [];
+                if (currentField === '氣溫') fieldNamesToMatch = CATEGORY_MAP["氣溫分析"];
+                else if (currentField === '降水量') fieldNamesToMatch = CATEGORY_MAP["降雨時空分佈"];
+                else if (currentField === '相對溼度') fieldNamesToMatch = CATEGORY_MAP["濕度與蒸發量"];
+                else if (currentField === '氣壓') fieldNamesToMatch = CATEGORY_MAP["大氣氣壓觀測"];
+
+                let fIdx = -1;
+                for (let fname of fieldNamesToMatch) {
+                    fIdx = st.headers.findIndex(h => String(h).match(new RegExp(fname, 'i')));
+                    if (fIdx !== -1) break;
+                }
 
                 if (fIdx !== -1) {
                     const val = parseFloat(dayData[fIdx]);
@@ -1119,10 +1110,10 @@ if (window.renderIDWCanvas) renderIDWCanvas();
 
         if (activePoints.length < 3) return; // 點數太少無法產生漸層
 
-        // 2. 遍歷畫面上的網格進行塗色 (設定 15px 為一個運算網格以優化效能)
-        const res = 15; 
-        for (let x = 0; x < size.x; x += res) {
-            for (let y = 0; y < size.y; y += res) {
+        // 2. 遍歷畫面網格進行塗色 (res=12 像素)
+        const res = 12; 
+        for (let x = 0; x < w; x += res) {
+            for (let y = 0; y < h; y += res) {
                 let latlng = window.myMap.containerPointToLatLng(L.point(x, y));
                 
                 // 3. IDW (反距離加權) 核心計算
@@ -1130,20 +1121,26 @@ if (window.renderIDWCanvas) renderIDWCanvas();
                 for (let p of activePoints) {
                     let d = Math.pow(p.lat - latlng.lat, 2) + Math.pow(p.lon - latlng.lng, 2);
                     if (d === 0) d = 0.000001; 
-                    let w = 1 / d; 
-                    num += w * p.val;
-                    den += w;
+                    let w_val = 1 / d; 
+                    num += w_val * p.val;
+                    den += w_val;
                 }
-                let interpolatedValue = num / den;
                 
-                // 4. 畫上正方形網格
-                ctx.fillStyle = getVisualColor(currentField, interpolatedValue);
-                ctx.fillRect(x, y, res, res);
+                if (den > 0) {
+                    let interpolatedValue = num / den;
+                    let color = getVisualColor(currentField, interpolatedValue);
+                    
+                    // 如果顏色不是透明的，才畫上去
+                    if(color !== 'rgba(0,0,0,0)') {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x, y, res + 1, res + 1); 
+                    }
+                }
             }
         }
     };
 
-    // 將數值轉換為漸層顏色的邏輯
+    // --- 將數值轉換為漸層顏色的邏輯 (優化雨量透明度) ---
     function getVisualColor(field, val) {
         if (field === '氣溫') {
             if (val >= 35) return '#d63031'; // 極熱 (深紅)
@@ -1157,8 +1154,8 @@ if (window.renderIDWCanvas) renderIDWCanvas();
             if (val >= 130) return '#6c5ce7'; // 豪雨
             if (val >= 80) return '#0984e3';  // 大雨
             if (val >= 40) return '#00b894';  // 中雨
-            if (val > 0) return '#81ecec';    // 小雨
-            return 'rgba(255,255,255,0.2)';   // 無雨
+            if (val >= 1) return '#81ecec';   // 小雨
+            return 'rgba(0,0,0,0)';           // 無雨 (完全透明)
         }
         if (field === '相對溼度') {
             if (val >= 90) return '#0984e3';
@@ -1172,7 +1169,7 @@ if (window.renderIDWCanvas) renderIDWCanvas();
             if (val >= 1000) return '#00b894';
             return '#0984e3';
         }
-        return '#a55eea'; // 預設顏色
+        return 'rgba(0,0,0,0)'; // 預設透明
     }
 </script>
 </body>
