@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣候資料智慧工具 V69 (全域矩陣裝甲版)</title>
+    <title>氣候資料智慧工具 V69</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -36,7 +36,7 @@
 
     <div class="card">
         <h2>📂 第一區：彙整與地理資訊注入 (免登入/強制去重輸出)</h2>
-        <p class="desc">在此區放入任何帶有 (1) 污染的檔案，系統皆會自動洗淨、去重，並輸出絕對標準的 66 欄 XLSX。</p>
+        <p class="desc">在此區放入任何帶有 (1) 污染的檔案，系統皆會自動洗淨、去重。</p>
         <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
         <button id="mergeBtn" class="btn-merge" disabled>執行洗淨與彙整下載</button>
     </div>
@@ -56,7 +56,7 @@
     </div>
 
     <div class="card cloud">
-        <h2>☁️ 第三區：智慧同步 (全域矩陣裝甲版)</h2>
+        <h2>☁️ 第三區：智慧同步</h2>
         <p class="desc">直接以洗淨後的純淨資料強制覆蓋雲端，徹底消滅歷史錯誤堆疊。</p>
         <div class="section">
             <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
@@ -147,7 +147,7 @@
             return str;
         }
 
-        // 核心引擎：第一區與第三區共用。強迫執行 66 欄的絕對矩陣展開，阻絕所有錯位與污染
+        // 核心引擎：第一區與第三區共用。強迫執行絕對矩陣展開，阻絕所有錯位與污染
         async function parseFile(file) {
             let fileBase = file.name;
             fileBase = fileBase.replace(/\.csv$/i, "");
@@ -271,7 +271,7 @@
             }
         }
 
-        // --- 第一區：導入全域矩陣裝甲的下載功能 ---
+        // --- 第一區：導入全域矩陣下載功能 ---
         document.getElementById('mergeInput').onchange = () => { document.getElementById('mergeBtn').disabled = false; };
         document.getElementById('mergeBtn').onclick = async () => {
             const files = Array.from(document.getElementById('mergeInput').files);
@@ -372,7 +372,7 @@
         };
         document.getElementById('syncBtn').onclick = () => {
             window.pendingAction = 'sync';
-            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 第三區啟動：全域矩陣裝甲更新中...<br>`;
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 第三區啟動：全域矩陣更新中...<br>`;
             if (accessToken !== null) { startFolderSync(); } 
             else { tokenClient.requestAccessToken({prompt: 'none'}); }
         };
