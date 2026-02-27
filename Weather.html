@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.18 - 視覺控制與透視完全體</title>
+    <title>氣象全測站分析 v62.19 - 視覺狀態指示完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
@@ -23,7 +23,7 @@
         
         #map { width: 100vw; height: 100vh; z-index: 1; background: #cbd2d8; }
 
-        /* 標籤基礎設計 */
+        /* 標籤基礎設計：預設為不透明白圈 */
         .st-marker { 
             width: 38px !important; height: 38px !important; 
             border: 3px solid #fff; border-radius: 50%; 
@@ -36,17 +36,22 @@
         .st-Ag { background: var(--purple) !important; }
         .v-marker { display: flex; justify-content: center; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
-        /* 🌟 新增：無資料時的半透明幽靈狀態 */
+        /* 👻 無資料、無雲端檔案時的半透明幽靈狀態 */
         .st-marker.no-data {
             opacity: 0.4 !important;
             filter: grayscale(90%);
             box-shadow: 0 0 5px rgba(0,0,0,0.3);
-            border-color: rgba(255,255,255,0.6);
+            border-color: rgba(255,255,255,0.6) !important;
         }
         .st-marker.no-data:hover {
-            opacity: 0.8 !important;
-            filter: grayscale(0%);
-            transform: scale(1.1);
+            opacity: 0.8 !important; filter: grayscale(0%); transform: scale(1.1);
+        }
+
+        /* 🌟 載入資料後的發光綠圈狀態 */
+        .st-marker.loaded-data {
+            border-color: var(--success) !important; 
+            box-shadow: 0 0 15px var(--success), inset 0 0 8px rgba(46, 213, 115, 0.8) !important;
+            z-index: 5000 !important; /* 讓有資料的標籤浮在上面 */
         }
 
         #diag-panel {
@@ -110,7 +115,6 @@
         .btn-update:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .btn-update:disabled { background: #ccc; cursor: not-allowed; transform: none; }
 
-        /* 🌟 新增：右側控制面板的 UI 設計 */
         #layer-control {
             position: absolute; top: 110px; right: 20px; z-index: 4000; 
             background: rgba(255,255,255,0.95); padding: 15px 20px; border-radius: 15px; 
@@ -126,9 +130,9 @@
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.18 【視覺控制與透視完全體】</h2>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.19 【視覺狀態指示完全體】</h2>
         <div style="font-size:12px; opacity:0.8; margin-top:5px;">
-            📡 引擎：半透明化視覺識別 | 雙層標題強制熔合 | 
+            📡 引擎：雲端授權狀態感知 | 發光綠圈資料標示 | 
             <span id="station-counter" style="color:var(--success); font-weight:bold; font-size:14px; margin-left: 8px;">📦 數據載入: 0 / 0 站</span>
         </div>
     </div>
@@ -199,7 +203,6 @@
         <button class="btn-update" style="background:#6c757d;" id="cp-close">取消</button>
     </div>
 </div>
-
 <script>
     const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F'; 
     const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
@@ -208,7 +211,6 @@
     let currentActiveStation = null, currentHeaders = [], currentRows = [], chartModes = {}, customColorMap = {}, activeColorTarget = null, virtualStationCount = 0;
     
     let cloudFilesList = []; 
-    // 🌟 記錄目前顯示哪些類別
     let activeCategories = { '46': true, 'C0': true, 'Ag': true, 'V': true };
 
     const CATEGORY_MAP = { 
@@ -237,7 +239,6 @@
         if(p2) { p2.innerHTML += html; p2.scrollTop = p2.scrollHeight; }
     }
 
-    // 🌟 計數器更新函式
     function updateStationCount() {
         const virtuals = Object.keys(mapMarkers).filter(k => k.startsWith('V_')).length;
         const total = Object.keys(STATION_DB).length + virtuals;
@@ -249,7 +250,6 @@
         }
     }
 
-    // 🌟 地圖圖層過濾器
     window.toggleCategory = (cat, isShow) => {
         activeCategories[cat] = isShow;
         refreshMarkers();
@@ -259,7 +259,7 @@
         clusterGroup.clearLayers();
         const layersToAdd = [];
         for (let id in mapMarkers) {
-            let cat = 'Ag'; // 預設歸類為農業/其他站
+            let cat = 'Ag'; 
             if (id.startsWith('46')) cat = '46';
             else if (id.startsWith('C0')) cat = 'C0';
             else if (id.startsWith('V_')) cat = 'V';
@@ -294,7 +294,7 @@
             client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly',
             callback: (resp) => { 
                 accessToken = resp.access_token; 
-                log("[AUTH] 授權成功！啟動雲端雷達掃描...", "google"); 
+                log("[AUTH] 授權成功！啟動雲端雷達掃描狀態...", "google"); 
                 fetchCloudFileList(); 
             }
         });
@@ -318,9 +318,8 @@
             STATION_DB[id] = { name: r.c[1]?.v || id, lat, lon };
             
             const cls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
-            // 🌟 初始狀態一律加上 no-data 變成半透明
+            // 🌟 預設全部加上 no-data 變成半透明幽靈
             const m = L.marker([lat, lon], { icon: L.divIcon({ className: `st-marker ${cls} no-data` }) });
-            
             m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(id, e.containerPoint); });
             mapMarkers[id] = m;
         });
@@ -335,7 +334,26 @@
             });
             const data = await resp.json();
             cloudFilesList = data.files || [];
-            log(`[CLOUD] 雷達發現 ${cloudFilesList.length} 份雲端檔案。`, "hit");
+            log(`[CLOUD] 雷達發現 ${cloudFilesList.length} 份雲端檔案。正在更新地圖標示狀態...`, "hit");
+
+            // 🌟 雲端比對：如果雲端有資料，圖標自動變成「不透明白圈」(移除 no-data)
+            Object.keys(mapMarkers).forEach(id => {
+                if (id.startsWith('V_')) return; 
+                const hasData = allStations[id] ? true : false;
+                const cloudFile = cloudFilesList.find(f => f.name.includes(id));
+                const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
+                
+                if (hasData) {
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
+                } else if (cloudFile) {
+                    // 雲端有檔案 -> 恢復不透明(白圈)
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` }));
+                } else {
+                    // 沒檔案也沒載入 -> 半透明幽靈
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` }));
+                }
+            });
+
         } catch (err) {
             log("[ERR] 讀取雲端清單失敗", "err");
         }
@@ -353,7 +371,7 @@
     };
 
     async function loadCloudFile(file) {
-        log(`[DOWNLOAD] 開始下載與解析: ${file.name}...`, "google");
+        log(`[DOWNLOAD] 正在下載解析: ${file.name}...`, "google");
         try {
             let raw;
             if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
@@ -368,7 +386,39 @@
             }
 
             if (!raw || raw.length < 3) return log(`[ERR] 資料列數不足`, "err");
-            processRawDataBlock(raw);
+
+            const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
+            const id = String(raw[2][0]);
+            
+            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
+            if (dateIdx === -1) dateIdx = 9;
+            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
+            if (yIdx === -1) yIdx = 7;
+            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
+            if (mIdx === -1) mIdx = 8;
+            
+            const dataMap = new Map();
+            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
+            
+            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
+            if (nameIdx === -1) nameIdx = 2;
+            const stName = raw[2][nameIdx] || id;
+
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            log(`✅ [${id}] 同步成功：共 ${dataMap.size} 筆日資料。`, "hit");
+
+            // 🌟 載入成功：加上發光綠圈 (loaded-data)
+            if (mapMarkers[id]) {
+                const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
+                mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
+            }
+            updateStationCount();
+
+            const menu = document.getElementById('marker-menu');
+            if (menu.style.display === 'block') {
+                const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
+                showMarkerMenu(id, pt);
+            }
         } catch (err) {
             log(`[ERR] 解析失敗: ${err.message}`, "err");
         }
@@ -380,45 +430,37 @@
             const ab = await file.arrayBuffer();
             const wb = XLSX.read(ab, { type: 'array' });
             const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            
             if (!raw || raw.length < 3) continue;
-            processRawDataBlock(raw);
+            
+            const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
+            const id = String(raw[2][0]);
+            
+            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
+            if (dateIdx === -1) dateIdx = 9;
+            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
+            if (yIdx === -1) yIdx = 7;
+            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
+            if (mIdx === -1) mIdx = 8;
+            
+            const dataMap = new Map();
+            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
+            
+            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
+            if (nameIdx === -1) nameIdx = 2;
+            const stName = raw[2][nameIdx] || id;
+
+            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+            log(`✅ [${id}] 匯入成功：共 ${dataMap.size} 筆日資料。`, "hit");
+
+            // 🌟 載入成功：加上發光綠圈
+            if (mapMarkers[id]) {
+                const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
+                mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} loaded-data` }));
+            }
         }
-        alert("資料處理完畢，請看監視器狀態。");
-    }
-
-    function processRawDataBlock(raw) {
-        const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
-        const id = String(raw[2][0]).trim();
-        
-        let dateIdx = headers.findIndex(h => h.match(/日期|Date/i));
-        if (dateIdx === -1) dateIdx = 9;
-        let yIdx = headers.findIndex(h => h.match(/年|Yr/i));
-        if (yIdx === -1) yIdx = 7;
-        let mIdx = headers.findIndex(h => h.match(/月|Mo/i));
-        if (mIdx === -1) mIdx = 8;
-        
-        const dataMap = new Map();
-        raw.slice(2).forEach(r => { if(r && r.length > 5 && r[dateIdx]) dataMap.set(String(r[dateIdx]).trim(), r); });
-        
-        let nameIdx = headers.findIndex(h => h.match(/站名|Station/i));
-        const stName = nameIdx !== -1 ? raw[2][nameIdx] : id;
-
-        allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
-        log(`✅ [${id}] 資料載入成功：共 ${dataMap.size} 筆。`, "hit");
-
-        // 🌟 點亮地圖標記：移除 no-data 類別，恢復全彩與不透明
-        if (mapMarkers[id]) {
-            const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
-            mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` }));
-        }
-
         updateStationCount();
-
-        const menu = document.getElementById('marker-menu');
-        if (menu.style.display === 'block') {
-            const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
-            showMarkerMenu(id, pt);
-        }
+        alert("資料處理完畢，請看監視器狀態。");
     }
 
     window.renameStation = (id, px, py) => {
@@ -465,6 +507,8 @@
             const file = cloudFilesList.find(f => f.name.includes(id));
             if (accessToken) {
                 dateInfoHtml = file ? `<div style="font-size:13px; background:#e8f4fd; padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid #b6d4fe; color:#0056b3;">☁️ 雲端有可用資料可下載</div>` : `<div style="font-size:13px; background:#fdf3f4; padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid #f8d7da; color:var(--danger); font-weight:bold;">❌ 雲端無此測站資料</div>`;
+            } else {
+                dateInfoHtml = `<div style="font-size:13px; background:#fff3cd; padding:12px; border-radius:8px; margin-bottom:15px; border:1px solid #ffeeba; color:#856404;">⚠️ 請先授權 Google 雲端以檢索狀態</div>`;
             }
         }
 
@@ -486,30 +530,33 @@
         document.getElementById('menu-content').innerHTML = `
             <b style="font-size:20px;">${stName}</b> <small>(${id})</small><hr style="margin:15px 0;">
             ${dateInfoHtml}
-            <div style="font-size:14px; margin-bottom:15px;">狀態：${hasData ? '<span style="color:var(--success);font-weight:bold;">✅ 已載入</span>' : '<span style="color:var(--danger);">⚪ 待匯入 (半透明)</span>'}</div>
+            <div style="font-size:14px; margin-bottom:15px;">狀態：${hasData ? '<span style="color:var(--success);font-weight:bold;">✅ 已載入 (發光綠圈)</span>' : '<span style="color:var(--danger);">⚪ 待匯入</span>'}</div>
             ${buttonsHtml}
         `;
         menu.style.display = 'block'; menu.style.left = (point.x - 170) + 'px'; menu.style.top = (point.y - 200) + 'px';
     }
 
-    // 🌟 雙軌刪除系統
     window.deleteStationData = (id, isVirtual, px, py) => {
         if(!confirm(isVirtual ? "確定要徹底刪除此模擬測站嗎？" : "確定要清除此測站的快取資料嗎？")) return;
         
         if(isVirtual) {
-            // 虛擬站：徹底拔除
             if(mapMarkers[id]) {
                 clusterGroup.removeLayer(mapMarkers[id]); 
                 delete mapMarkers[id];
             }
             document.getElementById('marker-menu').style.display = 'none';
         } else {
-            // 實體站：變回半透明幽靈
+            // 🌟 實體站清除快取：依據雲端狀態決定退回幽靈還是白圈
             if(mapMarkers[id]) {
                 const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
-                mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` }));
+                const cloudFile = cloudFilesList.find(f => f.name.includes(id));
+                if(cloudFile) {
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` })); // 退回不透明白圈
+                } else {
+                    mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` })); // 退回幽靈
+                }
             }
-            showMarkerMenu(id, {x: px, y: py}); // 重新整理選單
+            showMarkerMenu(id, {x: px, y: py}); 
         }
         
         if(allStations[id]) delete allStations[id];
@@ -543,12 +590,12 @@
         
         allStations[vId] = { id: vId, name: `虛擬站_${vId}`, lat, lon, headers: nearby[0].headers, dataMap, rawData: virtualRows, isVirtual: true, dateIdx: nearby[0].dateIdx, yIdx: nearby[0].yIdx, mIdx: nearby[0].mIdx };
         
-        // 虛擬站一生成就有資料，不需要 no-data 類別
-        const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
+        // 🌟 虛擬站建立後直接上發光綠圈
+        const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker loaded-data', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
         m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(vId, e.containerPoint); });
         
         mapMarkers[vId] = m; 
-        refreshMarkers(); // 讓地圖即時顯示出新的虛擬站
+        refreshMarkers(); // 重繪標記確保濾鏡生效
         updateStationCount();
         log(`[VIRTUAL] ${vId} 已透過最近 ${nearby.length} 站執行插值計算。`, "hit");
     }
@@ -671,6 +718,7 @@
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
+                        // 🛡️ 阻擋異常值
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
