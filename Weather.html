@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>氣象全測站分析 v62.17 - 虛擬站點控制完全體</title>
+    <title>氣象全測站分析 v62.18 - 視覺控制與透視完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
@@ -23,17 +23,31 @@
         
         #map { width: 100vw; height: 100vh; z-index: 1; background: #cbd2d8; }
 
+        /* 標籤基礎設計 */
         .st-marker { 
             width: 38px !important; height: 38px !important; 
             border: 3px solid #fff; border-radius: 50%; 
             box-shadow: 0 0 15px rgba(0,0,0,0.6); 
-            cursor: pointer !important; transition: 0.3s; 
+            cursor: pointer !important; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         }
         .st-marker:hover { transform: scale(1.3) rotate(5deg); z-index: 9999 !important; }
         .st-46 { background: var(--accent) !important; } 
         .st-C0 { background: var(--success) !important; } 
         .st-Ag { background: var(--purple) !important; }
         .v-marker { display: flex; justify-content: center; align-items: center; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+        /* 🌟 新增：無資料時的半透明幽靈狀態 */
+        .st-marker.no-data {
+            opacity: 0.4 !important;
+            filter: grayscale(90%);
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            border-color: rgba(255,255,255,0.6);
+        }
+        .st-marker.no-data:hover {
+            opacity: 0.8 !important;
+            filter: grayscale(0%);
+            transform: scale(1.1);
+        }
 
         #diag-panel {
             position: fixed; bottom: 20px; left: 20px; width: 600px;
@@ -95,20 +109,54 @@
         .btn-update { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.3s; font-size: 14px; }
         .btn-update:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .btn-update:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+        /* 🌟 新增：右側控制面板的 UI 設計 */
+        #layer-control {
+            position: absolute; top: 110px; right: 20px; z-index: 4000; 
+            background: rgba(255,255,255,0.95); padding: 15px 20px; border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+        .layer-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; margin-bottom: 12px; font-weight: bold; color: #333; }
+        .layer-toggle input { transform: scale(1.2); cursor: pointer; }
+        .mini-dot { width: 14px !important; height: 14px !important; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
 <div id="top-nav">
     <div>
-        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.17 【虛擬站點控制完全體】</h2>
-        <div style="font-size:12px; opacity:0.8; margin-top:5px;">📡 引擎：模擬站更名系統 | 雙軌刪除機制 | 終極防護網</div>
+        <h2 style="margin:0; letter-spacing: 2px; font-size:22px;">🌍 氣象系統 v62.18 【視覺控制與透視完全體】</h2>
+        <div style="font-size:12px; opacity:0.8; margin-top:5px;">
+            📡 引擎：半透明化視覺識別 | 雙層標題強制熔合 | 
+            <span id="station-counter" style="color:var(--success); font-weight:bold; font-size:14px; margin-left: 8px;">📦 數據載入: 0 / 0 站</span>
+        </div>
     </div>
     <div style="display:flex; gap:15px;">
         <button class="btn-update" style="background:var(--purple); width:auto; padding: 8px 15px;" id="authBtn">🔗 授權 Google 雲端</button>
         <button class="btn-update" style="width:auto; padding: 8px 15px;" onclick="document.getElementById('fileInput').click()">📁 匯入 XLSX/CSV 資料</button>
         <input type="file" id="fileInput" multiple accept=".xlsx, .csv" style="display:none;" onchange="handleLocalUpload(event)">
     </div>
+</div>
+
+<div id="layer-control">
+    <h4 style="margin: 0 0 15px 0; font-size: 15px; color: #1a2a3a; border-bottom: 2px solid #eee; padding-bottom: 8px;">📍 測站類別顯示開關</h4>
+    <label class="layer-toggle">
+        <input type="checkbox" checked onchange="toggleCategory('46', this.checked)"> 
+        <div class="mini-dot" style="background: var(--accent);"></div> 局屬氣象站 (46)
+    </label>
+    <label class="layer-toggle">
+        <input type="checkbox" checked onchange="toggleCategory('C0', this.checked)"> 
+        <div class="mini-dot" style="background: var(--success);"></div> 自動氣象站 (C0)
+    </label>
+    <label class="layer-toggle">
+        <input type="checkbox" checked onchange="toggleCategory('Ag', this.checked)"> 
+        <div class="mini-dot" style="background: var(--purple);"></div> 農業與其他站
+    </label>
+    <label class="layer-toggle" style="margin-bottom: 0;">
+        <input type="checkbox" checked onchange="toggleCategory('V', this.checked)"> 
+        <div style="font-size:14px; filter:hue-rotate(150deg);">📍</div> 虛擬空間插值站
+    </label>
 </div>
 
 <div id="map"></div>
@@ -160,6 +208,8 @@
     let currentActiveStation = null, currentHeaders = [], currentRows = [], chartModes = {}, customColorMap = {}, activeColorTarget = null, virtualStationCount = 0;
     
     let cloudFilesList = []; 
+    // 🌟 記錄目前顯示哪些類別
+    let activeCategories = { '46': true, 'C0': true, 'Ag': true, 'V': true };
 
     const CATEGORY_MAP = { 
         "風場分析": ["風速", "風向", "WD", "WS"], 
@@ -187,6 +237,40 @@
         if(p2) { p2.innerHTML += html; p2.scrollTop = p2.scrollHeight; }
     }
 
+    // 🌟 計數器更新函式
+    function updateStationCount() {
+        const virtuals = Object.keys(mapMarkers).filter(k => k.startsWith('V_')).length;
+        const total = Object.keys(STATION_DB).length + virtuals;
+        const loaded = Object.keys(allStations).filter(k => allStations[k].rawData && allStations[k].rawData.length > 0).length;
+        
+        const counterEl = document.getElementById('station-counter');
+        if(counterEl) {
+            counterEl.innerHTML = `📦 數據載入: <span style="color:var(--success); font-weight:bold; font-size:15px;">${loaded}</span> / ${total} 站`;
+        }
+    }
+
+    // 🌟 地圖圖層過濾器
+    window.toggleCategory = (cat, isShow) => {
+        activeCategories[cat] = isShow;
+        refreshMarkers();
+    };
+
+    function refreshMarkers() {
+        clusterGroup.clearLayers();
+        const layersToAdd = [];
+        for (let id in mapMarkers) {
+            let cat = 'Ag'; // 預設歸類為農業/其他站
+            if (id.startsWith('46')) cat = '46';
+            else if (id.startsWith('C0')) cat = 'C0';
+            else if (id.startsWith('V_')) cat = 'V';
+            
+            if (activeCategories[cat]) {
+                layersToAdd.push(mapMarkers[id]);
+            }
+        }
+        clusterGroup.addLayers(layersToAdd);
+    }
+
     window.onload = () => {
         log("STEP 1: 載入 Leaflet 地圖...", "hit");
         const map = L.map('map', { zoomControl: false, tap: false }).setView([23.6, 121], 7);
@@ -195,7 +279,6 @@
         clusterGroup = L.markerClusterGroup({ maxClusterRadius: 40 }).addTo(map);
         
         map.on('click', (e) => { 
-            // 必須至少有兩個「已經載入資料」的站點才能插值
             const loadedStations = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
             if (loadedStations.length >= 2) {
                 createVirtualStation(e.latlng.lat, e.latlng.lng);
@@ -233,12 +316,16 @@
             const lat = parseFloat(r.c[5]?.v), lon = parseFloat(r.c[4]?.v);
             if (!id || isNaN(lat)) return;
             STATION_DB[id] = { name: r.c[1]?.v || id, lat, lon };
+            
             const cls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
-            const m = L.marker([lat, lon], { icon: L.divIcon({ className: `st-marker ${cls}` }) });
+            // 🌟 初始狀態一律加上 no-data 變成半透明
+            const m = L.marker([lat, lon], { icon: L.divIcon({ className: `st-marker ${cls} no-data` }) });
+            
             m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(id, e.containerPoint); });
             mapMarkers[id] = m;
-            clusterGroup.addLayer(m);
         });
+        refreshMarkers();
+        updateStationCount();
     };
 
     async function fetchCloudFileList() {
@@ -266,7 +353,7 @@
     };
 
     async function loadCloudFile(file) {
-        log(`[DOWNLOAD] 開始下載與解析: ${file.name}... (類型: ${file.mimeType})`, "google");
+        log(`[DOWNLOAD] 開始下載與解析: ${file.name}...`, "google");
         try {
             let raw;
             if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
@@ -281,32 +368,7 @@
             }
 
             if (!raw || raw.length < 3) return log(`[ERR] 資料列數不足`, "err");
-
-            const headers = raw[0];
-            const id = String(raw[2][0]);
-            
-            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
-            if (dateIdx === -1) dateIdx = 9;
-            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
-            if (yIdx === -1) yIdx = 7;
-            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
-            if (mIdx === -1) mIdx = 8;
-            
-            const dataMap = new Map();
-            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
-            
-            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
-            if (nameIdx === -1) nameIdx = 2;
-            const stName = raw[2][nameIdx] || id;
-
-            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
-            log(`✅ [${id}] 同步成功：共 ${dataMap.size} 筆日資料。`, "hit");
-
-            const menu = document.getElementById('marker-menu');
-            if (menu.style.display === 'block') {
-                const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
-                showMarkerMenu(id, pt);
-            }
+            processRawDataBlock(raw);
         } catch (err) {
             log(`[ERR] 解析失敗: ${err.message}`, "err");
         }
@@ -318,94 +380,57 @@
             const ab = await file.arrayBuffer();
             const wb = XLSX.read(ab, { type: 'array' });
             const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-            
             if (!raw || raw.length < 3) continue;
-            
-            const headers = raw[0];
-            const id = String(raw[2][0]);
-            
-            let dateIdx = headers.findIndex(h => String(h).match(/日期|Date/i));
-            if (dateIdx === -1) dateIdx = 9;
-            let yIdx = headers.findIndex(h => String(h).match(/年|Yr/i));
-            if (yIdx === -1) yIdx = 7;
-            let mIdx = headers.findIndex(h => String(h).match(/月|Mo/i));
-            if (mIdx === -1) mIdx = 8;
-            
-            const dataMap = new Map();
-            raw.slice(2).forEach(r => { if(r[dateIdx]) dataMap.set(String(r[dateIdx]), r); });
-            
-            let nameIdx = headers.findIndex(h => String(h).match(/站名/i));
-            if (nameIdx === -1) nameIdx = 2;
-            const stName = raw[2][nameIdx] || id;
-
-            allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
-            log(`✅ [${id}] 匯入成功：共 ${dataMap.size} 筆日資料。`, "hit");
+            processRawDataBlock(raw);
         }
         alert("資料處理完畢，請看監視器狀態。");
     }
 
-    function createVirtualStation(lat, lon) {
-        const stationsWithData = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
-        const stations = stationsWithData.map(st => ({ ...st, dist: Math.sqrt(Math.pow(st.lat-lat,2)+Math.pow(st.lon-lon,2)) })).sort((a,b)=>a.dist-b.dist);
-        const nearby = stations.slice(0,3);
-        const vId = "V_"+(++virtualStationCount);
+    function processRawDataBlock(raw) {
+        const headers = raw[0].map((h, i) => String(h||"").trim() + "|" + String(raw[1]?.[i]||"").trim());
+        const id = String(raw[2][0]).trim();
         
-        const virtualRows = nearby[0].rawData.map((row, rIdx) => {
-            const newRow = [...row];
-            for(let i=10; i<row.length; i++) {
-                let sum=0, count=0;
-                nearby.forEach(st => { 
-                    if(st.rawData[rIdx]){
-                        const v=parseFloat(st.rawData[rIdx][i]); 
-                        if(!isNaN(v) && v > -50){sum+=v; count++;} 
-                    }
-                });
-                newRow[i] = count > 0 ? (sum/count).toFixed(2) : "--";
-            }
-            return newRow;
-        });
+        let dateIdx = headers.findIndex(h => h.match(/日期|Date/i));
+        if (dateIdx === -1) dateIdx = 9;
+        let yIdx = headers.findIndex(h => h.match(/年|Yr/i));
+        if (yIdx === -1) yIdx = 7;
+        let mIdx = headers.findIndex(h => h.match(/月|Mo/i));
+        if (mIdx === -1) mIdx = 8;
         
         const dataMap = new Map();
-        virtualRows.forEach(r => { dataMap.set(String(r[nearby[0].dateIdx]), r); });
+        raw.slice(2).forEach(r => { if(r && r.length > 5 && r[dateIdx]) dataMap.set(String(r[dateIdx]).trim(), r); });
         
-        allStations[vId] = { id: vId, name: `虛擬站_${vId}`, lat, lon, headers: nearby[0].headers, dataMap, rawData: virtualRows, isVirtual: true, dateIdx: nearby[0].dateIdx, yIdx: nearby[0].yIdx, mIdx: nearby[0].mIdx };
-        const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
-        
-        m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(vId, e.containerPoint); });
-        
-        mapMarkers[vId] = m; 
-        clusterGroup.addLayer(m);
-        log(`[VIRTUAL] ${vId} 已透過最近 ${nearby.length} 站執行插值計算。`, "hit");
+        let nameIdx = headers.findIndex(h => h.match(/站名|Station/i));
+        const stName = nameIdx !== -1 ? raw[2][nameIdx] : id;
+
+        allStations[id] = { id, name: stName, headers, dataMap, rawData: raw.slice(2), dateIdx, yIdx, mIdx };
+        log(`✅ [${id}] 資料載入成功：共 ${dataMap.size} 筆。`, "hit");
+
+        // 🌟 點亮地圖標記：移除 no-data 類別，恢復全彩與不透明
+        if (mapMarkers[id]) {
+            const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
+            mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls}` }));
+        }
+
+        updateStationCount();
+
+        const menu = document.getElementById('marker-menu');
+        if (menu.style.display === 'block') {
+            const pt = { x: parseFloat(menu.style.left) + 170, y: parseFloat(menu.style.top) + 200 };
+            showMarkerMenu(id, pt);
+        }
     }
 
-    // 🌟 新增：修改站名功能
     window.renameStation = (id, px, py) => {
         const st = allStations[id];
         if(!st) return;
-        const newName = prompt("請輸入新的測站名稱：", st.name);
+        const newName = prompt("請輸入新的虛擬測站名稱：", st.name);
         if(newName && newName.trim() !== "") {
             st.name = newName.trim();
             log(`[RENAME] 測站 ${id} 已更名為 ${st.name}`, "hit");
-            showMarkerMenu(id, {x: px, y: py}); // 重新整理選單
+            showMarkerMenu(id, {x: px, y: py}); 
         }
     }
-
-    // 🌟 修正：區分實體與虛擬站的刪除邏輯
-    window.deleteStationData = (id, isVirtual) => {
-        if(!confirm(isVirtual ? "確定要徹底刪除此模擬測站嗎？" : "確定要清除此測站的快取資料嗎？")) return;
-        
-        if(isVirtual) {
-            if(mapMarkers[id]) {
-                clusterGroup.removeLayer(mapMarkers[id]); 
-                delete mapMarkers[id];
-            }
-        }
-        if(allStations[id]) {
-            delete allStations[id];
-        }
-        document.getElementById('marker-menu').style.display = 'none';
-        log(`[DELETE] 已清除資料：${id}`, "hit");
-    };
 
     function showMarkerMenu(id, point) {
         const menu = document.getElementById('marker-menu');
@@ -455,16 +480,77 @@
         }
         if (hasData || isVirtual) {
             const btnText = isVirtual ? "🗑️ 徹底刪除模擬站" : "🗑️ 清除資料快取";
-            buttonsHtml += `<button class="btn-update" style="background:var(--danger); margin-top:10px;" onclick="window.deleteStationData('${id}', ${isVirtual})">${btnText}</button>`;
+            buttonsHtml += `<button class="btn-update" style="background:var(--danger); margin-top:10px;" onclick="window.deleteStationData('${id}', ${isVirtual}, ${point.x}, ${point.y})">${btnText}</button>`;
         }
 
         document.getElementById('menu-content').innerHTML = `
             <b style="font-size:20px;">${stName}</b> <small>(${id})</small><hr style="margin:15px 0;">
             ${dateInfoHtml}
-            <div style="font-size:14px; margin-bottom:15px;">數據庫狀態：${hasData ? '<span style="color:var(--success);font-weight:bold;">✅ 已載入</span>' : '<span style="color:var(--danger);">⚪ 待匯入</span>'}</div>
+            <div style="font-size:14px; margin-bottom:15px;">狀態：${hasData ? '<span style="color:var(--success);font-weight:bold;">✅ 已載入</span>' : '<span style="color:var(--danger);">⚪ 待匯入 (半透明)</span>'}</div>
             ${buttonsHtml}
         `;
         menu.style.display = 'block'; menu.style.left = (point.x - 170) + 'px'; menu.style.top = (point.y - 200) + 'px';
+    }
+
+    // 🌟 雙軌刪除系統
+    window.deleteStationData = (id, isVirtual, px, py) => {
+        if(!confirm(isVirtual ? "確定要徹底刪除此模擬測站嗎？" : "確定要清除此測站的快取資料嗎？")) return;
+        
+        if(isVirtual) {
+            // 虛擬站：徹底拔除
+            if(mapMarkers[id]) {
+                clusterGroup.removeLayer(mapMarkers[id]); 
+                delete mapMarkers[id];
+            }
+            document.getElementById('marker-menu').style.display = 'none';
+        } else {
+            // 實體站：變回半透明幽靈
+            if(mapMarkers[id]) {
+                const baseCls = id.startsWith('46') ? 'st-46' : (id.startsWith('C0') ? 'st-C0' : 'st-Ag');
+                mapMarkers[id].setIcon(L.divIcon({ className: `st-marker ${baseCls} no-data` }));
+            }
+            showMarkerMenu(id, {x: px, y: py}); // 重新整理選單
+        }
+        
+        if(allStations[id]) delete allStations[id];
+        updateStationCount();
+        log(`[DELETE] 已清除資料：${id}`, "hit");
+    };
+
+    function createVirtualStation(lat, lon) {
+        const stationsWithData = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
+        const stations = stationsWithData.map(st => ({ ...st, dist: Math.sqrt(Math.pow(st.lat-lat,2)+Math.pow(st.lon-lon,2)) })).sort((a,b)=>a.dist-b.dist);
+        const nearby = stations.slice(0,3);
+        const vId = "V_"+(++virtualStationCount);
+        
+        const virtualRows = nearby[0].rawData.map((row, rIdx) => {
+            const newRow = [...row];
+            for(let i=10; i<row.length; i++) {
+                let sum=0, count=0;
+                nearby.forEach(st => { 
+                    if(st.rawData[rIdx]){
+                        const v=parseFloat(st.rawData[rIdx][i]); 
+                        if(!isNaN(v) && v > -50){sum+=v; count++;} 
+                    }
+                });
+                newRow[i] = count > 0 ? (sum/count).toFixed(2) : "--";
+            }
+            return newRow;
+        });
+        
+        const dataMap = new Map();
+        virtualRows.forEach(r => { dataMap.set(String(r[nearby[0].dateIdx]), r); });
+        
+        allStations[vId] = { id: vId, name: `虛擬站_${vId}`, lat, lon, headers: nearby[0].headers, dataMap, rawData: virtualRows, isVirtual: true, dateIdx: nearby[0].dateIdx, yIdx: nearby[0].yIdx, mIdx: nearby[0].mIdx };
+        
+        // 虛擬站一生成就有資料，不需要 no-data 類別
+        const m = L.marker([lat, lon], { icon: L.divIcon({className: 'st-marker v-marker', html: '<div style="font-size:24px; filter:hue-rotate(150deg);">📍</div>'}) });
+        m.on('mousedown', (e) => { L.DomEvent.stopPropagation(e); showMarkerMenu(vId, e.containerPoint); });
+        
+        mapMarkers[vId] = m; 
+        refreshMarkers(); // 讓地圖即時顯示出新的虛擬站
+        updateStationCount();
+        log(`[VIRTUAL] ${vId} 已透過最近 ${nearby.length} 站執行插值計算。`, "hit");
     }
 
     window.launchAnalysis = (id) => {
@@ -486,7 +572,10 @@
         
         Object.keys(CATEGORY_MAP).forEach(cat => {
             const fields = CATEGORY_MAP[cat].filter(f => f.startsWith("[計算]") || currentHeaders.some(h => String(h).match(new RegExp(f, 'i'))));
-            if (!fields.length && cat !== "風場分析") return;
+            if (!fields.length && cat !== "風場分析") {
+                log(`[SKIP] 模組 [${cat}] 找不到對應標題，略過繪製。`, "err");
+                return;
+            }
 
             log(`[INIT] 正在部署模組 [${cat}]...`, "google");
 
@@ -582,7 +671,6 @@
                     
                     ds.rows.forEach(r => {
                         const s = parseFloat(r[wsIdx]), d = parseFloat(r[wdIdx]);
-                        // 🛡️ 阻擋異常值
                         if(!isNaN(s) && !isNaN(d) && s >= 0 && d >= 0 && d <= 360) { 
                             let dI = Math.floor((d + 11.25) / 22.5) % 16;
                             if (dI < 0) dI += 16; 
