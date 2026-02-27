@@ -124,6 +124,38 @@
         .layer-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; margin-bottom: 12px; font-weight: bold; color: #333; }
         .layer-toggle input { transform: scale(1.2); cursor: pointer; }
         .mini-dot { width: 14px !important; height: 14px !important; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+/* --- 動態全域時空面板 UI --- */
+        #dynamic-sidebar {
+            position: absolute; top: 110px; left: 20px; z-index: 4000;
+            background: rgba(26, 42, 58, 0.95); color: white; padding: 20px;
+            border-radius: 18px; width: 220px; backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: 0.3s;
+        }
+        .data-opt {
+            padding: 12px; margin-bottom: 8px; border-radius: 10px;
+            background: rgba(255,255,255,0.05); cursor: pointer;
+            transition: 0.3s; border: 1px solid transparent; font-size: 14px;
+        }
+        .data-opt:hover { background: rgba(0, 123, 255, 0.3); border-color: var(--accent); }
+        .data-opt.active { background: var(--accent); font-weight: bold; box-shadow: 0 0 15px rgba(0,123,255,0.5); }
+        
+        #play-controller {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 80%; max-width: 900px; background: rgba(13, 13, 13, 0.95);
+            padding: 20px 30px; border-radius: 50px; z-index: 100001;
+            display: none; align-items: center; gap: 20px; border: 1px solid #444;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+        }
+        
+        /* 動態數值標籤（取代原本的點） */
+        .dynamic-val-marker {
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 50%; font-weight: bold; color: #fff; font-size: 11px;
+            text-shadow: 0px 1px 3px rgba(0,0,0,0.8);
+            border: 2px solid rgba(255,255,255,0.8);
+            transition: background 0.5s ease, box-shadow 0.5s ease;
+        }
     </style>
 </head>
 <body>
@@ -162,7 +194,22 @@
         <div style="font-size:14px; filter:hue-rotate(150deg);">📍</div> 虛擬空間插值站
     </label>
 </div>
+<div id="dynamic-sidebar">
+    <h3 style="margin: 0 0 15px 0; font-size: 15px; border-bottom: 2px solid #444; padding-bottom: 10px; color: #fff;">📉 全域動態圖層 (10年期)</h3>
+    <div class="data-opt" onclick="initDynamicLayer('氣溫', this)">🌡️ 氣溫空間分布</div>
+    <div class="data-opt" onclick="initDynamicLayer('降水量', this)">💧 降雨量分布圖</div>
+    <div class="data-opt" onclick="initDynamicLayer('氣壓', this)">🌀 氣壓變化圖</div>
+    <div class="data-opt" onclick="initDynamicLayer('相對溼度', this)">🌫️ 相對溼度圖</div>
+</div>
 
+<div id="play-controller">
+    <button id="play-btn" style="background:var(--success); border:none; color:white; width: 45px; height: 45px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; justify-content:center; align-items:center; box-shadow: 0 0 15px var(--success); transition:0.3s;">▶</button>
+    <div style="flex-grow:1;">
+        <input type="range" id="global-time-slider" style="width:100%; cursor:pointer;" min="0" max="0" value="0">
+        <div id="current-time-label" style="color:#00ff00; font-family:'Consolas', monospace; font-size:14px; margin-top:5px; text-align:center; font-weight:bold;">準備就緒...</div>
+    </div>
+    <button class="btn-update" style="width:auto; margin:0; padding:10px 20px; background:#ff4757;" onclick="closeDynamicMode()">⏹ 退出動態模式</button>
+</div>
 <div id="map"></div>
 <div id="diag-panel"><b>[Main Monitor Ready]</b><br>> 核心算力模組展開...</div>
 
@@ -212,7 +259,125 @@
     
     let cloudFilesList = []; 
     let activeCategories = { '46': true, 'C0': true, 'Ag': true, 'V': true };
+// --- 全域動態模式變數 ---
+    let isDynamicMode = false;
+    let isPlaying = false;
+    let playInterval = null;
+    let dynamicTimeline = [];
+    let currentField = "";
+    let originalMarkersState = {}; // 用於退出時恢復標記狀態
 
+    // 初始化動態圖層
+    window.initDynamicLayer = (fieldName, btnElement) => {
+        const loadedStations = Object.values(allStations).filter(st => st.rawData && st.rawData.length > 0);
+        
+        if (loadedStations.length === 0) {
+            log("⚠️ 啟動失敗：請先點擊地圖上的測站，或透過雲端/本地載入資料！", "err");
+            alert("請先載入測站資料！");
+            return;
+        }
+
+        // 視覺切換按鈕狀態
+        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
+        if(btnElement) btnElement.classList.add('active');
+
+        currentField = fieldName;
+        isDynamicMode = true;
+
+        // 1. 蒐集所有測站的日期，建立一條共同的時間軸
+        let allDates = new Set();
+        loadedStations.forEach(st => {
+            st.dataMap.forEach((val, date) => {
+                // 將 Excel 日期格式轉為易讀格式 (若為數字)
+                let n = Number(date);
+                if (!isNaN(n) && n > 30000) {
+                    let d = new Date((n - 25569) * 86400 * 1000);
+                    allDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+                } else {
+                    allDates.add(date);
+                }
+            });
+        });
+        
+        dynamicTimeline = Array.from(allDates).sort();
+        if (dynamicTimeline.length === 0) return log("⚠️ 找不到有效的日期資料", "err");
+
+        // 2. 初始化 Slider
+        const slider = document.getElementById('global-time-slider');
+        slider.max = dynamicTimeline.length - 1;
+        slider.value = 0;
+        
+        document.getElementById('play-controller').style.display = 'flex';
+        document.getElementById('current-time-label').innerText = `目前時間：${dynamicTimeline[0]}`;
+        
+        // 3. 備份原始標記樣式 (為了退出時恢復)
+        if(Object.keys(originalMarkersState).length === 0) {
+            for (let id in mapMarkers) {
+                originalMarkersState[id] = {
+                    className: mapMarkers[id].options.icon.options.className,
+                    html: mapMarkers[id].options.icon.options.html || ''
+                };
+            }
+        }
+
+        log(`[DYNAMIC] 啟動 ${fieldName} 模式，時間軸共 ${dynamicTimeline.length} 天`, "hit");
+        updateMapFrame(0);
+    };
+
+    // 關閉動態模式
+    window.closeDynamicMode = () => {
+        isDynamicMode = false;
+        clearInterval(playInterval);
+        isPlaying = false;
+        document.getElementById('play-btn').innerText = "▶";
+        document.getElementById('play-controller').style.display = 'none';
+        document.querySelectorAll('.data-opt').forEach(b => b.classList.remove('active'));
+        
+        // 恢復原始標記狀態
+        for (let id in originalMarkersState) {
+            if (mapMarkers[id]) {
+                mapMarkers[id].setIcon(L.divIcon({ 
+                    className: originalMarkersState[id].className,
+                    html: originalMarkersState[id].html
+                }));
+            }
+        }
+        originalMarkersState = {};
+        log("[DYNAMIC] 已退出時空動態模式，恢復預設地圖。", "debug");
+    };
+
+    // Slider 與播放器事件綁定 (等待 window.onload 觸發)
+    function setupDynamicControllers() {
+        document.getElementById('global-time-slider').oninput = function() {
+            updateMapFrame(parseInt(this.value));
+        };
+
+        document.getElementById('play-btn').onclick = function() {
+            isPlaying = !isPlaying;
+            this.innerText = isPlaying ? "⏸" : "▶";
+            this.style.background = isPlaying ? "var(--danger)" : "var(--success)";
+            this.style.boxShadow = isPlaying ? "0 0 15px var(--danger)" : "0 0 15px var(--success)";
+            
+            if (isPlaying) {
+                playInterval = setInterval(() => {
+                    let slider = document.getElementById('global-time-slider');
+                    let nextVal = parseInt(slider.value) + 1;
+                    if (nextVal >= dynamicTimeline.length) {
+                        nextVal = 0; // 循環播放
+                        isPlaying = false;
+                        this.innerText = "▶";
+                        this.style.background = "var(--success)";
+                        clearInterval(playInterval);
+                        return;
+                    }
+                    slider.value = nextVal;
+                    updateMapFrame(nextVal);
+                }, 300); // 播放速度：300毫秒換一天
+            } else {
+                clearInterval(playInterval);
+            }
+        };
+    }
     const CATEGORY_MAP = { 
         "風場分析": ["風速", "風向", "WD", "WS"], 
         "氣溫分析": ["氣溫", "Temperature", "Temp", "T Max", "T Min"], 
@@ -301,6 +466,7 @@
         document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
         document.getElementById('cp-apply').onclick = applyIndividualColor;
         document.getElementById('cp-close').onclick = () => document.getElementById('color-picker-popover').style.display='none';
+setupDynamicControllers();
     };
 
     function loadStationIndex() {
@@ -820,6 +986,94 @@
     function closeModal() { 
         document.getElementById('analysis-modal').style.display = 'none'; 
         document.getElementById('categoryContainer').innerHTML = ""; 
+    }
+// --- 第三部分：動態渲染引擎 ---
+    function updateMapFrame(index) {
+        if (!isDynamicMode || dynamicTimeline.length === 0) return;
+        
+        const targetDate = dynamicTimeline[index];
+        document.getElementById('current-time-label').innerText = `📅 日期：${targetDate} | 項目：${currentField}`;
+
+        // 掃描地圖上的每一個測站標記
+        Object.keys(mapMarkers).forEach(id => {
+            const st = allStations[id];
+            const marker = mapMarkers[id];
+            if (!marker || !marker.getElement()) return;
+
+            // 如果該站當天沒有資料，就變成半透明幽靈狀態
+            if (!st || !st.dataMap.has(targetDate)) {
+                marker.getElement().className = 'leaflet-marker-icon st-marker no-data leaflet-zoom-animated leaflet-interactive';
+                marker.getElement().style.background = '';
+                marker.getElement().innerHTML = '';
+                return;
+            }
+
+            const dayData = st.dataMap.get(targetDate);
+            
+            // 根據 currentField 找出對應的 Excel 欄位索引
+            let fieldNamesToMatch = [];
+            if (currentField === '氣溫') fieldNamesToMatch = CATEGORY_MAP["氣溫分析"];
+            else if (currentField === '降水量') fieldNamesToMatch = CATEGORY_MAP["降雨時空分佈"];
+            else if (currentField === '相對溼度') fieldNamesToMatch = CATEGORY_MAP["濕度與蒸發量"];
+            else if (currentField === '氣壓') fieldNamesToMatch = CATEGORY_MAP["大氣氣壓觀測"];
+
+            let fIdx = -1;
+            for (let fname of fieldNamesToMatch) {
+                fIdx = st.headers.findIndex(h => String(h).match(new RegExp(fname, 'i')));
+                if (fIdx !== -1) break;
+            }
+
+            // 如果找到欄位，且數值正常，就改變顏色並顯示數字
+            if (fIdx !== -1) {
+                const val = parseFloat(dayData[fIdx]);
+                if (!isNaN(val) && val > -50) {
+                    const color = getVisualColor(currentField, val);
+                    // 套用我們在第一部分寫好的 CSS class
+                    marker.getElement().className = 'leaflet-marker-icon st-marker dynamic-val-marker leaflet-zoom-animated leaflet-interactive';
+                    marker.getElement().style.background = color;
+                    marker.getElement().style.boxShadow = `0 0 15px ${color}`;
+                    // 顯示整數數值在圈圈內
+                    marker.getElement().innerHTML = Math.round(val);
+                } else {
+                    // 數值異常一樣變回幽靈
+                    marker.getElement().className = 'leaflet-marker-icon st-marker no-data leaflet-zoom-animated leaflet-interactive';
+                    marker.getElement().style.background = '';
+                    marker.getElement().innerHTML = '';
+                }
+            }
+        });
+    }
+
+    // 將數值轉換為漸層顏色的邏輯
+    function getVisualColor(field, val) {
+        if (field === '氣溫') {
+            if (val >= 35) return '#d63031'; // 極熱 (深紅)
+            if (val >= 30) return '#e84393'; // 炎熱 (粉紅)
+            if (val >= 25) return '#fdcb6e'; // 溫暖 (橘黃)
+            if (val >= 20) return '#00b894'; // 舒適 (綠)
+            if (val >= 15) return '#0984e3'; // 偏涼 (藍)
+            return '#6c5ce7';                // 寒冷 (紫)
+        }
+        if (field === '降水量') {
+            if (val >= 130) return '#6c5ce7'; // 豪雨
+            if (val >= 80) return '#0984e3';  // 大雨
+            if (val >= 40) return '#00b894';  // 中雨
+            if (val > 0) return '#81ecec';    // 小雨
+            return 'rgba(255,255,255,0.2)';   // 無雨
+        }
+        if (field === '相對溼度') {
+            if (val >= 90) return '#0984e3';
+            if (val >= 70) return '#00cec9';
+            if (val >= 50) return '#55efc4';
+            return '#ffeaa7';
+        }
+        if (field === '氣壓') {
+            if (val >= 1020) return '#d63031';
+            if (val >= 1010) return '#fdcb6e';
+            if (val >= 1000) return '#00b894';
+            return '#0984e3';
+        }
+        return '#a55eea'; // 預設顏色
     }
 </script>
 </body>
