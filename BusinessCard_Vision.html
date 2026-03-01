@@ -1,0 +1,278 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 實驗室 - 名片智慧處理系統 v3.6</title>
+    <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
+    <style>
+        :root { --primary: #3498db; --success: #27ae60; --warning: #e67e22; --dark: #2c3e50; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f3f5; margin: 0; padding: 20px; padding-bottom: 220px; }
+        .container { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 25px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
+        
+        .workspace { border-right: 1px solid #eee; padding-right: 20px; }
+        #canvasContainer { position: relative; background: #333; border-radius: 8px; cursor: crosshair; overflow: hidden; margin-bottom: 15px; min-height: 300px; display: flex; align-items: center; justify-content: center; }
+        canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        
+        .form-panel { padding: 10px; }
+        .preview-box { background: #ecf0f1; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        #colorPreview { max-width: 100%; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        input[type="text"], select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        label { font-size: 13px; font-weight: bold; color: var(--dark); }
+
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
+        .btn-upload { background: var(--primary); }
+        .btn-action { background: var(--warning); }
+        .btn-save { background: var(--success); width: 100%; margin-top: 15px; font-size: 1.1em; }
+        .btn:disabled { background: #ccc; }
+
+        #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 180px; background: #1a1a1a; color: #0f0; padding: 15px; font-family: monospace; font-size: 12px; overflow-y: auto; border-top: 4px solid var(--primary); z-index: 1000; }
+        .log-entry { border-bottom: 1px solid #333; padding: 2px 0; }
+        .log-time { color: #888; margin-right: 5px; }
+        .log-tag { color: #f1c40f; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="workspace">
+        <h2>📸 影像採集與校正</h2>
+        <div class="btn-group">
+            <input type="file" id="upload" accept="image/*" style="display:none">
+            <button class="btn btn-upload" onclick="document.getElementById('upload').click()">📁 1. 選取名片</button>
+            <button class="btn btn-action" id="rotateBtn" disabled>🔄 旋轉</button>
+            <button class="btn btn-action" id="transformBtn" disabled>🪄 2. 校正並辨識</button>
+        </div>
+        <div id="canvasContainer">
+            <canvas id="mainCanvas"></canvas>
+            <p id="placeholderMsg" style="color: #666;">尚未上傳圖片</p>
+        </div>
+        <div id="ocrStatus" style="font-weight:bold; color:var(--primary)"></div>
+    </div>
+
+    <div class="form-panel">
+        <h2>📝 智慧辨識結果</h2>
+        <div class="preview-box">
+            <h4>彩色封面預覽</h4>
+            <canvas id="colorPreview" width="300" height="180"></canvas>
+        </div>
+        <label>姓名：</label><input type="text" id="field_name">
+        <label>職稱：</label><input type="text" id="field_title">
+        <label>公司：</label><input type="text" id="field_company">
+        <label>電話：</label><input type="text" id="field_phone">
+        <label>電子郵件：</label><input type="text" id="field_email">
+        <label>關聯案號：</label><input type="text" id="field_project" placeholder="AI 正在比對資料庫...">
+        <label>標籤：</label><input type="text" id="field_tags">
+        <button class="btn btn-save" id="saveBtn" disabled>💾 3. 儲存至 Google 雲端</button>
+    </div>
+</div>
+
+<div id="monitor">
+    <div style="border-bottom: 1px solid #444; padding-bottom: 5px;">🖥️ 系統監視窗 (Console)</div>
+    <div id="logBody"></div>
+</div>
+
+<script>
+    // 🔑 此處填入您的 API Key
+    const GEMINI_API_KEY = "AIzaSyAqQY4N6vTue885gHlstu-wBowmIOzopXs"; 
+
+    const mainCanvas = document.getElementById('mainCanvas');
+    const ctx = mainCanvas.getContext('2d', { willReadFrequently: true });
+    const colorCanvas = document.getElementById('colorPreview');
+    const cCtx = colorCanvas.getContext('2d');
+    const bwCanvas = document.createElement('canvas'); // 隱藏黑白畫布
+    const bCtx = bwCanvas.getContext('2d');
+
+    let img = new Image();
+    let points = []; 
+    let draggingPoint = null;
+    let imgScale = 1;
+    let imgRotation = 0;
+
+    function log(tag, msg) {
+        const body = document.getElementById('logBody');
+        const now = new Date().toLocaleTimeString();
+        body.innerHTML += `<div class="log-entry"><span class="log-time">[${now}]</span> <span class="log-tag">[${tag}]</span> ${msg}</div>`;
+        document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
+    }
+
+    log("SYSTEM", "系統載入成功。");
+
+    document.getElementById('upload').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.getElementById('placeholderMsg').style.display = 'none';
+        const reader = new FileReader();
+        reader.onload = ev => {
+            img.onload = () => {
+                imgRotation = 0;
+                resetWorkspace();
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function resetWorkspace() {
+        const isRotated = (imgRotation / 90) % 2 !== 0;
+        const displayW = isRotated ? img.height : img.width;
+        const displayH = isRotated ? img.width : img.height;
+        const maxW = 580;
+        imgScale = displayW > maxW ? maxW / displayW : 1;
+        mainCanvas.width = displayW * imgScale;
+        mainCanvas.height = displayH * imgScale;
+        const w = mainCanvas.width, h = mainCanvas.height;
+        points = [{x: w*0.1, y: h*0.2}, {x: w*0.9, y: h*0.2}, {x: w*0.9, y: h*0.8}, {x: w*0.1, y: h*0.8}];
+        draw();
+        document.getElementById('rotateBtn').disabled = false;
+        document.getElementById('transformBtn').disabled = false;
+        log("IMAGE", "影像載入完成，請拖動紅點對準名片四角。");
+    }
+
+    document.getElementById('rotateBtn').onclick = () => { imgRotation = (imgRotation + 90) % 360; resetWorkspace(); };
+
+    function draw() {
+        ctx.save();
+        ctx.clearRect(0,0,mainCanvas.width, mainCanvas.height);
+        ctx.translate(mainCanvas.width/2, mainCanvas.height/2);
+        ctx.rotate(imgRotation * Math.PI / 180);
+        const isRotated = (imgRotation / 90) % 2 !== 0;
+        const dw = isRotated ? mainCanvas.height : mainCanvas.width;
+        const dh = isRotated ? mainCanvas.width : mainCanvas.height;
+        ctx.drawImage(img, -dw/2, -dh/2, dw, dh);
+        ctx.restore();
+        ctx.strokeStyle = '#3498db'; ctx.lineWidth = 2; ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for(let i=1; i<4; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath(); ctx.stroke();
+        points.forEach(p => { ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fill(); });
+    }
+
+    mainCanvas.onmousedown = e => {
+        const rect = mainCanvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (mainCanvas.width / rect.width);
+        const my = (e.clientY - rect.top) * (mainCanvas.height / rect.height);
+        points.forEach((p, idx) => { if (Math.hypot(p.x - mx, p.y - my) < 25) draggingPoint = idx; });
+    };
+    window.onmousemove = e => {
+        if (draggingPoint === null) return;
+        const rect = mainCanvas.getBoundingClientRect();
+        points[draggingPoint].x = (e.clientX - rect.left) * (mainCanvas.width / rect.width);
+        points[draggingPoint].y = (e.clientY - rect.top) * (mainCanvas.height / rect.height);
+        draw();
+    };
+    window.onmouseup = () => draggingPoint = null;
+
+    document.getElementById('transformBtn').onclick = async () => {
+        log("PROCESS", "執行透視校正與黑白強化...");
+        const tw = 900, th = 540;
+        bwCanvas.width = tw; bwCanvas.height = th;
+        
+        // 彩色預覽 (步驟 4)
+        cCtx.drawImage(mainCanvas, 0, 0, mainCanvas.width, mainCanvas.height, 0, 0, 300, 180);
+        
+        // 黑白強化 (步驟 5)
+        bCtx.drawImage(mainCanvas, 0, 0, mainCanvas.width, mainCanvas.height, 0, 0, tw, th);
+        const idata = bCtx.getImageData(0, 0, tw, th);
+        for (let i = 0; i < idata.data.length; i += 4) {
+            let gray = idata.data[i] * 0.3 + idata.data[i+1] * 0.59 + idata.data[i+2] * 0.11;
+            let v = gray > 130 ? 255 : 0;
+            idata.data[i] = idata.data[i+1] = idata.data[i+2] = v;
+        }
+        bCtx.putImageData(idata, 0, 0);
+
+        log("OCR", "啟動文字辨識引擎...");
+        const result = await Tesseract.recognize(bwCanvas, 'chi_tra+eng');
+        log("SUCCESS", "原始辨識完成。正在請求 Gemini 智慧分析...");
+        callGemini(result.data.text);
+    };
+
+    async function callGemini(ocrText) {
+        if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("您的")) {
+            log("ERROR", "⚠️ 尚未填入正確的 API KEY，請檢查程式碼第 70 行。");
+            return;
+        }
+
+        log("AI", "正在請求 Gemini 智慧解析並比對公司實績庫...");
+        
+        // 取得您 CSV 的簡化參考資料 (您可以根據需求增加更多案件)
+        const projectReference = `
+            案號, 案件簡稱, 業主
+            P10002, 縱谷鯉魚潭, 交通部觀光局
+            P10003, 玉里規劃, 花蓮縣玉里鎮公所
+            P10145, 宜蘭河整治, 宜蘭縣政府
+            P9907, 南竿清水濕地, 連江縣政府
+        `;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        
+        const prompt = `
+            你是一個專業的商務秘書，負責處理名片資訊並與公司實績資料庫進行比對。
+            
+            【任務】:
+            1. 從 OCR 文字中萃取姓名、職稱、公司名稱、電話、Email。
+            2. 關鍵任務：比對「公司名稱」是否與參考資料庫中的「業主」或「案件簡稱」相似。
+            3. 如果發現相似，請直接填入對應的「案號」與「案件簡稱」到專案欄位。
+            
+            【參考資料庫】:
+            ${projectReference}
+            
+            【OCR 文字內容】:
+            "${ocrText}"
+            
+            【輸出要求】:
+            請嚴格僅輸出 JSON 格式，不需其他解釋文字。
+            範例：{"name":"張三","title":"經理","company":"花蓮縣政府","email":"test@gov.tw","phone":"0912-345678","project":"P10145 (宜蘭河整治)"}
+        `;
+
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const data = await resp.json();
+
+            // --- 診斷邏輯：如果 API 報錯 ---
+            if (data.error) {
+                log("ERROR", `Google API 錯誤 (${data.error.code}): ${data.error.message}`);
+                return;
+            }
+
+            if (!data.candidates || data.candidates.length === 0) {
+                log("ERROR", "AI 回傳了空的結果，可能內容被過濾。原始回應：" + JSON.stringify(data));
+                return;
+            }
+
+            // 解析 JSON
+            let cleanJson = data.candidates[0].content.parts[0].text.replace(/```json|```/g, "").trim();
+            const res = JSON.parse(cleanJson);
+            
+            // 填入表單
+            document.getElementById('field_name').value = res.name || "";
+            document.getElementById('field_title').value = res.title || "";
+            document.getElementById('field_company').value = res.company || "";
+            document.getElementById('field_email').value = res.email || "";
+            document.getElementById('field_phone').value = res.phone || "";
+            document.getElementById('field_project').value = res.project || "";
+            
+            if(res.project) {
+                log("SUCCESS", `✨ 智慧匹配成功：此廠商關聯至 ${res.project}`);
+                document.getElementById('field_tags').value = `#${res.project.split(' ')[0]} #自動串聯`;
+            } else {
+                log("SUCCESS", "Gemini 分析完畢，未發現資料庫匹配項。");
+            }
+            
+            document.getElementById('saveBtn').disabled = false;
+
+        } catch (e) {
+            log("ERROR", "連線或解析失敗: " + e.message);
+            console.error(e);
+        }
+    }
+</script>
+</body>
+</html>
