@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI 實驗室 - 名片智慧處理系統 v4.0 (終極版)</title>
+    <title>AI 實驗室 - 名片智慧處理系統 v4.1 (雲端儲存版)</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -21,7 +21,6 @@
         .btn-blue { background: var(--primary); }
         .btn-save { background: var(--success); width: 100%; margin-top: 20px; font-size: 1.1em; }
         #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 180px; background: #1a1a1a; color: #00ff00; padding: 15px; font-family: monospace; overflow-y: auto; border-top: 4px solid var(--primary); z-index: 1000; }
-        .log-error { color: #ff5555; }
     </style>
 </head>
 <body>
@@ -31,8 +30,9 @@
         <h2>📸 影像處理區</h2>
         <div class="btn-group">
             <input type="file" id="upload" accept="image/*" style="display:none">
-            <button class="btn btn-blue" onclick="document.getElementById('upload').click()">📁 選取相片</button>
+            <button class="btn btn-blue" onclick="document.getElementById('upload').click()">📁 選取名片</button>
             <button class="btn btn-blue" id="transformBtn" disabled>🪄 校正並辨識</button>
+            <button class="btn btn-blue" id="authBtn">🔑 登入 Google 帳號</button>
         </div>
         <div id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
@@ -41,139 +41,175 @@
     </div>
 
     <div class="form-panel">
-        <h2>📝 雲端存檔預覽</h2>
+        <h2>📝 智慧辨識結果</h2>
         <div class="preview-box">
             <canvas id="colorPreview" width="300" height="180"></canvas>
         </div>
         <input type="text" id="field_name" placeholder="姓名">
         <input type="text" id="field_company" placeholder="公司">
-        <input type="text" id="field_project" placeholder="關聯案號 (智慧比對)">
+        <input type="text" id="field_project" placeholder="關聯案號 (AI 智慧比對中...)">
         <input type="text" id="field_phone" placeholder="電話">
         <input type="text" id="field_email" placeholder="Email">
+        <input type="text" id="field_tags" placeholder="標籤">
         
-        <button class="btn btn-save" id="saveBtn" disabled>💾 執行步驟 6：儲存至雲端</button>
+        <button class="btn btn-save" id="saveBtn" disabled>💾 第六步：儲存至 Google 雲端</button>
     </div>
 </div>
 
 <div id="monitor">
-    <div style="border-bottom: 1px solid #444; padding-bottom: 5px;">🖥️ 系統監視窗 v4.0</div>
+    <div style="border-bottom: 1px solid #444; padding-bottom: 5px;">🖥️ 系統監視窗 v4.1 (Stable)</div>
     <div id="logBody"></div>
 </div>
 
 <script>
-    // 🔑 API 設定
-    const GEMINI_API_KEY = "AIzaSyAqQY4N6vTue885gHlstu-wBowmIOzopXs";
-    
-    // 💡 提示：這裡需要填入您的 Google Client ID 才能正式啟用上傳功能
-    const CLIENT_ID = '您的_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
-    const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
+    // 🔑 API 金鑰與設定 (請替換為您的正確資訊)
+    const GEMINI_API_KEY = "AIzaSyAqQY4N6vTue885gHlstu-wBowmIOzopXs"; 
+    const CLIENT_ID = '您的_OAUTH_CLIENT_ID.apps.googleusercontent.com';
+    const SPREADSHEET_ID = '您的_GOOGLE_SHEET_ID'; // 名片總表 ID
 
+    let tokenClient;
+    let accessToken = null;
+
+    function log(tag, msg) {
+        const body = document.getElementById('logBody');
+        body.innerHTML += `<div>[${new Date().toLocaleTimeString()}] [${tag}] ${msg}</div>`;
+        document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
+    }
+
+    // --- Google API 初始化 ---
+    function gapiLoaded() { gapi.load('client', initializeGapiClient); }
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            discoveryDocs: [
+                'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+                'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'
+            ],
+        });
+        log("SYSTEM", "Google API 庫已載入。");
+    }
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+            callback: (resp) => { accessToken = resp.access_token; log("AUTH", "登入成功！"); },
+        });
+    }
+
+    document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
+
+    // --- 影像處理與 OCR ---
     const mainCanvas = document.getElementById('mainCanvas');
     const ctx = mainCanvas.getContext('2d');
     const colorCanvas = document.getElementById('colorPreview');
     const cCtx = colorCanvas.getContext('2d');
-    const bwCanvas = document.createElement('canvas');
-    const bCtx = bwCanvas.getContext('2d');
-
     let img = new Image();
-    let points = [];
-    let imgScale = 1;
 
-    function log(tag, msg, isError = false) {
-        const body = document.getElementById('logBody');
-        body.innerHTML += `<div style="${isError?'color:#ff5555':''}">[${new Date().toLocaleTimeString()}] [${tag}] ${msg}</div>`;
-        document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
-    }
-
-    log("SYSTEM", "系統已啟動。");
-
-    // 影像載入與處理邏輯 (簡化顯示)
     document.getElementById('upload').addEventListener('change', e => {
         const file = e.target.files[0];
         const reader = new FileReader();
         reader.onload = ev => {
             img.onload = () => {
-                mainCanvas.width = 600; 
-                mainCanvas.height = 400;
-                points = [{x:50,y:50},{x:550,y:50},{x:550,y:350},{x:50,y:350}];
-                draw();
+                mainCanvas.width = 600; mainCanvas.height = 400;
+                ctx.drawImage(img, 0, 0, 600, 400);
                 document.getElementById('transformBtn').disabled = false;
+                log("IMAGE", "影像已載入。");
             };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
     });
 
-    function draw() {
-        ctx.drawImage(img, 0, 0, 600, 400);
-        ctx.strokeStyle = "cyan";
-        ctx.strokeRect(points[0].x, points[0].y, 500, 300);
-    }
-
     document.getElementById('transformBtn').onclick = async () => {
-        log("PROCESS", "執行影像優化中...");
-        cCtx.drawImage(mainCanvas, 50, 50, 500, 300, 0, 0, 300, 180);
-        log("OCR", "開始 Tesseract 文字掃描...");
+        log("PROCESS", "執行校正與辨識...");
+        cCtx.drawImage(mainCanvas, 0, 0, 600, 400, 0, 0, 300, 180);
         const result = await Tesseract.recognize(mainCanvas, 'chi_tra+eng');
         callGemini(result.data.text);
     };
 
-    // ✨ 核心修正：Gemini API 呼叫 (解決 404 問題)
+    // ✨ 解決 404 問題的核心 URL
     async function callGemini(ocrText) {
-        log("AI", "正在請求 Gemini 智慧解析...");
-        
-        // 🚀 使用更強韌的 v1beta 搭配最新型號名稱
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+        log("AI", "正在請求 Gemini 穩定版 v1 解析...");
+        // 強制使用 v1 穩定路徑與標準模型名稱
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
         
         const payload = {
-            contents: [{ parts: [{ text: `請分析以下名片文字並回傳 JSON 格式 (name, company, project, phone, email)。文字：${ocrText}` }] }]
+            contents: [{ parts: [{ text: `你是一個秘書。從以下文字提取姓名, 公司, 案號(比對 CSV), 電話, Email 並以 JSON 回傳：${ocrText}` }] }]
         };
 
         try {
-            const resp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
+            const resp = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
             const data = await resp.json();
-            if (data.error) {
-                log("ERROR", `API 報錯: ${data.error.message}`, true);
-                // 嘗試備援路徑 (v1)
-                return; 
-            }
-
+            if (data.error) throw new Error(data.error.message);
+            
             const raw = data.candidates[0].content.parts[0].text;
             const res = JSON.parse(raw.match(/\{[\s\S]*\}/)[0]);
             
             document.getElementById('field_name').value = res.name || "";
             document.getElementById('field_company').value = res.company || "";
+            document.getElementById('field_project').value = res.project || "";
             document.getElementById('field_phone').value = res.phone || "";
             document.getElementById('field_email').value = res.email || "";
             
-            log("SUCCESS", "AI 辨識成功，請確認資料後點擊儲存。");
+            log("SUCCESS", "AI 分析完成。");
             document.getElementById('saveBtn').disabled = false;
         } catch (e) {
-            log("ERROR", "連線失敗，請檢查網路或 API Key 權限。", true);
+            log("ERROR", `AI 解析失敗: ${e.message}`, true);
         }
     }
 
-    // 💾 步驟 6：正式儲存功能
-    document.getElementById('saveBtn').onclick = () => {
-        log("CLOUD", "開始執行儲存程序...");
-        // 此處會觸發 Google 登入並上傳
-        saveToGoogle();
-    };
+    // --- 💾 正式儲存：Google Drive + Sheets ---
+    document.getElementById('saveBtn').onclick = async () => {
+        if (!accessToken) { alert("請先登入 Google 帳號！"); return; }
+        log("CLOUD", "開始執行雲端儲存工作流...");
 
-    function saveToGoogle() {
-        log("AUTH", "請在跳出的視窗中完成 Google 授權...");
-        // 模擬儲存流程 (實際需載入 gapi)
-        setTimeout(() => {
-            log("SUCCESS", "✅ 名片封面已存入 Google Drive");
-            log("SUCCESS", "✅ 聯絡資訊已寫入 Google Sheets 實績地圖總表");
-            alert("雲端儲存成功！");
-        }, 2000);
-    }
+        try {
+            // 1. 上傳圖片到 Google Drive
+            log("DRIVE", "正在上傳名片封面圖片...");
+            const blob = await new Promise(res => colorCanvas.toBlob(res, 'image/jpeg'));
+            const metadata = { name: `名片_${document.getElementById('field_name').value}.jpg`, mimeType: 'image/jpeg' };
+            
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob);
+
+            const driveResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + accessToken },
+                body: form
+            });
+            const driveFile = await driveResp.json();
+            log("SUCCESS", `圖片已存入雲端硬碟 (ID: ${driveFile.id})`);
+
+            // 2. 寫入資料到 Google Sheets
+            log("SHEETS", "正在寫入資料至實績地圖總表...");
+            const rowData = [
+                new Date().toLocaleDateString(),
+                document.getElementById('field_name').value,
+                document.getElementById('field_company').value,
+                document.getElementById('field_project').value,
+                document.getElementById('field_phone').value,
+                document.getElementById('field_email').value,
+                `https://drive.google.com/file/d/${driveFile.id}/view`
+            ];
+
+            await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: SPREADSHEET_ID,
+                range: 'Sheet1!A1',
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: [rowData] },
+            });
+            
+            log("SUCCESS", "✅ 雲端存檔全部完成！");
+            alert("資料已成功同步至實績地圖資料庫！");
+
+        } catch (e) {
+            log("ERROR", `儲存失敗: ${e.message}`);
+        }
+    };
 </script>
+
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
 </body>
 </html>
