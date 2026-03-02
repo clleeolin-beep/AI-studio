@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>惇陽名片數位管理系統 v8.2</title>
+    <title>惇陽名片數位管理系統 v8.3</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -19,6 +19,7 @@
         .input-group { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
         input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
         label { font-size: 11px; font-weight: bold; color: var(--dark); display: block; margin-bottom: 3px; }
+        
         .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; font-size: 13px; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-ocr { background: var(--warning); width: 45px; height: 45px; font-size: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -73,19 +74,24 @@
         <label>案號：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id', this)">🪄</button></div>
         <label>契約案名：</label><div class="input-group"><input type="text" id="f_proj_name" readonly style="background:#f8fafc"></div>
         <label>備註：</label><div class="input-group"><input type="text" id="f_note"><button class="btn btn-ocr" onclick="ocrField('f_note', this)">🪄</button></div>
-        <button class="btn" style="background:var(--success); width:100%; height:50px; margin-top:15px; font-size:1.1em;" id="btn_save" disabled>💾 5. 驗證並儲存</button>
+        
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button class="btn" style="background:var(--success); flex-grow: 1; height:50px; font-size:1.1em;" id="btn_save" disabled>💾 5. 驗證並儲存</button>
+            <button class="btn" style="background:var(--danger); width: 100px; height:50px;" id="btn_clear">🗑️ 清空</button>
+        </div>
     </div>
 </div>
 
 <div id="monitor">
     <div class="mon-header" onclick="this.parentElement.style.height = this.parentElement.style.height==='35px'?'160px':'35px'">
-        <span>🖥️ 系統監視窗 v8.2 [API 結構修正版]</span>
+        <span>🖥️ 系統監視窗 v8.3 [資料保留版]</span>
         <span>[收合/展開]</span>
     </div>
     <div id="logBody" style="overflow-y:auto; height:120px; margin-top:5px;"></div>
 </div>
 
 <script>
+    // --- 同 v8.2 配置 ---
     const CLIENT_ID = "615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com";
     const DB_SHEET_ID = "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE"; 
     const TARGET_FILE_NAME = "惇陽名片資料庫";
@@ -106,6 +112,13 @@
         document.getElementById('overlay').style.display = 'none';
     }
 
+    // --- ✨ 新功能：手動清空欄位 ---
+    document.getElementById('btn_clear').onclick = () => {
+        const fields = ['f_name', 'f_comp', 'f_phone', 'f_email', 'f_proj_id', 'f_proj_name', 'f_note'];
+        fields.forEach(f => document.getElementById(f).value = "");
+        log("SYSTEM", "欄位已手動清空。");
+    };
+
     // --- 📁 資料夾輔助函數 ---
     async function getOrCreateFolder(name, parentId = 'root') {
         log("SYSTEM", `檢查資料夾: ${name}...`);
@@ -125,7 +138,7 @@
         return folder.id;
     }
 
-    // --- 💾 儲存邏輯 (解決 Spreadsheet Create 語法問題) ---
+    // --- 💾 儲存邏輯 (v8.2 語法修復版 + v8.3 資料保留) ---
     document.getElementById('btn_save').onclick = async function() {
         const name = document.getElementById('f_name').value.trim();
         const comp = document.getElementById('f_comp').value.trim();
@@ -153,23 +166,22 @@
                 const dupIdx = rows.findIndex(r => r[0] === name);
                 if (dupIdx !== -1) {
                     const oldComp = rows[dupIdx][1];
-                    const oldDate = (await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!A${dupIdx+1}` })).result.values[0][0];
-                    const oldLink = (await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!M${dupIdx+1}` })).result.values[0][0];
+                    const oldData = (await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!A${dupIdx+1}:M${dupIdx+1}` })).result.values[0];
 
-                    document.getElementById('dupText').innerHTML = `<b>${name}</b> 已存在於庫中。<br>現有單位：${oldComp}<br>上次日期：${oldDate}`;
+                    document.getElementById('dupText').innerHTML = `<b>${name}</b> 已存在於庫中。<br>現有單位：${oldComp}<br>上次日期：${oldData[0]}`;
                     document.getElementById('dupModal').style.display = 'block';
                     document.getElementById('overlay').style.display = 'block';
 
                     document.getElementById('btn_new_person').onclick = () => { closeModal(); finalizeSave(sheetId, sheetTitle, photoId, rootId, "New"); };
-                    document.getElementById('btn_same_person').onclick = () => { closeModal(); finalizeSave(sheetId, sheetTitle, photoId, rootId, "Update", {oldComp, oldDate, oldLink}); };
-                    btn.disabled = false; btn.innerText = "💾 驗證並儲存";
+                    document.getElementById('btn_same_person').onclick = () => { closeModal(); finalizeSave(sheetId, sheetTitle, photoId, rootId, "Update", {oldComp, oldDate: oldData[0], oldLink: oldData[12]}); };
+                    btn.disabled = false; btn.innerText = "💾 5. 驗證並儲存";
                     return;
                 }
-                finalizeSave(sheetId, sheetTitle, photoId, rootId, "Standard");
+                await finalizeSave(sheetId, sheetTitle, photoId, rootId, "Standard");
             } else {
-                finalizeSave(null, null, photoId, rootId, "Standard");
+                await finalizeSave(null, null, photoId, rootId, "Standard");
             }
-        } catch (e) { processError(e); btn.disabled = false; btn.innerText = "💾 驗證並儲存"; }
+        } catch (e) { processError(e); btn.disabled = false; btn.innerText = "💾 5. 驗證並儲存"; }
     };
 
     async function finalizeSave(sheetId, sheetTitle, photoFolderId, rootId, mode, oldInfo = null) {
@@ -201,18 +213,10 @@
 
             if(!sheetId) {
                 log("SYSTEM", "建立總表試算表...");
-                // ✨ 修正點：先建立試算表
-                const cResp = await gapi.client.sheets.spreadsheets.create({ 
-                    resource: { properties: { title: TARGET_FILE_NAME } } 
-                });
+                const cResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
                 sheetId = cResp.result.spreadsheetId;
                 sheetTitle = cResp.result.sheets[0].properties.title;
-
-                // ✨ 修正點：將試算表移動到「惇陽名片」資料夾
-                await fetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?addParents=${rootId}`, {
-                    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + accessToken }
-                });
-
+                await fetch(`https://www.googleapis.com/drive/v3/files/${sheetId}?addParents=${rootId}`, { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + accessToken } });
                 const head = [["日期", "姓名", "公司/單位", "手機/電話", "Email", "案號", "契約案名", "自訂1", "自訂2", "自訂3", "備註", "圖片連結", "歷史關聯"]];
                 await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: sheetId, range: `${sheetTitle}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: head } });
             }
@@ -220,13 +224,18 @@
             const row = [new Date().toLocaleDateString(), document.getElementById('f_name').value, document.getElementById('f_comp').value, document.getElementById('f_phone').value, document.getElementById('f_email').value, document.getElementById('f_proj_id').value, document.getElementById('f_proj_name').value, "", "", "", document.getElementById('f_note').value, `https://drive.google.com/file/d/${dFile.id}/view`, historyInfo];
             await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: sheetId, range: `${sheetTitle}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: [row] } });
 
-            log("SUCCESS", "✅ 儲存成功！", "var(--success)");
-            alert("儲存成功！");
-            location.reload();
+            log("SUCCESS", "✅ 儲存成功！資料已保留在欄位供複製。", "var(--success)");
+            alert("儲存成功！\n資料已保留在欄位，處理下一位前請點擊『清空』。");
+            
+            // ✨ v8.3 修正：不重整頁面，僅恢復按鈕狀態
+            const saveBtn = document.getElementById('btn_save');
+            saveBtn.disabled = false;
+            saveBtn.innerText = "💾 5. 驗證並儲存";
+
         } catch (e) { processError(e); }
     }
 
-    // --- 影像與辨識邏輯 ---
+    // --- 影像控制與辨識 (維持穩定邏輯) ---
     function renderAll() {
         const rot = (imgRotation / 90) % 2 !== 0;
         canvas.width = rot ? img.height : img.width; canvas.height = rot ? img.width : img.height;
