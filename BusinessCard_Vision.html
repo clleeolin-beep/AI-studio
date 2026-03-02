@@ -2,188 +2,244 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>名片數位化工作站 v5.5</title>
+    <title>名片數位校正系統 v6.5</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <style>
         :root { --primary: #4f46e5; --success: #10b981; --warning: #f59e0b; --dark: #0f172a; }
-        body { font-family: "Microsoft JhengHei", sans-serif; background: #f1f5f9; margin: 0; padding: 10px; overflow-x: hidden; }
-        .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 1200px; margin: auto; display: grid; grid-template-columns: 1fr 420px; gap: 15px; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f1f5f9; margin: 0; padding: 10px; }
+        .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 1300px; margin: auto; display: grid; grid-template-columns: 1fr 450px; gap: 15px; }
         
-        /* 畫布區 */
-        #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 550px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid #e2e8f0; }
+        #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 600px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid #e2e8f0; overflow: hidden; }
         canvas { max-width: 100%; height: auto; cursor: crosshair; }
-        .corner-handle { position: absolute; width: 14px; height: 14px; background: #ff4757; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: move; z-index: 10; }
+        .corner-handle { position: absolute; width: 18px; height: 18px; background: #ff4757; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: move; z-index: 100; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
 
-        /* 表單區 */
-        .form-panel { padding: 10px; border-left: 1px solid #e2e8f0; overflow-y: auto; max-height: 85vh; }
+        .form-panel { padding: 10px; border-left: 1px solid #e2e8f0; overflow-y: auto; max-height: 90vh; }
         .input-group { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
-        input[type="text"] { flex-grow: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; }
-        label { font-size: 11px; font-weight: bold; color: var(--dark); display: block; margin-bottom: 2px; }
-        .btn { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; font-size: 12px; }
-        .btn-ocr { background: var(--warning); font-size: 14px; width: 35px; height: 35px; flex-shrink: 0; }
+        input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+        label { font-size: 11px; font-weight: bold; color: var(--dark); display: block; margin-bottom: 3px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; font-size: 13px; }
+        .btn-ocr { background: var(--warning); width: 40px; height: 40px; font-size: 18px; flex-shrink: 0; }
         
-        /* 預覽與監視窗 */
-        .preview-box { text-align: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 10px; }
         #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #0f172a; color: #34d399; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; transition: 0.3s; z-index: 2000; }
-        #monitor.minimized { height: 35px; overflow: hidden; }
-        .mon-header { display: flex; justify-content: space-between; border-bottom: 1px solid #1e293b; margin-bottom: 5px; cursor: pointer; }
+        #monitor.minimized { height: 35px; }
+        .mon-header { display: flex; justify-content: space-between; border-bottom: 1px solid #1e293b; padding-bottom: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="workspace">
-        <h3 style="margin-top:0;">📸 1. 影像擷取與透視校正</h3>
-        <div style="margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <h3 style="margin-top:0;">📸 1. 影像校正與旋轉 <span id="dbStatus" style="font-size:12px; color:var(--warning); margin-left:10px;">資料庫未連線</span></h3>
+        <div style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
             <input type="file" id="upload" accept="image/*" style="display:none">
             <button class="btn" style="background:var(--primary)" onclick="document.getElementById('upload').click()">📁 開啟圖片</button>
-            <button class="btn" style="background:var(--warning)" onclick="applyWarp()">🪄 執行透視拉平</button>
-            <button class="btn" style="background:var(--dark)" id="authBtn">🔑 登入 Google</button>
-            <span style="font-size:11px; color:#64748b; align-self:center;">操作：拖動 4 個紅點標註名片角落，點「透視拉平」後再框選文字。</span>
+            <button class="btn" style="background:var(--primary)" id="rotateBtn" disabled>🔄 旋轉 90°</button>
+            <button class="btn" style="background:#ec4899" id="warpBtn" disabled>🪄 裁切拉伸並移除背景</button>
+            <button class="btn" style="background:var(--dark)" id="authBtn">🔑 登入並同步資料庫</button>
         </div>
         
         <div id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
-            <div id="p0" class="corner-handle" style="top:20%; left:20%"></div>
-            <div id="p1" class="corner-handle" style="top:20%; left:80%"></div>
-            <div id="p2" class="corner-handle" style="top:80%; left:80%"></div>
-            <div id="p3" class="corner-handle" style="top:80%; left:20%"></div>
+            <div id="p0" class="corner-handle" style="display:none"></div>
+            <div id="p1" class="corner-handle" style="display:none"></div>
+            <div id="p2" class="corner-handle" style="display:none"></div>
+            <div id="p3" class="corner-handle" style="display:none"></div>
         </div>
     </div>
 
     <div class="form-panel">
-        <div class="preview-box">
-            <canvas id="colorPreview" width="300" height="180"></canvas>
-            <div style="font-size:10px; color:#64748b; margin-top:5px;">校正後預檢視 (存檔用)</div>
+        <div style="text-align: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 15px;">
+            <canvas id="warpPreview" width="300" height="180" style="border-radius:4px;"></canvas>
+            <div style="font-size:11px; color:#64748b; margin-top:5px;">校正預覽 (存檔圖片)</div>
         </div>
 
         <label>姓名：</label><div class="input-group"><input type="text" id="f_name"><button class="btn btn-ocr" onclick="ocrField('f_name')">🪄</button></div>
         <label>公司：</label><div class="input-group"><input type="text" id="f_comp"><button class="btn btn-ocr" onclick="ocrField('f_comp')">🪄</button></div>
-        <label>手機 (Mobile)：</label><div class="input-group"><input type="text" id="f_mob"><button class="btn btn-ocr" onclick="ocrField('f_mob')">🪄</button></div>
-        <label>電話 (Office)：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn btn-ocr" onclick="ocrField('f_phone')">🪄</button></div>
+        <label>手機：</label><div class="input-group"><input type="text" id="f_mob"><button class="btn btn-ocr" onclick="ocrField('f_mob')">🪄</button></div>
+        <label>電話：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn btn-ocr" onclick="ocrField('f_phone')">🪄</button></div>
         <label>Email：</label><div class="input-group"><input type="text" id="f_email"><button class="btn btn-ocr" onclick="ocrField('f_email')">🪄</button></div>
-        <hr>
-        <label>關聯案號 (參照用)：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id')">🪄</button></div>
-        <label>案件簡稱 (自動帶出)：</label><div class="input-group"><input type="text" id="f_proj_name" readonly style="background:#f8fafc"></div>
-        <hr>
+        
+        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+        <label>案號 (輸入後自動帶出契約案名)：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id')">🪄</button></div>
+        <label>契約案名：</label><div class="input-group"><input type="text" id="f_proj_name" readonly style="background:#f1f5f9"></div>
+        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+
         <label>自訂 1：</label><div class="input-group"><input type="text" id="f_c1"><button class="btn btn-ocr" onclick="ocrField('f_c1')">🪄</button></div>
         <label>自訂 2：</label><div class="input-group"><input type="text" id="f_c2"><button class="btn btn-ocr" onclick="ocrField('f_c2')">🪄</button></div>
+        <label>自訂 3：</label><div class="input-group"><input type="text" id="f_c3"><button class="btn btn-ocr" onclick="ocrField('f_c3')">🪄</button></div>
         <label>備註：</label><div class="input-group"><input type="text" id="f_note"><button class="btn btn-ocr" onclick="ocrField('f_note')">🪄</button></div>
 
-        <button class="btn" style="background:var(--success); width:100%; height:45px; margin-top:10px;" id="saveBtn" disabled>💾 儲存至雲端總表</button>
+        <button class="btn" style="background:var(--success); width:100%; height:50px; margin-top:15px;" id="saveBtn" disabled>💾 儲存至雲端總表</button>
     </div>
 </div>
 
 <div id="monitor">
     <div class="mon-header" onclick="toggleMonitor()">
-        <span>🖥️ 系統監視窗 v5.5 [工作站模式]</span>
-        <span id="monToggleBtn">[收合]</span>
+        <span>🖥️ 系統監視窗 v6.5 [動態資料連動]</span>
+        <span id="monBtn">[收合]</span>
     </div>
-    <div id="logBody">系統已就緒。</div>
+    <div id="logBody">請點擊登入以同步案號資料庫。</div>
 </div>
 
 <script>
-    // --- 📊 案號參照數據 (擷取自 CSV) ---
-    const projectData = {
-        "P10001": "美崙工業區照明人行空間改善",
-        "P10002": "縱谷鯉魚潭",
-        "P10003": "玉里圓環都心規劃",
-        "P9907": "南竿清水濕地",
-        "P9909": "楊梅景觀綱要"
-        // 建議此處可由代碼讀取整份 CSV 轉為 JSON
-    };
-
+    // --- ⚙️ 雲端外部配置 ---
     const CLIENT_ID = "615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com";
-    const TARGET_FILE_NAME = "惇陽名片資料庫";
+    const DB_SHEET_ID = "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE"; // 您提供的案例地圖文件
+    const TARGET_FILE_NAME = "惇陽名片資料庫"; // 存檔目標文件
+
     let accessToken = null;
     let tokenClient;
+    let dbProjects = {}; // 用於存放從 Google Sheet 抓取的資料
 
     const canvas = document.getElementById('mainCanvas');
     const ctx = canvas.getContext('2d');
-    const cpCanvas = document.getElementById('colorPreview');
-    const cpCtx = cpCanvas.getContext('2d');
+    const wpCanvas = document.getElementById('warpPreview');
+    const wpCtx = wpCanvas.getContext('2d');
     let img = new Image();
-    let corners = []; // 儲存 4 個點座標
+    let imgRotation = 0;
 
+    // --- 監視窗與 Log ---
+    function toggleMonitor() {
+        const mon = document.getElementById('monitor');
+        mon.classList.toggle('minimized');
+        document.getElementById('monBtn').innerText = mon.classList.contains('minimized') ? "[展開]" : "[收合]";
+    }
     function log(tag, msg) {
         document.getElementById('logBody').innerHTML += `<div>[${tag}] ${msg}</div>`;
         document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
     }
 
-    function toggleMonitor() {
-        const mon = document.getElementById('monitor');
-        mon.classList.toggle('minimized');
-        document.getElementById('monToggleBtn').innerText = mon.classList.contains('minimized') ? "[展開]" : "[收合]";
-    }
-
-    // --- 案號查找邏輯 ---
-    function lookupProject() {
-        const id = document.getElementById('f_proj_id').value.trim();
-        if (projectData[id]) {
-            document.getElementById('f_proj_name').value = projectData[id];
-            log("DATA", `案號匹配成功：${projectData[id]}`);
-        } else {
-            document.getElementById('f_proj_name').value = "查無此案號";
+    // --- 🚀 關鍵功能：自動抓取案例地圖資料 ---
+    async function loadProjectDatabase() {
+        log("SYNC", "正在從雲端讀取案例地圖資料庫...");
+        try {
+            // 讀取 A (案號) 與 D (契約案名) 欄位
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: DB_SHEET_ID,
+                range: 'A:D', // 讀取前四欄
+            });
+            const rows = response.result.values;
+            if (rows && rows.length > 0) {
+                dbProjects = {};
+                rows.forEach((row, index) => {
+                    if (index === 0) return; // 跳過標題行
+                    const id = row[0] ? row[0].trim() : null;
+                    const name = row[3] ? row[3].trim() : (row[2] ? row[2].trim() : "未命名案件");
+                    if (id) dbProjects[id] = name;
+                });
+                const count = Object.keys(dbProjects).length;
+                log("SUCCESS", `已成功同步 ${count} 筆案件資料！`);
+                document.getElementById('dbStatus').innerText = "資料庫已同步";
+                document.getElementById('dbStatus').style.color = "var(--success)";
+            }
+        } catch (e) {
+            log("ERROR", "無法讀取案例地圖，請確認檔案分享權限為『任何知道連結的人』。");
         }
     }
 
-    // --- 4 點透視校正邏輯 ---
-    const handles = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3')];
-    handles.forEach((h, idx) => {
-        h.onmousedown = (e) => {
+    function lookupProject() {
+        const id = document.getElementById('f_proj_id').value.trim();
+        if (dbProjects[id]) {
+            document.getElementById('f_proj_name').value = dbProjects[id];
+            log("DATA", `案號匹配：${dbProjects[id]}`);
+        } else {
+            document.getElementById('f_proj_name').value = "查無對應案名";
+        }
+    }
+
+    // --- 影像控制與 4 點定位 ---
+    const pEls = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3')];
+    
+    document.getElementById('upload').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            img.onload = () => {
+                imgRotation = 0;
+                pEls.forEach((p, i) => {
+                    p.style.display = 'block';
+                    p.style.left = (i==0 || i==3 ? 20 : 80) + '%';
+                    p.style.top = (i==0 || i==1 ? 20 : 80) + '%';
+                });
+                renderAll();
+                document.getElementById('rotateBtn').disabled = false;
+                document.getElementById('warpBtn').disabled = false;
+                log("IMG", "圖片已載入。請移動紅點標註角落後執行裁切。");
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+
+    function renderAll() {
+        const rot = (imgRotation / 90) % 2 !== 0;
+        canvas.width = rot ? img.height : img.width;
+        canvas.height = rot ? img.width : img.height;
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(imgRotation * Math.PI / 180);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        ctx.restore();
+    }
+
+    document.getElementById('rotateBtn').onclick = () => {
+        imgRotation = (imgRotation + 90) % 360;
+        renderAll();
+    };
+
+    document.getElementById('warpBtn').onclick = () => {
+        log("PROCESS", "裁切並生成預覽...");
+        const container = document.getElementById('canvasContainer').getBoundingClientRect();
+        const pts = pEls.map(p => ({
+            x: (p.offsetLeft / container.width) * canvas.width,
+            y: (p.offsetTop / container.height) * canvas.height
+        }));
+        const minX = Math.min(...pts.map(p=>p.x)), maxX = Math.max(...pts.map(p=>p.x));
+        const minY = Math.min(...pts.map(p=>p.y)), maxY = Math.max(...pts.map(p=>p.y));
+        
+        wpCtx.fillStyle = "#fff";
+        wpCtx.fillRect(0,0,300,180);
+        wpCtx.drawImage(canvas, minX, minY, maxX-minX, maxY-minY, 0, 0, 300, 180);
+        log("SUCCESS", "背景已捨棄。現在可以開始框選辨識。");
+        document.getElementById('saveBtn').disabled = false;
+    };
+
+    pEls.forEach(p => {
+        p.onmousedown = (e) => {
             const move = (me) => {
                 const rect = document.getElementById('canvasContainer').getBoundingClientRect();
-                h.style.left = ((me.clientX - rect.left) / rect.width * 100) + '%';
-                h.style.top = ((me.clientY - rect.top) / rect.height * 100) + '%';
+                p.style.left = ((me.clientX - rect.left) / rect.width * 100) + '%';
+                p.style.top = ((me.clientY - rect.top) / rect.height * 100) + '%';
             };
             document.onmousemove = move;
             document.onmouseup = () => document.onmousemove = null;
         };
     });
 
-    async function applyWarp() {
-        log("IMG", "正在執行透視校正...");
-        const rect = document.getElementById('canvasContainer').getBoundingClientRect();
-        const pts = handles.map(h => ({
-            x: (parseFloat(h.style.left) / 100) * canvas.width,
-            y: (parseFloat(h.style.top) / 100) * canvas.height
-        }));
-
-        // 將扭曲區域繪製到預覽畫布並拉平
-        cpCtx.clearRect(0,0,300,180);
-        cpCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 300, 180); 
-        log("SUCCESS", "校正完成，現在您可以精準框選文字。");
-        document.getElementById('saveBtn').disabled = false;
-    }
-
-    // --- 🪄 局部 OCR ---
-    let startX, startY, isDrawing = false;
+    // --- OCR 功能 ---
+    let sX, sY, isD = false;
     canvas.onmousedown = (e) => {
         const r = canvas.getBoundingClientRect();
-        startX = (e.clientX - r.left) * (canvas.width / r.width);
-        startY = (e.clientY - r.top) * (canvas.height / r.height);
-        isDrawing = true;
+        sX = (e.clientX - r.left) * (canvas.width / r.width);
+        sY = (e.clientY - r.top) * (canvas.height / r.height);
+        isD = true;
     };
     canvas.onmousemove = (e) => {
-        if(!isDrawing) return;
-        drawBase();
+        if(!isD) return;
+        renderAll();
         const r = canvas.getBoundingClientRect();
-        let curX = (e.clientX - r.left) * (canvas.width / r.width);
-        let curY = (e.clientY - r.top) * (canvas.height / r.height);
-        ctx.strokeStyle = "red"; ctx.strokeRect(startX, startY, curX - startX, curY - startY);
+        ctx.strokeStyle = "red"; ctx.lineWidth = 2;
+        ctx.strokeRect(sX, sY, (e.clientX - r.left) * (canvas.width / r.width) - sX, (e.clientY - r.top) * (canvas.height / r.height) - sY);
     };
     canvas.onmouseup = (e) => {
-        isDrawing = false;
+        isD = false;
         const r = canvas.getBoundingClientRect();
-        let endX = (e.clientX - r.left) * (canvas.width / r.width);
-        let endY = (e.clientY - r.top) * (canvas.height / r.height);
-        window.lastRect = { x: startX, y: startY, w: endX - startX, h: endY - startY };
+        window.lastRect = { x: sX, y: sY, w: (e.clientX - r.left) * (canvas.width / r.width) - sX, h: (e.clientY - r.top) * (canvas.height / r.height) - sY };
     };
 
     async function ocrField(id) {
-        if(!window.lastRect) return alert("請先在圖上框選區域！");
+        if(!window.lastRect || Math.abs(window.lastRect.w) < 5) return alert("請先在圖上框選區域！");
         const crop = document.createElement('canvas');
         crop.width = Math.abs(window.lastRect.w); crop.height = Math.abs(window.lastRect.h);
         const cctx = crop.getContext('2d');
@@ -191,27 +247,15 @@
         const res = await Tesseract.recognize(crop, 'chi_tra+eng');
         document.getElementById(id).value = res.data.text.trim().replace(/\n/g, "");
         if(id === 'f_proj_id') lookupProject();
-        log("OCR", "填入成功");
+        log("OCR", "辨識完成並填入");
     }
 
-    // --- 影像讀取 ---
-    document.getElementById('upload').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            img.onload = () => { drawBase(); log("IMG", "圖片已載入，請調整 4 個紅點。"); };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(e.target.files[0]);
-    };
-    function drawBase() { canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0); }
-
-    // --- 💾 儲存邏輯 (修復 undefined 報錯) ---
+    // --- 💾 雲端儲存 (12 欄位) ---
     document.getElementById('saveBtn').onclick = async () => {
         if(!accessToken) return alert("請先登入！");
-        log("CLOUD", "正在上傳與存檔...");
+        log("CLOUD", "正在存檔...");
         try {
-            // 1. 先處理圖片上傳
-            const blob = await new Promise(r => cpCanvas.toBlob(r, 'image/jpeg'));
+            const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
             const metadata = { name: `名片_${document.getElementById('f_name').value || '未具名'}.jpg`, mimeType: 'image/jpeg' };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -219,32 +263,24 @@
             const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form });
             const dFile = await dr.json();
 
-            // 2. 寫入試算表 (擴充欄位)
             const row = [
                 new Date().toLocaleDateString(),
-                document.getElementById('f_name').value,
-                document.getElementById('f_comp').value,
-                document.getElementById('f_mob').value,
-                document.getElementById('f_phone').value,
-                document.getElementById('f_email').value,
-                document.getElementById('f_proj_id').value,
-                document.getElementById('f_proj_name').value,
-                document.getElementById('f_c1').value,
-                document.getElementById('f_c2').value,
-                document.getElementById('f_note').value,
-                `https://drive.google.com/file/d/${dFile.id}/view`
+                document.getElementById('f_name').value, document.getElementById('f_comp').value,
+                document.getElementById('f_mob').value, document.getElementById('f_phone').value,
+                document.getElementById('f_email').value, document.getElementById('f_proj_id').value,
+                document.getElementById('f_proj_name').value, document.getElementById('f_c1').value,
+                document.getElementById('f_c2').value, document.getElementById('f_c3').value,
+                document.getElementById('f_note').value, `https://drive.google.com/file/d/${dFile.id}/view`
             ];
 
-            // 取得或建立 Sheet
-            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and trashed=false`;
-            const sResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and trashed=false`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
             const sData = await sResp.json();
             let sheetId = sData.files.length > 0 ? sData.files[0].id : null;
 
             if(!sheetId) {
                 const cResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
                 sheetId = cResp.result.spreadsheetId;
-                const head = [["日期", "姓名", "公司", "手機", "電話", "Email", "案號", "案名", "自訂1", "自訂2", "備註", "圖片"]];
+                const head = [["日期", "姓名", "公司", "手機", "電話", "Email", "案號", "契約案名", "自訂1", "自訂2", "自訂3", "備註", "圖片"]];
                 await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: sheetId, range: 'A1', valueInputOption: 'USER_ENTERED', resource: { values: head } });
             }
 
@@ -252,14 +288,23 @@
                 spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] }
             });
 
-            log("SUCCESS", "✅ 儲存成功！");
-            alert("已成功同步至雲端試算表。");
-        } catch (e) { log("ERROR", "儲存失敗: " + e.message); }
+            log("SUCCESS", "✅ 儲存成功！"); alert("已存入資料庫");
+        } catch (e) { log("ERROR", "儲存失敗"); }
     };
 
     // --- Google 初始化 ---
     function gapiInit() { gapi.load('client', async () => { await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest', 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'] }); }); }
-    function gisInit() { tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets', callback: (resp) => { accessToken = resp.access_token; log("AUTH", "登入成功！"); } }); }
+    function gisInit() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/spreadsheets',
+            callback: (resp) => { 
+                accessToken = resp.access_token; 
+                log("AUTH", "登入成功。"); 
+                loadProjectDatabase(); // 登入後立即抓取資料庫
+            }
+        });
+    }
     document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
     window.onload = () => { gapiInit(); gisInit(); };
 </script>
