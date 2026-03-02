@@ -2,234 +2,127 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI 實驗室 - 名片智慧處理系統 v4.8.2 (自動修復版)</title>
+    <title>AI 實驗室 - 模型診斷與選取工具</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <style>
-        :root { --primary: #6366f1; --success: #10b981; --warning: #f59e0b; --dark: #0f172a; }
-        body { font-family: "Microsoft JhengHei", sans-serif; background: #f8fafc; margin: 0; padding: 15px; }
-        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 1000px; margin: auto; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
-        #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 400px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border: 2px solid #e2e8f0; }
-        canvas { max-width: 100%; height: auto; }
-        .form-panel { padding: 10px; border-left: 1px solid #f1f5f9; }
-        input[type="text"] { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        label { font-size: 12px; font-weight: bold; color: var(--dark); margin-top: 10px; display: block; }
-        .btn { padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; margin-bottom: 10px; transition: 0.2s; }
+        :root { --primary: #6366f1; --dark: #0f172a; --accent: #ec4899; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f1f5f9; margin: 0; padding: 20px; }
+        .diag-container { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-width: 900px; margin: auto; }
+        .model-selector-box { background: #f8fafc; border: 2px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        input[type="text"] { width: 70%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 5px; font-family: monospace; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
         .btn-blue { background: var(--primary); }
-        .btn-yellow { background: var(--warning); color: #fff; }
-        .btn-save { background: var(--success); width: 100%; font-size: 1.1em; margin-top: 15px; }
-        .btn:disabled { background: #94a3b8; cursor: not-allowed; opacity: 0.6; }
-        #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #0f172a; color: #34d399; padding: 12px; font-family: 'Consolas', monospace; font-size: 12px; overflow-y: auto; border-top: 4px solid var(--primary); z-index: 1000; }
-        .model-tag { background: #334155; color: #818cf8; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+        .btn-pink { background: var(--accent); }
+        #monitor { height: 400px; background: #0f172a; color: #34d399; padding: 15px; font-family: 'Consolas', monospace; font-size: 13px; overflow-y: auto; border-radius: 8px; margin-top: 20px; line-height: 1.6; }
+        .highlight { color: #f472b6; font-weight: bold; }
+        .method-tag { font-size: 10px; background: #334155; padding: 2px 5px; border-radius: 3px; margin-left: 5px; color: #94a3b8; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="workspace">
-        <h3>📸 1. 影像採集與校正 <span id="activeModelTag" class="model-tag">等待偵測...</span></h3>
-        <div style="margin-bottom: 15px;">
-            <input type="file" id="upload" accept="image/*" style="display:none">
-            <button class="btn btn-blue" onclick="document.getElementById('upload').click()">📁 選取相片</button>
-            <button class="btn btn-yellow" id="rotateBtn" disabled>🔄 旋轉</button>
-            <button class="btn btn-yellow" id="transformBtn" disabled>🪄 辨識文字 (AI 解析)</button>
-            <button class="btn btn-blue" id="authBtn">🔑 登入 Google</button>
-        </div>
-        <div id="canvasContainer">
-            <canvas id="mainCanvas"></canvas>
-        </div>
+<div class="diag-container">
+    <h2>🧪 模型清單診斷工具</h2>
+    <p style="color: #64748b;">請先點擊「🔑 登入並掃描」，系統將列出您帳號下所有可用的模型 ID。</p>
+    
+    <div class="model-selector-box">
+        <label><b>當前選定模型：</b></label><br><br>
+        <input type="text" id="manualModelInput" placeholder="請從下方列表複製 ID 填入此處...">
+        <button class="btn btn-pink" onclick="confirmModel()">✅ 確認選擇</button>
+        <p id="selectedStatus" style="font-size: 12px; color: #6366f1; margin-top: 10px;">尚未選定</p>
     </div>
 
-    <div class="form-panel">
-        <h3>📝 2. AI 智慧解析</h3>
-        <div style="text-align: center; background: #f8fafc; padding: 8px; border-radius: 8px; margin-bottom: 10px; border: 1px dashed #cbd5e1;">
-            <canvas id="colorPreview" width="300" height="180" style="border: 2px solid white; border-radius: 4px; background: #eee;"></canvas>
-            <p style="font-size: 10px; color: #64748b; margin-top: 5px;">名片存檔縮圖</p>
+    <button class="btn btn-blue" id="authBtn">🔑 1. 登入 Google 並開始掃描</button>
+    
+    <div id="monitor">
+        <div style="color: #818cf8; border-bottom: 1px solid #334155; padding-bottom: 5px; margin-bottom: 10px;">
+            [系統狀態] 等待登入以獲取 API 模型列表...
         </div>
-        <label>姓名：</label><input type="text" id="field_name">
-        <label>公司：</label><input type="text" id="field_company">
-        <label>案號：</label><input type="text" id="field_project" placeholder="例: A114001">
-        <label>電話：</label><input type="text" id="field_phone">
-        <label>Email：</label><input type="text" id="field_email">
-        <button class="btn btn-save" id="saveBtn" disabled>💾 3. 儲存至雲端總表</button>
+        <div id="logBody"></div>
     </div>
-</div>
-
-<div id="monitor">
-    <div style="border-bottom: 1px solid #1e293b; margin-bottom: 5px; color: #818cf8; font-weight: bold;">🖥️ 系統監視窗 v4.8.2 [Smart Model Discovery]</div>
-    <div id="logBody"></div>
 </div>
 
 <script>
-    // ==========================================
-    // ⚙️ 核心配置
-    // ==========================================
-    let GEMINI_API_KEY = null; 
     const CLIENT_ID = "615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com";
     const KEY_DOC_ID = "1cbhhhJbkJnrQYXnl-xgnscGR0uzZem6x7s1cI7kV6oM"; 
-    const TARGET_FILE_NAME = "惇陽名片資料庫";
-    const API_VERSION = "v1beta";
-    let DISCOVERED_MODEL = null; // 儲存自動偵測到的可用模型
-    // ==========================================
-
+    let GEMINI_API_KEY = null;
     let accessToken = null;
     let tokenClient;
-    const mainCanvas = document.getElementById('mainCanvas');
-    const ctx = mainCanvas.getContext('2d');
-    const cpCtx = document.getElementById('colorPreview').getContext('2d');
-    let img = new Image();
-    let imgRotation = 0;
+    let selectedModelID = "";
 
-    function log(tag, msg) {
+    function log(tag, msg, isHighlight = false) {
         const body = document.getElementById('logBody');
-        body.innerHTML += `<div>[${new Date().toLocaleTimeString()}] [${tag}] ${msg}</div>`;
+        const style = isHighlight ? 'class="highlight"' : '';
+        body.innerHTML += `<div ${style}>[${tag}] ${msg}</div>`;
         document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
     }
 
-    // --- ✨ 核心：自動偵測正確的模型 ID ---
-    async function autoDiscoverModel() {
-        log("SYSTEM", "正在掃描帳號支援的模型列表...");
+    // --- 核心：抓取並列出所有模型細節 ---
+    async function listAllModels() {
+        log("SCAN", "開始抓取完整模型清單...");
         try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/${API_VERSION}/models?key=${GEMINI_API_KEY}`);
-            const data = await resp.json();
-            
-            if (data.models) {
-                // 優先找 Gemma 3 (因為它有 14,400 次配額)
-                const gemma = data.models.find(m => m.name.includes('gemma-3') && m.supportedGenerationMethods.includes('generateContent'));
-                // 其次找 Gemini 1.5 Flash
-                const flash = data.models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods.includes('generateContent'));
+            // 同時檢查 v1 與 v1beta 以確保資訊最完整
+            const versions = ['v1beta', 'v1'];
+            for (let ver of versions) {
+                log("API", `正在查詢版本: ${ver}...`);
+                const resp = await fetch(`https://generativelanguage.googleapis.com/${ver}/models?key=${GEMINI_API_KEY}`);
+                const data = await resp.json();
                 
-                DISCOVERED_MODEL = gemma ? gemma.name : (flash ? flash.name : data.models[0].name);
-                
-                log("LIST", "偵測到可用模型: " + data.models.map(m => m.name.split('/')[1]).slice(0, 5).join(', '));
-                log("SUCCESS", `選定引擎：${DISCOVERED_MODEL}`);
-                document.getElementById('activeModelTag').innerText = DISCOVERED_MODEL.split('/')[1];
-                document.getElementById('transformBtn').disabled = false;
-            } else {
-                log("ERROR", "無法獲取模型清單，請確認 API Key 有效。");
+                if (data.models) {
+                    log("SUCCESS", `--- 在 ${ver} 中找到 ${data.models.length} 個模型 ---`, true);
+                    data.models.forEach(m => {
+                        const methods = m.supportedGenerationMethods.join(', ');
+                        const isGenerator = m.supportedGenerationMethods.includes('generateContent') ? "✅ 可解析" : "❌ 不支援解析";
+                        log("ID", `<span class="highlight">${m.name}</span> <span class="method-tag">${isGenerator}</span>`);
+                        // 如果包含配額表看到的關鍵字，特別標記
+                        if(m.name.includes('gemma') || m.name.includes('gemini-3')) {
+                            log("INFO", `   └─ 💡 這是您配額表中的高額度模型候選者！`);
+                        }
+                    });
+                }
             }
+            log("FINISH", "掃描結束。請複製上方 <span class='highlight'>models/xxxx</span> ID 並與我討論。", true);
         } catch (e) {
-            log("ERROR", "模型探測失敗。");
+            log("ERROR", "掃描過程發生錯誤: " + e.message);
         }
     }
 
-    // --- 🔑 從 Google Doc 讀取金鑰 ---
-    async function fetchApiKeyFromDoc() {
-        log("SYSTEM", "載入雲端金鑰...");
+    function confirmModel() {
+        selectedModelID = document.getElementById('manualModelInput').value.trim();
+        if(!selectedModelID) return alert("請輸入模型 ID");
+        document.getElementById('selectedStatus').innerText = `已選定：${selectedModelID} (準備進行解析測試)`;
+        log("SELECT", `手動設定模型為：${selectedModelID}`, true);
+    }
+
+    // --- Google 授權與金鑰讀取 ---
+    async function fetchApiKey() {
+        log("DRIVE", "正在從雲端讀取 API Key...");
         try {
             const url = `https://www.googleapis.com/drive/v3/files/${KEY_DOC_ID}/export?mimeType=text/plain`;
             const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
             if (resp.ok) {
                 GEMINI_API_KEY = (await resp.text()).trim();
-                log("SUCCESS", "金鑰載入成功。");
-                await autoDiscoverModel(); // 載入後觸發自動偵測
-            } else { log("ERROR", "讀取金鑰失敗，請檢查權限。"); }
-        } catch (e) { log("ERROR", "API 連線出錯。"); }
+                log("SUCCESS", "金鑰載入成功！啟動掃描流程...");
+                await listAllModels();
+            } else { log("ERROR", "讀取金鑰文件失敗，請確認權限。"); }
+        } catch (e) { log("ERROR", "連線失敗。"); }
     }
 
-    // --- 初始化 Google 服務 ---
-    function gapiInit() {
-        gapi.load('client', async () => {
-            await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest', 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'] });
-            log("SYSTEM", "Google 服務已就緒。");
-        });
-    }
     function gisInit() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            callback: (resp) => { accessToken = resp.access_token; log("AUTH", "授權成功！"); fetchApiKeyFromDoc(); }
+            scope: 'https://www.googleapis.com/auth/drive.readonly',
+            callback: (resp) => {
+                accessToken = resp.access_token;
+                log("AUTH", "授權成功！");
+                fetchApiKey();
+            }
         });
     }
     document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
 
-    // --- 影像處理 ---
-    document.getElementById('upload').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => { img.onload = () => { imgRotation = 0; renderImage(); document.getElementById('rotateBtn').disabled = false; }; img.src = ev.target.result; };
-        reader.readAsDataURL(e.target.files[0]);
-    };
-    function renderImage() {
-        const isRotated = (imgRotation / 90) % 2 !== 0;
-        mainCanvas.width = isRotated ? img.height : img.width; mainCanvas.height = isRotated ? img.width : img.height;
-        ctx.save(); ctx.translate(mainCanvas.width / 2, mainCanvas.height / 2); ctx.rotate(imgRotation * Math.PI / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore();
-    }
-    document.getElementById('rotateBtn').onclick = () => { imgRotation = (imgRotation + 90) % 360; renderImage(); };
-
-    // --- 🪄 調用偵測到的模型進行解析 ---
-    document.getElementById('transformBtn').onclick = async () => {
-        log("OCR", "影像文字掃描中...");
-        cpCtx.drawImage(mainCanvas, 0, 0, mainCanvas.width, mainCanvas.height, 0, 0, 300, 180);
-        const result = await Tesseract.recognize(mainCanvas, 'chi_tra+eng');
-        callAI(result.data.text);
-    };
-
-    async function callAI(ocrText) {
-        log("AI", `使用引擎 [${DISCOVERED_MODEL}] 解析中...`);
-        const url = `https://generativelanguage.googleapis.com/${API_VERSION}/${DISCOVERED_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-        
-        const prompt = `你是一個專業的名片提取助手。請從文字中提取 JSON: {"name":"","company":"","project":"","phone":"","email":""}。
-                        文字內容：${ocrText}`;
-
-        try {
-            const resp = await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
-            const data = await resp.json();
-            
-            if (data.error) { log("ERROR", "AI 請求失敗: " + data.error.message); return; }
-
-            const cleanText = data.candidates[0].content.parts[0].text.replace(/```json|```/g, "").trim();
-            const res = JSON.parse(cleanText);
-            
-            document.getElementById('field_name').value = res.name || "";
-            document.getElementById('field_company').value = res.company || "";
-            document.getElementById('field_project').value = res.project || "";
-            document.getElementById('field_phone').value = res.phone || "";
-            document.getElementById('field_email').value = res.email || "";
-            
-            log("SUCCESS", "解析完成。");
-            document.getElementById('saveBtn').disabled = false;
-        } catch (e) { log("ERROR", "解析過程發生錯誤。"); }
-    }
-
-    // --- 儲存邏輯 (Sheets/Drive) ---
-    async function getOrCreateSheet() {
-        const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-        const searchResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        const searchData = await searchResp.json();
-        if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
-        const createResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
-        const newId = createResp.result.spreadsheetId;
-        const header = [["日期", "姓名", "公司", "案號", "電話", "Email", "圖片連結"]];
-        await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: newId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: header } });
-        return newId;
-    }
-
-    document.getElementById('saveBtn').onclick = async () => {
-        log("CLOUD", "同步雲端總表...");
-        try {
-            const sheetId = await getOrCreateSheet();
-            const blob = await new Promise(res => document.getElementById('colorPreview').toBlob(res, 'image/jpeg'));
-            const metadata = { name: `名片_${document.getElementById('field_name').value}.jpg`, mimeType: 'image/jpeg' };
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', blob);
-
-            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form
-            });
-            const dFile = await dr.json();
-            const row = [new Date().toLocaleDateString(), document.getElementById('field_name').value, document.getElementById('field_company').value, document.getElementById('field_project').value, document.getElementById('field_phone').value, document.getElementById('field_email').value, `https://drive.google.com/file/d/${dFile.id}/view` ];
-            await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] } });
-            log("SUCCESS", "✅ 儲存成功！"); alert("名片資料已存入「惇陽名片資料庫」");
-        } catch (e) { log("ERROR", "儲存失敗"); }
-    };
+    window.onload = gisInit;
 </script>
-<script async defer src="https://apis.google.com/js/api.js" onload="gapiInit()"></script>
-<script async defer src="https://accounts.google.com/gsi/client" onload="gisInit()"></script>
 </body>
 </html>
