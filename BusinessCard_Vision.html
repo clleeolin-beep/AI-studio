@@ -82,27 +82,30 @@
         document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
     }
 
-    // --- ✨ 核心功能：從雲端讀取金鑰 ---
-    async function fetchApiKey() {
-        log("SYSTEM", "正在檢索系統金鑰...");
-        try {
-            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${KEY_FILE_NAME}' and trashed=false`;
-            const searchResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-            const searchData = await searchResp.json();
-
-            if (searchData.files && searchData.files.length > 0) {
-                const fileId = searchData.files[0].id;
-                const contentResp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-                    headers: { 'Authorization': 'Bearer ' + accessToken }
-                });
-                GEMINI_API_KEY = (await contentResp.text()).trim();
-                log("SUCCESS", "AI 金鑰載入成功，系統已就緒。");
-                document.getElementById('transformBtn').disabled = false;
-            } else {
-                log("ERROR", "找不到 gemini_config.txt，請確認檔案已分享給您。");
-            }
-        } catch (e) { log("ERROR", "讀取金鑰失敗: " + e.message); }
+// --- ✨ 修改後的：使用固定 File ID 讀取金鑰 ---
+async function fetchApiKey() {
+    // 這是從您提供的網址中提取的 File ID
+    const FIXED_KEY_FILE_ID = "1HRhNP9YsOSLMDEBy8v9HgE0trISt-mMP"; 
+    
+    log("SYSTEM", "正在透過固定 ID 讀取系統金鑰...");
+    try {
+        // 直接對準 ID 抓取內容，不需要搜尋
+        const contentResp = await fetch(`https://www.googleapis.com/drive/v3/files/${FIXED_KEY_FILE_ID}?alt=media`, {
+            headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        
+        if (contentResp.ok) {
+            GEMINI_API_KEY = (await contentResp.text()).trim();
+            log("SUCCESS", "AI 金鑰載入成功！系統已就緒。");
+            document.getElementById('transformBtn').disabled = false;
+        } else {
+            // 如果報錯，通常是因為使用者沒有該檔案的「檢視權限」
+            log("ERROR", "讀取失敗。請確認您是否已有該檔案的檢視權限。");
+        }
+    } catch (e) { 
+        log("ERROR", "連線至金鑰檔案失敗: " + e.message); 
     }
+}
 
     // --- Google API 初始化 ---
     function gapiLoaded() { 
@@ -210,3 +213,4 @@
 <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
+
