@@ -156,75 +156,102 @@
         log("SUCCESS", "完成。");
     }
 
-    // --- 💾 核心儲存 (強化診斷版) ---
-    document.getElementById('btn_save').onclick = async function() {
-        const btn = this;
-        btn.disabled = true; btn.innerText = "⏳ 處理中...";
-        log("SAVE", "啟動存檔...");
+// --- 請完全替換原本 script 標籤內的儲存按鈕 (btn_save) 邏輯 ---
 
-        try {
-            // 1. 上傳圖片
-            log("STEP 1", "上傳縮圖...");
-            const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
-            const metadata = { name: `名片_${document.getElementById('f_name').value || '未具名'}.jpg`, mimeType: 'image/jpeg' };
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', blob);
+document.getElementById('btn_save').onclick = async function() {
+    const btn = this;
+    btn.disabled = true; btn.innerText = "⏳ 正在處理...";
+    log("SAVE", "啟動存檔程序...");
+
+    try {
+        // 1. 上傳圖片
+        log("STEP 1", "上傳縮圖至 Google Drive...");
+        const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
+        const metadata = { 
+            name: `名片_${document.getElementById('f_name').value || '未具名'}.jpg`, 
+            mimeType: 'image/jpeg' 
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+        
+        const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { 
+            method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form 
+        });
+        const dFile = await dr.json();
+        if (dFile.error) throw dFile.error;
+        log("SUCCESS", "圖片上傳完成。");
+
+        // 2. 獲取試算表並偵測分頁名稱
+        log("STEP 2", "確認試算表與工作表名稱...");
+        const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(TARGET_FILE_NAME)}' and trashed=false`, { 
+            headers: { 'Authorization': 'Bearer ' + accessToken } 
+        });
+        const sData = await sResp.json();
+        
+        let sheetId = (sData.files && sData.files.length > 0) ? sData.files[0].id : null;
+        let firstSheetName = "";
+
+        if (!sheetId) {
+            log("SYSTEM", "建立新試算表...");
+            const cResp = await gapi.client.sheets.spreadsheets.create({ 
+                resource: { properties: { title: TARGET_FILE_NAME } } 
+            });
+            sheetId = cResp.result.spreadsheetId;
+            firstSheetName = cResp.result.sheets[0].properties.title; // ✨ 直接獲取系統建立的預設名稱
             
-            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { 
-                method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form 
+            // 寫入標題列 (使用偵測到的名稱)
+            const head = [["日期", "姓名", "公司", "手機", "電話", "Email", "案號", "案名", "自訂1", "自訂2", "自訂3", "備註", "圖片"]];
+            await gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: sheetId, range: `${firstSheetName}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: head }
             });
-            const dFile = await dr.json();
-            if(dFile.error) throw dFile.error;
-            log("SUCCESS", "圖片上傳完成。");
-
-            // 2. 獲取試算表
-            log("STEP 2", "確認總表檔案...");
-            const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(TARGET_FILE_NAME)}' and trashed=false`, { 
-                headers: { 'Authorization': 'Bearer ' + accessToken } 
-            });
-            const sData = await sResp.json();
-            if(sData.error) throw sData.error;
-
-            let sheetId = (sData.files && sData.files.length > 0) ? sData.files[0].id : null;
-
-            if(!sheetId) {
-                log("SYSTEM", "建立新試算表...");
-                const cResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
-                sheetId = cResp.result.spreadsheetId;
-                const head = [["日期", "姓名", "公司", "電話", "Email", "案號", "案名", "備註", "圖片"]];
-                await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: head } });
-            }
-
-            // 3. 寫入
-            log("STEP 3", "寫入資料列...");
-            const row = [
-                new Date().toLocaleDateString(),
-                document.getElementById('f_name').value, document.getElementById('f_comp').value,
-                document.getElementById('f_phone').value, document.getElementById('f_email').value,
-                document.getElementById('f_proj_id').value, document.getElementById('f_proj_name').value,
-                document.getElementById('f_note').value, `https://drive.google.com/file/d/${dFile.id}/view`
-            ];
-
-            const result = await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] }
-            });
-            
-            if (result.status === 200) {
-                log("SUCCESS", "✅ 儲存成功！", "var(--success)");
-                alert("儲存成功！");
-            } else { throw result; }
-
-        } catch (e) {
-            // ✨ 終極診斷邏輯：印出完整 JSON 錯誤內容
-            let errString = JSON.stringify(e);
-            log("ERROR", "儲存失敗，原始報錯內容如下：", "var(--danger)");
-            log("DEBUG", errString, "var(--warning)");
-            console.error("Full Error:", e);
-            alert("儲存失敗！詳細原因請看監視窗 [DEBUG] 標籤內容。");
+        } else {
+            // ✨ 如果檔案已存在，獲取其第一個分頁的真實名稱
+            const spreadsheet = await gapi.client.sheets.spreadsheets.get({ spreadsheetId: sheetId });
+            firstSheetName = spreadsheet.result.sheets[0].properties.title;
+            log("INFO", `偵測到工作表名稱為: [${firstSheetName}]`);
         }
-        btn.disabled = false; btn.innerText = "💾 5. 儲存至雲端總表";
-    };
+
+        // 3. 寫入資料
+        log("STEP 3", `寫入資料至 [${firstSheetName}]...`);
+        const row = [
+            new Date().toLocaleDateString(),
+            document.getElementById('f_name').value, 
+            document.getElementById('f_comp').value,
+            "", // 手機 (可選)
+            document.getElementById('f_phone').value, 
+            document.getElementById('f_email').value,
+            document.getElementById('f_proj_id').value, 
+            document.getElementById('f_proj_name').value,
+            "", "", "", // 自訂欄位
+            document.getElementById('f_note').value, 
+            `https://drive.google.com/file/d/${dFile.id}/view`
+        ];
+
+        const appendResp = await gapi.client.sheets.spreadsheets.values.append({
+            spreadsheetId: sheetId,
+            range: `${firstSheetName}!A1`, // ✨ 使用動態名稱
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            resource: { values: [row] }
+        });
+
+        if (appendResp.status === 200) {
+            log("SUCCESS", "✅ 存檔完成！資料已寫入總表。", "var(--success)");
+            alert("儲存成功！");
+        } else {
+            throw appendResp;
+        }
+
+    } catch (e) {
+        let errMsg = e.message || (e.result && e.result.error ? e.result.error.message : JSON.stringify(e));
+        log("ERROR", "儲存失敗原因: " + errMsg, "var(--danger)");
+        console.error("Full Error Info:", e);
+        alert("儲存失敗！原因：" + errMsg);
+    }
+    btn.disabled = false;
+    btn.innerText = "💾 5. 儲存至雲端總表";
+};
 
     // --- 影像控制 ---
     const pEls = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3')];
@@ -282,3 +309,4 @@
 </script>
 </body>
 </html>
+
