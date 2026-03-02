@@ -33,84 +33,31 @@
         .range-slider-container input { position: absolute; width: 100%; pointer-events: none; -webkit-appearance: none; background: none; z-index: 2; }
         .range-slider-container input::-webkit-slider-thumb { position: relative; z-index: 5; pointer-events: auto; width: 18px; height: 18px; border-radius: 50%; background: #1A5276; -webkit-appearance: none; cursor: pointer; border: 2px solid #fff; }
         .btn-export { background: #27AE60; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; font-size: 14px; }
-/* --- CSS 開始 --- */
 
-/* 1. 強制地圖彈窗（Popup）層級置頂，確保不被圓點覆蓋 */
-.maplibregl-popup {
-    z-index: 999999 !important; 
-}
+        /* 1. 強制地圖彈窗（Popup）層級置頂，確保不被圓點覆蓋 */
+        .maplibregl-popup { z-index: 999999 !important; }
+        .maplibregl-popup-content { padding: 0 !important; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; }
+        /* 2. 小窗內部容器與滾動設定 */
+        .popup-container { width: 320px; font-size: 12px; line-height: 1.5; max-height: 450px; overflow-y: auto; background: #ffffff; position: relative; }
+        /* 3. 核心功能：案名、獲獎資訊與圖片 首欄凍結 */
+        .sticky-header { position: sticky; top: 0; z-index: 10; background: #ffffff; border-bottom: 2px solid #27AE60; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .sticky-案名 { padding: 12px 15px 5px 15px; font-size: 14px; font-weight: bold; color: #27AE60; }
+        .sticky-獲獎 { padding: 0 15px 10px 15px; font-size: 11px; color: #E67E22; font-weight: bold; }
+        /* 4. 圖片自動縮放至框內 */
+        .popup-container img { width: 100% !important; height: auto !important; display: block; }
+        /* 5. 表格排版與第一列寬度修正 */
+        .popup-container .content-box { padding: 0 15px 15px 15px; } 
+        .popup-container table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .popup-container td { vertical-align: top; padding: 6px 4px; border-bottom: 1px solid #f0f0f0; }
+        .popup-container td:first-child { width: 95px; color: #1A5276; font-weight: bold; background: #f9fbfc; border-right: 1px solid #eee; padding: 6px 8px; }
 
-.maplibregl-popup-content {
-    padding: 0 !important; /* 移除內距讓圖片與凍結標題填滿 */
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-/* 2. 小窗內部容器與滾動設定 */
-.popup-container { 
-    width: 320px; 
-    font-size: 12px; 
-    line-height: 1.5; 
-    max-height: 450px; 
-    overflow-y: auto; 
-    background: #ffffff;
-    position: relative;
-}
-
-/* 3. 核心功能：案名、獲獎資訊與圖片 首欄凍結 */
-.sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: #ffffff;
-    border-bottom: 2px solid #27AE60;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.sticky-案名 {
-    padding: 12px 15px 5px 15px;
-    font-size: 14px;
-    font-weight: bold;
-    color: #27AE60;
-}
-
-.sticky-獲獎 {
-    padding: 0 15px 10px 15px;
-    font-size: 11px;
-    color: #E67E22;
-    font-weight: bold;
-}
-
-/* 4. 圖片自動縮放至框內 */
-.popup-container img { 
-    width: 100% !important; 
-    height: auto !important; 
-    display: block;
-}
-
-/* 5. 表格排版與第一列寬度修正 */
-.popup-container .content-box { padding: 0 15px 15px 15px; } 
-.popup-container table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-.popup-container td { vertical-align: top; padding: 6px 4px; border-bottom: 1px solid #f0f0f0; }
-.popup-container td:first-child { 
-    width: 95px; 
-    color: #1A5276; /* 改回藍色標題更美觀 */
-    font-weight: bold; 
-    background: #f9fbfc;
-    border-right: 1px solid #eee;
-    padding: 6px 8px; /* 增加內距 */
-}
-/* --- CSS 結束 --- */
-
-/* 自定義垂直投影按鈕樣式 */
-.maplibregl-ctrl-pitch {
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E");
-    background-size: 20px;
-    background-repeat: no-repeat;
-    background-position: center;
-}
-
+        /* 自定義垂直投影按鈕樣式 */
+        .maplibregl-ctrl-pitch {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E");
+            background-size: 20px;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
     </style>
 </head>
 <body>
@@ -212,7 +159,7 @@ const esriStyle = {
         "esri": { 
             "type": "raster", 
             "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], 
-            "tileSize": 256, // 保持 256 或試著改為 512 觀察色差
+            "tileSize": 256,
             "attribution": "Esri" 
         },
         "t-rgb": terrainRGB
@@ -222,7 +169,7 @@ const esriStyle = {
 };
     var map = new maplibregl.Map({ container: 'map', style: osmStyle, center: [121.0, 23.8], zoom: 7, pitch: 45 });
     map.addControl(new maplibregl.NavigationControl());
-map.on('click', (e) => {});
+
 // 在原生的 NavigationControl 容器中插入按鈕
 const navGroup = document.querySelector('.maplibregl-ctrl-group');
 if (navGroup) {
@@ -235,22 +182,20 @@ if (navGroup) {
     navGroup.appendChild(pitchBtn);
 
     // 2. 開關立體地形按鈕
-    let terrainEnabled = true; // 預設開啟
+    let terrainEnabled = true;
     const terrainBtn = document.createElement('button');
     terrainBtn.className = 'maplibregl-ctrl-icon maplibregl-ctrl-terrain';
     terrainBtn.type = 'button';
     terrainBtn.title = '開啟/關閉立體地形';
-    terrainBtn.innerHTML = '⛰️'; // 使用 Emoji 或自定義圖示
+    terrainBtn.innerHTML = '⛰️';
     terrainBtn.style.fontSize = '16px';
     
     terrainBtn.onclick = () => {
         terrainEnabled = !terrainEnabled;
         if (terrainEnabled) {
-            // 重新啟用地形 (使用定義好的數據源)
             map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
-            terrainBtn.style.background = '#eee'; // 按下狀態
+            terrainBtn.style.background = '#eee';
         } else {
-            // 關閉地形
             map.setTerrain(null);
             terrainBtn.style.background = '#fff';
         }
@@ -263,51 +208,69 @@ if (navGroup) {
     const levels = [0, 1e6, 1e7, 5e7, 1e8, 5e8, 1e12];
 
     function loadSpreadsheetData() {
-    const ssId = "19GZRlk-nx6xR-EL3JtS6bBrB_POCPIQgQdeKVN5O7C8";
-    const sheets = Object.keys(categoryColors);
-    let loaded = 0;
-    sheets.forEach((name, idx) => {
-        const cbName = `cb_${idx}`;
+        // 更新為新的 Google Sheet ID
+        const ssId = "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE";
+        const sheetName = "公司已結案案件";
+        const cbName = `cb_0`;
+
         window[cbName] = (json) => {
             if (json.table) {
                 json.table.rows.forEach(row => {
                     const get = (i) => (row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
-                    let wkt = String(get(0));
-                    if (!wkt || wkt.includes("座標") || wkt === "--") return;
+                    
+                    // 根據新欄位：座標在 Index 1
+                    let wkt = String(get(1));
+                    if (!wkt || wkt.includes("座標") || wkt === "--" || wkt === "null") return;
 
-                    // 依序抓取 17 個欄位 (A-Q)
+                    // 合併獲獎資訊 (Index 15: 工程會金質獎, Index 16: 其他獲獎)
+                    let awards = [];
+                    if (get(15)) awards.push(String(get(15)));
+                    if (get(16)) awards.push(String(get(16)));
+
+                    // 合併起始與結束日期 (Index 22: 起始, Index 23: 結束)
+                    let startD = get(22);
+                    let endD = get(23);
+                    let dateStr = "";
+                    if (startD || endD) {
+                        dateStr = `${startD || '--'} - ${endD || '--'}`;
+                    }
+
+                    // 重新定義抓取的 26 個欄位
                     projectData.push({
-                        wkt: wkt,                    // A: 座標
-                        案號: get(1),                // B
-                        案件簡稱: get(2),            // C
-                        契約案名: get(3),            // D
-                        工程名稱: get(4),            // E
-                        業主: get(5),                // F
-                        所在位置: get(6),            // G
-                        面積規模: get(7),            // H
-                        經費: get(8),                // I
-                        經費值: parseFloat(String(get(8)).replace(/[^0-9.]/g, "")) || 0,
-                        實績照片: get(9),            // J
-                        案件屬性: get(10),           // K
-                        獲獎資訊: get(11),           // L
-                        執行組別: get(12),           // M
-                        計畫主持人: get(13),         // N
-                        關鍵法條: get(14),           // O
-                        起訖日期: get(15),           // P
-                        備註: get(16),               // Q
-                        分類: name,
-                        縣市: String(get(6)).substring(0, 3),
+                        wkt: wkt,                                    // 座標
+                        案號: get(0),                                // A
+                        案件簡稱: get(2),                            // C
+                        契約案名: get(3),                            // D
+                        工程名稱: get(4),                            // E
+                        業主: get(5),                                // F
+                        縣市: String(get(6)),                        // G (用於篩選)
+                        所在位置: String(get(6)) + String(get(7)),   // G + H (縣市+鄉鎮市區)
+                        面積規模: get(8),                            // I
+                        經費: get(9),                                // J (服務經費)
+                        經費值: parseFloat(String(get(9)).replace(/[^0-9.]/g, "")) || 0,
+                        實績照片: get(11),                           // L
+                        分類: get(12) || "未分類",                   // M (類別，對應地圖顏色)
+                        類型: get(13),                               // N
+                        案件屬性: get(14),                           // O
+                        獲獎資訊: awards.join(" / "),                // P, Q 合併
+                        執行組別: get(17),                           // R
+                        計畫主持人: get(18),                         // S
+                        協同主持人: get(19),                         // T
+                        專案經理: get(20),                           // U
+                        起訖日期: dateStr,                           // W, X 合併
+                        案件狀態: get(24),                           // Y
+                        備註: get(25),                               // Z
                         selected: true
                     });
                 });
             }
-            if (++loaded === sheets.length) finalize();
+            finalize();
         };
+
         const s = document.createElement('script');
-        s.src = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(name)}`;
+        s.src = `https://docs.google.com/spreadsheets/d/${ssId}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(sheetName)}`;
         document.body.appendChild(s);
-    });
-}
+    }
 
     function finalize() {
         document.getElementById('status').style.display = 'none';
@@ -323,14 +286,14 @@ function createProjectMarker(p) {
     const el = document.createElement('div');
     const color = categoryColors[p.分類] || "#333";
     
-    // 設定點位樣式，zIndex 設為 0
+    // 設定點位樣式
     el.style.width = '14px';
     el.style.height = '14px';
     el.style.backgroundColor = color;
     el.style.borderRadius = '50%';
     el.style.border = '2px solid #ffffff';
     el.style.cursor = 'pointer';
-    el.style.zIndex = '0'; // 點位層級最低
+    el.style.zIndex = '0';
     el.style.boxShadow = '0 0 6px rgba(0,0,0,0.6)';
 
     let imageUrl = p.實績照片;
@@ -338,43 +301,46 @@ function createProjectMarker(p) {
         const fileIdMatch = imageUrl.match(/[-\w]{25,}/);
         if (fileIdMatch) imageUrl = `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${fileIdMatch[0]}`;
     }
-let startDate = "--";
-let endDate = "--";
-if (p.起訖日期 && p.起訖日期.includes('-')) {
-    const parts = p.起訖日期.split('-');
-    startDate = parts[0].trim();
-    endDate = parts[1].trim();
-} else if (p.起訖日期) {
-    startDate = p.起訖日期;
-}
-// 重新編排 HTML：案名與圖片置頂凍結
-const popupHtml = `
-    <div class="popup-container">
-        <div class="sticky-header">
-            <div class="sticky-案名">${p.契約案名 || p.案件簡稱}</div>
-            ${p.獲獎資訊 ? `<div class="sticky-獲獎">🏆 ${p.獲獎資訊}</div>` : ''}
-            ${imageUrl ? `<img src="${imageUrl}" onerror="this.style.display='none'">` : ''}
-        </div>
-        <div class="content-box">
-<table>
-                <tr><td>案號</td><td>${p.案號}</td></tr>
-                <tr><td>案件簡稱</td><td>${p.案件簡稱}</td></tr>
-                <tr><td>工程名稱</td><td>${p.工程名稱}</td></tr>
-                <tr><td>業主</td><td>${p.業主}</td></tr>
-                <tr><td>開始日期</td><td>${startDate}</td></tr>
-                <tr><td>結束日期</td><td>${endDate}</td></tr>
-                <tr><td>所在位置</td><td>${p.所在位置}</td></tr>
-                <tr><td>面積規模</td><td>${p.面積規模}</td></tr>
-                <tr><td>經費</td><td>${p.經費}</td></tr>
-                <tr><td>執行組別</td><td>${p.執行組別}</td></tr>
-                <tr><td>計畫主持人</td><td>${p.計畫主持人}</td></tr>
-                <tr><td>關鍵法條</td><td>${p.關鍵法條}</td></tr>
-                <tr><td>備註</td><td>${p.備註}</td></tr>
-                <tr><td>實績分類</td><td>${p.分類}</td></tr>
+
+    let startDate = "--";
+    let endDate = "--";
+    if (p.起訖日期 && p.起訖日期.includes('-')) {
+        const parts = p.起訖日期.split('-');
+        startDate = parts[0].trim();
+        endDate = parts[1].trim();
+    }
+
+    // 更新 Popup HTML 欄位對應
+    const popupHtml = `
+        <div class="popup-container">
+            <div class="sticky-header">
+                <div class="sticky-案名">${p.契約案名 || p.案件簡稱}</div>
+                ${p.獲獎資訊 ? `<div class="sticky-獲獎">🏆 ${p.獲獎資訊}</div>` : ''}
+                ${imageUrl ? `<img src="${imageUrl}" onerror="this.style.display='none'">` : ''}
+            </div>
+            <div class="content-box">
+                <table>
+                    <tr><td>案號</td><td>${p.案號}</td></tr>
+                    <tr><td>案件簡稱</td><td>${p.案件簡稱}</td></tr>
+                    <tr><td>工程名稱</td><td>${p.工程名稱}</td></tr>
+                    <tr><td>業主</td><td>${p.業主}</td></tr>
+                    <tr><td>開始日期</td><td>${startDate}</td></tr>
+                    <tr><td>結束日期</td><td>${endDate}</td></tr>
+                    <tr><td>所在位置</td><td>${p.所在位置}</td></tr>
+                    <tr><td>面積規模</td><td>${p.面積規模}</td></tr>
+                    <tr><td>服務經費</td><td>${p.經費}</td></tr>
+                    <tr><td>執行組別</td><td>${p.執行組別}</td></tr>
+                    <tr><td>計畫主持人</td><td>${p.計畫主持人}</td></tr>
+                    <tr><td>協同主持人</td><td>${p.協同主持人}</td></tr>
+                    <tr><td>專案經理</td><td>${p.專案經理}</td></tr>
+                    <tr><td>類型</td><td>${p.類型}</td></tr>
+                    <tr><td>案件屬性</td><td>${p.案件屬性}</td></tr>
+                    <tr><td>實績分類</td><td>${p.分類}</td></tr>
+                    <tr><td>備註</td><td>${p.備註}</td></tr>
                 </table>
             </div>
         </div>`;
-// Marker 獨立建立，點擊才觸發 Popup ---
+
     const marker = new maplibregl.Marker({ 
         element: el, 
         anchor: 'center' 
@@ -383,11 +349,9 @@ const popupHtml = `
     el.addEventListener('click', (e) => {
         e.stopPropagation(); 
         
-        // 先關閉全地圖所有現有的 Popup (實作排他性)
         const activePopups = document.getElementsByClassName('maplibregl-popup');
         while (activePopups[0]) { activePopups[0].remove(); }
 
-        // 在該座標處建立單一 Popup
         new maplibregl.Popup({
             offset: 40, 
             maxWidth: '340px',
@@ -398,11 +362,11 @@ const popupHtml = `
         .setLngLat(coords)
         .setHTML(popupHtml)
         .addTo(map);
-       
     });
 
     return marker;
 }
+
 function handleDateFilter() {
     const startV = document.getElementById('filter-start-year').value;
     const endV = document.getElementById('filter-end-year').value;
@@ -410,6 +374,7 @@ function handleDateFilter() {
     document.getElementById('end-year-display').innerText = `結束年份：${endV} 以下`;
     filterProjects();
 }
+
     function parseWKT(wkt) {
         try {
             let match = wkt.includes("POINT") ? wkt.match(/\(([^)]+)\)/)[1].trim().split(/\s+/) : wkt.match(/\(\(([^,]+)/)[1].trim().split(/\s+/);
@@ -423,8 +388,6 @@ function handleDateFilter() {
         if (projectData[i].selected) projectData[i].marker.addTo(map);
         else projectData[i].marker.remove();
     }
-
-// --- JavaScript 開始 ---
 
 function filterProjects() {
     const city = document.getElementById('city-filter').value;
@@ -445,22 +408,22 @@ function filterProjects() {
         let mType = checkedTypes.includes(p.分類);
         let mPrice = (p.經費值 >= minV && p.經費值 <= maxV);
         let mSearch = !searchStr || (p.案件簡稱 + p.業主 + p.計畫主持人 + p.案號).toLowerCase().includes(searchStr);
-let mYearMatch = true;
-        if (p.起訖日期 && p.起訖日期.includes('.')) {
+        let mYearMatch = true;
+
+        if (p.起訖日期 && p.起訖日期.includes('-')) {
             const years = p.起訖日期.match(/\d{4}/g); 
             if (years && years.length >= 1) {
                 const projectStart = parseInt(years[0]);
                 const projectEnd = years.length > 1 ? parseInt(years[1]) : projectStart;
-
-                // 嚴格篩選：開始時間必須在範圍後，結束時間必須在範圍前
                 mYearMatch = (projectStart >= filterStartY && projectEnd <= filterEndY);
             }
         }
-if (mSpatial && mType && mPrice && mSearch && mYearMatch) {
+
+        if (mSpatial && mType && mPrice && mSearch && mYearMatch) {
             count++;
             if (p.selected) p.marker.addTo(map); else p.marker.remove();
             let div = document.createElement('div');
-            div.className = 'result-item'; div.style.borderLeft = `6px solid ${categoryColors[p.分類]}`;
+            div.className = 'result-item'; div.style.borderLeft = `6px solid ${categoryColors[p.分類] || '#333'}`;
             div.innerHTML = `
                 <div style="display:flex;align-items:center;">
                     <input type="checkbox" ${p.selected?'checked':''} onclick="toggleSelect(event,${index})" style="margin-right:10px;">
@@ -474,6 +437,7 @@ if (mSpatial && mType && mPrice && mSearch && mYearMatch) {
     });
     document.getElementById('result-count').innerText = `符合： ${count} 筆`;
 }
+
     // 繪製功能
     let drawPoints = [];
     function startDraw() {
@@ -497,13 +461,9 @@ if (mSpatial && mType && mPrice && mSearch && mYearMatch) {
 
 function switchStyle(val) {
     map.setStyle(val === 'osm' ? osmStyle : esriStyle);
-    
     map.once('style.load', () => {
-        // 先清除舊標點
         projectData.forEach(p => { if (p.marker) p.marker.remove(); });
-        // 重新生成帶有正確 zIndex 的標點
         projectData.forEach(p => { p.marker = createProjectMarker(p); });
-        // 執行篩選顯示
         filterProjects();
 
         if (val === 'esri' && map.getLayer('esri-layer')) {
@@ -513,17 +473,11 @@ function switchStyle(val) {
 }
     function toggleAccordion(h, id) { h.classList.toggle('active'); document.getElementById(id).classList.toggle('show'); }
     function handleSlider() { let s1 = document.getElementById('min-slider'), s2 = document.getElementById('max-slider'); if (parseInt(s1.value) > parseInt(s2.value)) [s1.value, s2.value] = [s2.value, s1.value]; document.getElementById('price-display').innerText = `經費：${levelNames[s1.value]} ~ ${levelNames[s2.value]}`; filterProjects(); }
-    function handleYearSlider() {
-    let s1 = document.getElementById('min-year'), s2 = document.getElementById('max-year');
-    if (parseInt(s1.value) > parseInt(s2.value)) [s1.value, s2.value] = [s2.value, s1.value];
-    document.getElementById('year-display').innerText = `年份：${s1.value} ~ ${s2.value}`;
-    filterProjects(); // 觸發篩選
-}
-function handleCityFilter() { if (polygonFilter) clearSpatialFilter(); filterProjects(); }
+    function handleCityFilter() { if (polygonFilter) clearSpatialFilter(); filterProjects(); }
     function toggleAllTypes(c) { document.querySelectorAll('#type-checkbox-group input').forEach(i => i.checked = c); filterProjects(); }
+
 function exportToCSV() {
     let toExport = projectData.filter(p => p.selected && p.marker.getElement().parentElement);
-    // 修正：調整為對應 17 欄位的新變數名稱
     let csv = "\ufeff案號,分類,案件簡稱,契約案名,業主,所在位置,經費,計畫主持人\n" + 
               toExport.map(p => `"${p.案號}","${p.分類}","${p.案件簡稱}","${p.契約案名}","${p.業主}","${p.所在位置}","${p.經費}","${p.計畫主持人}"`).join("\n");
     
@@ -535,82 +489,7 @@ function exportToCSV() {
 
     const container = document.getElementById('type-checkbox-group');
     for (let cat in categoryColors) { container.innerHTML += `<label class="checkbox-item"><input type="checkbox" value="${cat}" checked onchange="filterProjects()"> ${cat}</label>`; }
-async function exportSatelliteImage() {
-    if (!polygonFilter) {
-        alert("請先完成第一階段的「繪製篩選區域」！");
-        return;
-    }
 
-    const statusEl = document.getElementById('status');
-    statusEl.style.display = 'block';
-    statusEl.innerText = "正在計算瓦片並準備拼接圖片...";
-
-    try {
-        // 1. 取得圈選範圍的邊界 (BBox)
-        const bbox = turf.bbox(polygonFilter); // [minLng, minLat, maxLng, maxLat]
-        const zoom = 18; // 設定最精細尺度 (通常為 18 或 19)
-
-        // 2. 座標轉瓦片索引 (經緯度轉 Tile XYZ)
-        const lon2tile = (lon, zoom) => Math.floor((lon + 180) / 360 * Math.pow(2, zoom));
-        const lat2tile = (lat, zoom) => Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
-
-        const startX = lon2tile(bbox[0], zoom);
-        const endX = lon2tile(bbox[2], zoom);
-        const startY = lat2tile(bbox[3], zoom);
-        const endY = lat2tile(bbox[1], zoom);
-
-        const width = (endX - startX + 1) * 256;
-        const height = (endY - startY + 1) * 256;
-
-        if (width > 8000 || height > 8000) {
-            if (!confirm("範圍過大，生成的圖片解析度極高，可能會造成瀏覽器當機。是否繼續？")) {
-                statusEl.style.display = 'none';
-                return;
-            }
-        }
-
-        // 3. 建立畫布
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-
-        // 4. 下載並拼接瓦片 (使用 Esri 衛星圖源)
-        const tilePromises = [];
-        for (let x = startX; x <= endX; x++) {
-            for (let y = startY; y <= endY; y++) {
-                const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`;
-                tilePromises.push(new Promise((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin = "Anonymous";
-                    img.onload = () => {
-                        ctx.drawImage(img, (x - startX) * 256, (y - startY) * 256);
-                        resolve();
-                    };
-                    img.onerror = resolve; // 即使某塊失敗也繼續
-                    img.src = url;
-                }));
-            }
-        }
-
-        await Promise.all(tilePromises);
-
-        // 5. 導出圖片
-        const link = document.createElement('a');
-        link.download = `惇陽衛星影像_${new Date().getTime()}.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-
-        statusEl.innerText = "匯出成功！";
-        setTimeout(() => statusEl.style.display = 'none', 2000);
-
-    } catch (err) {
-        console.error(err);
-        alert("匯出失敗，請縮小圈選範圍後再試一次。");
-        statusEl.style.display = 'none';
-    }
-}
-    loadSpreadsheetData();
 async function exportSatelliteImageBatch() {
     if (!polygonFilter) { alert("請先完成第一階段的「繪製篩選區域」！"); return; }
     const statusEl = document.getElementById('status');
@@ -660,13 +539,15 @@ async function exportSatelliteImageBatch() {
                 link.download = `惇陽衛星圖_${cx+1}_${cy+1}.png`;
                 link.href = canvas.toDataURL("image/png");
                 link.click();
-                await new Promise(r => setTimeout(r, 800)); // 防止瀏覽器阻擋
+                await new Promise(r => setTimeout(r, 800)); 
             }
         }
         statusEl.innerText = "批量匯出完成！";
         setTimeout(() => statusEl.style.display = 'none', 2000);
     } catch (err) { alert("匯出失敗。"); statusEl.style.display = 'none'; }
 }
+
+    loadSpreadsheetData();
 </script>
 </body>
 </html>
