@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>名片數位校正系統 v7.4</title>
+    <title>名片數位校正系統 v7.5</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -10,31 +10,23 @@
         :root { --primary: #4f46e5; --success: #10b981; --warning: #f59e0b; --dark: #0f172a; --danger: #ef4444; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f1f5f9; margin: 0; padding: 10px; }
         .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 1350px; margin: auto; display: grid; grid-template-columns: 1fr 450px; gap: 15px; }
-        
-        /* 畫布區 */
         #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 600px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid #e2e8f0; overflow: hidden; }
         canvas { max-width: 100%; height: auto; cursor: crosshair; }
         .corner-handle { position: absolute; width: 22px; height: 22px; background: var(--danger); border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: move; z-index: 100; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-
-        /* 表單區 */
         .form-panel { padding: 10px; border-left: 1px solid #e2e8f0; overflow-y: auto; max-height: 90vh; }
         .input-group { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
         input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
         label { font-size: 11px; font-weight: bold; color: var(--dark); display: block; margin-bottom: 3px; }
         .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; font-size: 13px; transition: 0.2s; }
         .btn-ocr { background: var(--warning); width: 45px; height: 45px; font-size: 18px; flex-shrink: 0; }
-        
-        /* 監視窗 */
-        #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #0f172a; color: #34d399; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; z-index: 2000; border-top: 4px solid var(--primary); transition: 0.3s; }
-        .mon-header { display: flex; justify-content: space-between; cursor: pointer; border-bottom: 1px solid #1e293b; padding-bottom: 5px; }
-        .mon-min { height: 35px !important; }
+        #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #0f172a; color: #34d399; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; z-index: 2000; border-top: 4px solid var(--primary); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="workspace">
-        <h3 style="margin-top:0;">📸 1. 影像校正與裁切 <span id="dbTag" style="color:var(--danger); font-size:12px;">● 未連線</span></h3>
+        <h3 style="margin-top:0;">📸 1. 影像校正 <span id="dbTag" style="color:var(--danger); font-size:12px;">● 未連線</span></h3>
         <div style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
             <input type="file" id="upload" accept="image/*" style="display:none">
             <button class="btn" style="background:var(--primary)" id="btn_file">📁 1.開啟圖片</button>
@@ -42,7 +34,6 @@
             <button class="btn" style="background:#ec4899" id="btn_warp" disabled>🪄 3.裁切拉平</button>
             <button class="btn" style="background:var(--dark)" id="btn_auth">🔑 4.登入與授權</button>
         </div>
-        
         <div id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
             <div id="p0" class="corner-handle" style="display:none"></div>
@@ -53,33 +44,24 @@
     </div>
 
     <div class="form-panel">
-        <div style="text-align: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 15px;">
-            <canvas id="warpPreview" width="300" height="180"></canvas>
-            <div style="font-size:11px; color:#64748b; margin-top:5px;">存檔預覽</div>
+        <div style="text-align: center; margin-bottom: 15px;">
+            <canvas id="warpPreview" width="300" height="180" style="border-radius:4px; border:1px solid #ddd;"></canvas>
+            <div style="font-size:11px; color:#64748b; margin-top:5px;">存檔縮圖</div>
         </div>
-
         <label>姓名：</label><div class="input-group"><input type="text" id="f_name"><button class="btn btn-ocr" onclick="ocrField('f_name')">🪄</button></div>
         <label>公司：</label><div class="input-group"><input type="text" id="f_comp"><button class="btn btn-ocr" onclick="ocrField('f_comp')">🪄</button></div>
-        <label>手機/電話 (放寬格式)：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn btn-ocr" onclick="ocrField('f_phone')">🪄</button></div>
+        <label>手機/電話：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn btn-ocr" onclick="ocrField('f_phone')">🪄</button></div>
         <label>Email：</label><div class="input-group"><input type="text" id="f_email"><button class="btn btn-ocr" onclick="ocrField('f_email')">🪄</button></div>
-        
-        <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
-        <label>案號 (輸入自動連動案名)：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id')">🪄</button></div>
+        <label>案號：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id')">🪄</button></div>
         <label>契約案名：</label><div class="input-group"><input type="text" id="f_proj_name" readonly style="background:#f8fafc"></div>
-        <hr style="margin:15px 0; border:0; border-top:1px solid #eee;">
-
-        <label>自訂 1：</label><div class="input-group"><input type="text" id="f_c1"><button class="btn btn-ocr" onclick="ocrField('f_c1')">🪄</button></div>
-        <label>自訂 2：</label><div class="input-group"><input type="text" id="f_c2"><button class="btn btn-ocr" onclick="ocrField('f_c2')">🪄</button></div>
-        <label>自訂 3：</label><div class="input-group"><input type="text" id="f_c3"><button class="btn btn-ocr" onclick="ocrField('f_c3')">🪄</button></div>
         <label>備註：</label><div class="input-group"><input type="text" id="f_note"><button class="btn btn-ocr" onclick="ocrField('f_note')">🪄</button></div>
-
         <button class="btn" style="background:var(--success); width:100%; height:50px; margin-top:15px;" id="btn_save" disabled>💾 5. 儲存至雲端總表</button>
     </div>
 </div>
 
 <div id="monitor">
-    <div class="mon-header" onclick="document.getElementById('monitor').classList.toggle('mon-min')">
-        <span>🖥️ 系統監視窗 v7.4 [終極穩定版]</span>
+    <div class="mon-header" onclick="this.parentElement.style.height = this.parentElement.style.height==='35px'?'160px':'35px'" style="display:flex; justify-content:space-between; cursor:pointer;">
+        <span>🖥️ 系統監視窗 v7.5 [全視界診斷版]</span>
         <span>[收合/展開]</span>
     </div>
     <div id="logBody" style="overflow-y:auto; height:120px; margin-top:5px;"></div>
@@ -102,50 +84,47 @@
 
     function log(tag, msg, color="#34d399") {
         const lb = document.getElementById('logBody');
-        lb.innerHTML += `<div style="color:${color}">[${tag}] ${msg}</div>`;
+        lb.innerHTML += `<div style="color:${color}">[${new Date().toLocaleTimeString()}] [${tag}] ${msg}</div>`;
         lb.scrollTop = lb.scrollHeight;
     }
 
-    // --- 🚀 案號資料同步 ---
+    // --- 🚀 案號同步 ---
     async function syncDatabase() {
-        log("SYNC", "正在同步雲端案號資料庫...");
+        log("SYNC", "同步案號資料庫...");
         try {
-            const response = await gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: DB_SHEET_ID, range: 'A:D',
-            });
-            const rows = response.result.values;
-            if (rows) {
+            const resp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: DB_SHEET_ID, range: 'A:D' });
+            if (resp.result.values) {
                 dbProjects = {};
-                rows.forEach((row, idx) => { if(idx>0 && row[0]) dbProjects[row[0].trim()] = row[3] || row[2] || "未知案名"; });
+                resp.result.values.forEach((row, idx) => { if(idx>0 && row[0]) dbProjects[row[0].trim()] = row[3] || row[2] || "未知案名"; });
                 log("SUCCESS", `已載入 ${Object.keys(dbProjects).length} 筆案件。`);
-                document.getElementById('dbTag').innerText = "● 雲端連線成功";
+                document.getElementById('dbTag').innerText = "● 連線成功";
                 document.getElementById('dbTag').style.color = "var(--success)";
             }
-        } catch (e) { log("ERROR", "無法同步資料庫，請確認權限。", "var(--danger)"); }
+        } catch (e) { log("ERROR", "案號資料同步失敗。", "var(--danger)"); }
     }
 
     function lookupProject() {
         const id = document.getElementById('f_proj_id').value.trim();
-        document.getElementById('f_proj_name').value = dbProjects[id] || "查無此案號";
+        document.getElementById('f_proj_name').value = dbProjects[id] || "查無案名";
     }
 
-    // --- 🔑 Google 授權與診斷 ---
+    // --- 🔑 Google 授權 ---
     function initGIS() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            prompt: 'select_account consent', // ✨ 強制要求授權勾選
+            prompt: 'select_account consent', 
             callback: (resp) => {
-                if (resp.error) { log("ERROR", "授權取消或失敗: " + resp.error, "var(--danger)"); return; }
+                if (resp.error) { log("ERROR", "授權失敗: " + resp.error, "var(--danger)"); return; }
                 accessToken = resp.access_token;
-                log("AUTH", "✅ 登入成功，已取得檔案寫入授權。");
+                log("AUTH", "✅ 登入成功。");
                 syncDatabase();
             }
         });
         document.getElementById('btn_auth').onclick = () => tokenClient.requestAccessToken();
     }
 
-    // --- 🪄 局部 OCR (優化辨識邏輯) ---
+    // --- 🪄 局部辨識 ---
     let sX, sY, isD = false, lastRect = null;
     canvas.onmousedown = (e) => {
         const r = canvas.getBoundingClientRect();
@@ -165,8 +144,8 @@
     canvas.onmouseup = () => isD = false;
 
     async function ocrField(id) {
-        if(!lastRect) return alert("請先在圖上框選區域！");
-        log("OCR", "辨識區域中...");
+        if(!lastRect) return alert("請先框選區域！");
+        log("OCR", "辨識中...");
         const crop = document.createElement('canvas');
         crop.width = Math.abs(lastRect.w); crop.height = Math.abs(lastRect.h);
         const cctx = crop.getContext('2d');
@@ -174,71 +153,77 @@
         const res = await Tesseract.recognize(crop, 'chi_tra+eng');
         document.getElementById(id).value = res.data.text.trim().replace(/\n/g, " ");
         if(id === 'f_proj_id') lookupProject();
-        log("SUCCESS", "辨識完成。");
+        log("SUCCESS", "完成。");
     }
 
-    // --- 💾 核心儲存邏輯 (13 欄位嚴格對齊) ---
+    // --- 💾 核心儲存 (強化診斷版) ---
     document.getElementById('btn_save').onclick = async function() {
         const btn = this;
-        btn.disabled = true; btn.innerText = "⏳ 儲存中...";
-        log("SAVE", "啟動存檔程序...");
+        btn.disabled = true; btn.innerText = "⏳ 處理中...";
+        log("SAVE", "啟動存檔...");
+
         try {
-            // STEP 1: 上傳圖片
-            log("STEP 1", "上傳縮圖至 Google Drive...");
+            // 1. 上傳圖片
+            log("STEP 1", "上傳縮圖...");
             const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
             const metadata = { name: `名片_${document.getElementById('f_name').value || '未具名'}.jpg`, mimeType: 'image/jpeg' };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', blob);
             
-            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form });
+            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { 
+                method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form 
+            });
             const dFile = await dr.json();
-            if(dFile.error) throw new Error(dFile.error.message || "圖片上傳失敗");
+            if(dFile.error) throw dFile.error;
+            log("SUCCESS", "圖片上傳完成。");
 
-            // STEP 2: 尋找表格
-            log("STEP 2", "寫入試算表...");
-            const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and trashed=false`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            // 2. 獲取試算表
+            log("STEP 2", "確認總表檔案...");
+            const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(TARGET_FILE_NAME)}' and trashed=false`, { 
+                headers: { 'Authorization': 'Bearer ' + accessToken } 
+            });
             const sData = await sResp.json();
-            let sheetId = sData.files && sData.files[0] ? sData.files[0].id : null;
+            if(sData.error) throw sData.error;
+
+            let sheetId = (sData.files && sData.files.length > 0) ? sData.files[0].id : null;
 
             if(!sheetId) {
-                log("SYSTEM", "建立新資料庫文件...");
+                log("SYSTEM", "建立新試算表...");
                 const cResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
                 sheetId = cResp.result.spreadsheetId;
-                const head = [["日期", "姓名", "公司", "手機", "電話", "Email", "案號", "契約案名", "自訂1", "自訂2", "自訂3", "備註", "圖片連結"]];
+                const head = [["日期", "姓名", "公司", "電話", "Email", "案號", "案名", "備註", "圖片"]];
                 await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: head } });
             }
 
-            // STEP 3: 寫入 13 個欄位
+            // 3. 寫入
+            log("STEP 3", "寫入資料列...");
             const row = [
                 new Date().toLocaleDateString(),
                 document.getElementById('f_name').value, document.getElementById('f_comp').value,
-                "", // 手機 (可手動分開或留空)
-                document.getElementById('f_phone').value,
-                document.getElementById('f_email').value,
-                document.getElementById('f_proj_id').value,
-                document.getElementById('f_proj_name').value,
-                document.getElementById('f_c1').value,
-                document.getElementById('f_c2').value,
-                document.getElementById('f_c3').value,
-                document.getElementById('f_note').value,
-                `https://drive.google.com/file/d/${dFile.id}/view`
+                document.getElementById('f_phone').value, document.getElementById('f_email').value,
+                document.getElementById('f_proj_id').value, document.getElementById('f_proj_name').value,
+                document.getElementById('f_note').value, `https://drive.google.com/file/d/${dFile.id}/view`
             ];
 
-            const appendResp = await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', insertDataOption: 'INSERT_ROWS', resource: { values: [row] }
+            const result = await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] }
             });
-
-            if(appendResp.status === 200) {
-                log("SUCCESS", "✅ 存檔完成！", "var(--success)");
+            
+            if (result.status === 200) {
+                log("SUCCESS", "✅ 儲存成功！", "var(--success)");
                 alert("儲存成功！");
-            } else { throw new Error("寫入試算表失敗"); }
+            } else { throw result; }
 
         } catch (e) {
-            log("ERROR", "儲存失敗: " + e.message, "var(--danger)");
-            alert("儲存失敗: " + e.message);
+            // ✨ 終極診斷邏輯：印出完整 JSON 錯誤內容
+            let errString = JSON.stringify(e);
+            log("ERROR", "儲存失敗，原始報錯內容如下：", "var(--danger)");
+            log("DEBUG", errString, "var(--warning)");
+            console.error("Full Error:", e);
+            alert("儲存失敗！詳細原因請看監視窗 [DEBUG] 標籤內容。");
         }
-        btn.disabled = false; btn.innerText = "💾 儲存至雲端總表";
+        btn.disabled = false; btn.innerText = "💾 5. 儲存至雲端總表";
     };
 
     // --- 影像控制 ---
@@ -266,20 +251,20 @@
     }
     document.getElementById('btn_rotate').onclick = () => { imgRotation = (imgRotation + 90) % 360; renderAll(); };
     document.getElementById('btn_warp').onclick = () => {
-        const rect = document.getElementById('canvasContainer').getBoundingClientRect();
-        const pts = pEls.map(p => ({ x: (p.offsetLeft / rect.width) * canvas.width, y: (p.offsetTop / rect.height) * canvas.height }));
+        const r = document.getElementById('canvasContainer').getBoundingClientRect();
+        const pts = pEls.map(p => ({ x: (p.offsetLeft / r.width) * canvas.width, y: (p.offsetTop / r.height) * canvas.height }));
         const minX = Math.min(...pts.map(p=>p.x)), maxX = Math.max(...pts.map(p=>p.x));
         const minY = Math.min(...pts.map(p=>p.y)), maxY = Math.max(...pts.map(p=>p.y));
         wpCtx.drawImage(canvas, minX, minY, maxX-minX, maxY-minY, 0, 0, 300, 180);
         document.getElementById('btn_save').disabled = false;
-        log("SUCCESS", "校正預覽已生成。");
+        log("SUCCESS", "縮圖生成。");
     };
     pEls.forEach(p => {
         p.onmousedown = (e) => {
             const move = (me) => {
                 const r = document.getElementById('canvasContainer').getBoundingClientRect();
-                p.style.left = Math.max(0, Math.min(100, (me.clientX - r.left) / r.width * 100)) + '%';
-                p.style.top = Math.max(0, Math.min(100, (me.clientY - r.top) / r.height * 100)) + '%';
+                p.style.left = ((me.clientX - r.left) / r.width * 100) + '%';
+                p.style.top = ((me.clientY - r.top) / r.height * 100) + '%';
             };
             document.onmousemove = move;
             document.onmouseup = () => document.onmousemove = null;
