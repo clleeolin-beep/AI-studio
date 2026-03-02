@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>名片數位校正系統 v7.5</title>
+    <title>惇陽名片數位管理系統 v8.0</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -10,29 +10,47 @@
         :root { --primary: #4f46e5; --success: #10b981; --warning: #f59e0b; --dark: #0f172a; --danger: #ef4444; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f1f5f9; margin: 0; padding: 10px; }
         .container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 1350px; margin: auto; display: grid; grid-template-columns: 1fr 450px; gap: 15px; }
-        #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 600px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid #e2e8f0; overflow: hidden; }
+        
+        #canvasContainer { background: #1e293b; border-radius: 8px; min-height: 550px; display: flex; align-items: center; justify-content: center; position: relative; border: 2px solid #e2e8f0; overflow: hidden; }
         canvas { max-width: 100%; height: auto; cursor: crosshair; }
-        .corner-handle { position: absolute; width: 22px; height: 22px; background: var(--danger); border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: move; z-index: 100; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
-        .form-panel { padding: 10px; border-left: 1px solid #e2e8f0; overflow-y: auto; max-height: 90vh; }
+        .corner-handle { position: absolute; width: 22px; height: 22px; background: var(--danger); border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); cursor: move; z-index: 100; }
+        
+        .form-panel { padding: 10px; border-left: 1px solid #e2e8f0; overflow-y: auto; max-height: 92vh; }
         .input-group { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
         input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
         label { font-size: 11px; font-weight: bold; color: var(--dark); display: block; margin-bottom: 3px; }
-        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; font-size: 13px; transition: 0.2s; }
-        .btn-ocr { background: var(--warning); width: 45px; height: 45px; font-size: 18px; flex-shrink: 0; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+        
         #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 160px; background: #0f172a; color: #34d399; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; z-index: 2000; border-top: 4px solid var(--primary); }
+        .mon-header { display: flex; justify-content: space-between; cursor: pointer; border-bottom: 1px solid #1e293b; padding-bottom: 5px; }
+
+        /* 查重提示彈窗 */
+        #dupModal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 25px; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); z-index: 3000; width: 400px; text-align: center; }
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 2999; }
     </style>
 </head>
 <body>
 
+<div id="dupModal">
+    <h3 style="color:var(--danger)">⚠️ 偵測到重複姓名</h3>
+    <p id="dupText" style="font-size: 14px; line-height: 1.6;"></p>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+        <button class="btn" style="background:var(--success)" id="btn_same_person">是的，他是同一人 (將更新單位並歸檔舊名片)</button>
+        <button class="btn" style="background:var(--primary)" id="btn_new_person">不是，這是同名同姓的不同人</button>
+        <button class="btn" style="background:#94a3b8" onclick="closeModal()">取消儲存</button>
+    </div>
+</div>
+<div class="modal-overlay" id="overlay"></div>
+
 <div class="container">
     <div class="workspace">
-        <h3 style="margin-top:0;">📸 1. 影像校正 <span id="dbTag" style="color:var(--danger); font-size:12px;">● 未連線</span></h3>
-        <div style="margin-bottom: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <h3 style="margin-top:0;">📸 影像數位化 <span id="dbTag" style="color:var(--danger); font-size:12px;">● 未登入</span></h3>
+        <div style="margin-bottom: 15px; display: flex; gap: 8px;">
             <input type="file" id="upload" accept="image/*" style="display:none">
-            <button class="btn" style="background:var(--primary)" id="btn_file">📁 1.開啟圖片</button>
-            <button class="btn" style="background:var(--primary)" id="btn_rotate" disabled>🔄 2.旋轉</button>
-            <button class="btn" style="background:#ec4899" id="btn_warp" disabled>🪄 3.裁切拉平</button>
-            <button class="btn" style="background:var(--dark)" id="btn_auth">🔑 4.登入與授權</button>
+            <button class="btn" style="background:var(--primary)" onclick="document.getElementById('upload').click()">📁 開啟圖片</button>
+            <button class="btn" style="background:var(--primary)" id="btn_rotate" disabled>🔄 旋轉</button>
+            <button class="btn" style="background:#ec4899" id="btn_warp" disabled>🪄 裁切拉平</button>
+            <button class="btn" style="background:var(--dark)" id="btn_auth">🔑 登入 Google</button>
         </div>
         <div id="canvasContainer">
             <canvas id="mainCanvas"></canvas>
@@ -44,24 +62,23 @@
     </div>
 
     <div class="form-panel">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <canvas id="warpPreview" width="300" height="180" style="border-radius:4px; border:1px solid #ddd;"></canvas>
-            <div style="font-size:11px; color:#64748b; margin-top:5px;">存檔縮圖</div>
+        <div style="text-align: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 10px;">
+            <canvas id="warpPreview" width="300" height="180"></canvas>
         </div>
-        <label>姓名：</label><div class="input-group"><input type="text" id="f_name"><button class="btn btn-ocr" onclick="ocrField('f_name')">🪄</button></div>
-        <label>公司：</label><div class="input-group"><input type="text" id="f_comp"><button class="btn btn-ocr" onclick="ocrField('f_comp')">🪄</button></div>
-        <label>手機/電話：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn btn-ocr" onclick="ocrField('f_phone')">🪄</button></div>
-        <label>Email：</label><div class="input-group"><input type="text" id="f_email"><button class="btn btn-ocr" onclick="ocrField('f_email')">🪄</button></div>
-        <label>案號：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn btn-ocr" onclick="ocrField('f_proj_id')">🪄</button></div>
+        <label>姓名：</label><div class="input-group"><input type="text" id="f_name"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_name')">🪄</button></div>
+        <label>單位 (公司/部門)：</label><div class="input-group"><input type="text" id="f_comp"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_comp')">🪄</button></div>
+        <label>手機/電話：</label><div class="input-group"><input type="text" id="f_phone"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_phone')">🪄</button></div>
+        <label>Email：</label><div class="input-group"><input type="text" id="f_email"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_email')">🪄</button></div>
+        <label>關聯案號：</label><div class="input-group"><input type="text" id="f_proj_id" onchange="lookupProject()"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_proj_id')">🪄</button></div>
         <label>契約案名：</label><div class="input-group"><input type="text" id="f_proj_name" readonly style="background:#f8fafc"></div>
-        <label>備註：</label><div class="input-group"><input type="text" id="f_note"><button class="btn btn-ocr" onclick="ocrField('f_note')">🪄</button></div>
-        <button class="btn" style="background:var(--success); width:100%; height:50px; margin-top:15px;" id="btn_save" disabled>💾 5. 儲存至雲端總表</button>
+        <label>備註：</label><div class="input-group"><input type="text" id="f_note"><button class="btn" style="background:var(--warning)" onclick="ocrField('f_note')">🪄</button></div>
+        <button class="btn" style="background:var(--success); width:100%; height:50px; margin-top:15px;" id="btn_save" disabled>💾 驗證並儲存</button>
     </div>
 </div>
 
 <div id="monitor">
-    <div class="mon-header" onclick="this.parentElement.style.height = this.parentElement.style.height==='35px'?'160px':'35px'" style="display:flex; justify-content:space-between; cursor:pointer;">
-        <span>🖥️ 系統監視窗 v7.5 [全視界診斷版]</span>
+    <div class="mon-header" onclick="this.parentElement.style.height = this.parentElement.style.height==='35px'?'160px':'35px'">
+        <span>🖥️ 系統監視窗 v8.0 [企業邏輯模式]</span>
         <span>[收合/展開]</span>
     </div>
     <div id="logBody" style="overflow-y:auto; height:120px; margin-top:5px;"></div>
@@ -72,210 +89,159 @@
     const DB_SHEET_ID = "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE"; 
     const TARGET_FILE_NAME = "惇陽名片資料庫";
 
-    let accessToken = null;
-    let tokenClient = null;
-    let dbProjects = {}; 
-    const canvas = document.getElementById('mainCanvas');
-    const ctx = canvas.getContext('2d');
-    const wpCanvas = document.getElementById('warpPreview');
-    const wpCtx = wpCanvas.getContext('2d');
-    let img = new Image();
-    let imgRotation = 0;
+    let accessToken = null, tokenClient = null;
+    let dbProjects = {}, sheetNames = {};
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
+    const wpCanvas = document.getElementById('warpPreview'), wpCtx = wpCanvas.getContext('2d');
+    let img = new Image(), imgRotation = 0;
 
     function log(tag, msg, color="#34d399") {
         const lb = document.getElementById('logBody');
-        lb.innerHTML += `<div style="color:${color}">[${new Date().toLocaleTimeString()}] [${tag}] ${msg}</div>`;
+        lb.innerHTML += `<div style="color:${color}">[${tag}] ${msg}</div>`;
         lb.scrollTop = lb.scrollHeight;
     }
 
-    // --- 🚀 案號同步 ---
-    async function syncDatabase() {
-        log("SYNC", "同步案號資料庫...");
-        try {
-            const resp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: DB_SHEET_ID, range: 'A:D' });
-            if (resp.result.values) {
-                dbProjects = {};
-                resp.result.values.forEach((row, idx) => { if(idx>0 && row[0]) dbProjects[row[0].trim()] = row[3] || row[2] || "未知案名"; });
-                log("SUCCESS", `已載入 ${Object.keys(dbProjects).length} 筆案件。`);
-                document.getElementById('dbTag').innerText = "● 連線成功";
-                document.getElementById('dbTag').style.color = "var(--success)";
-            }
-        } catch (e) { log("ERROR", "案號資料同步失敗。", "var(--danger)"); }
+    function closeModal() {
+        document.getElementById('dupModal').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
     }
 
-    function lookupProject() {
-        const id = document.getElementById('f_proj_id').value.trim();
-        document.getElementById('f_proj_name').value = dbProjects[id] || "查無案名";
-    }
+    // --- 📁 核心：資料夾偵測與建立 ---
+    async function getOrCreateFolder(name, parentId = 'root') {
+        const q = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentId}' in parents`;
+        const resp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+        const data = await resp.json();
+        if (data.files && data.files.length > 0) return data.files[0].id;
 
-    // --- 🔑 Google 授權 ---
-    function initGIS() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            prompt: 'select_account consent', 
-            callback: (resp) => {
-                if (resp.error) { log("ERROR", "授權失敗: " + resp.error, "var(--danger)"); return; }
-                accessToken = resp.access_token;
-                log("AUTH", "✅ 登入成功。");
-                syncDatabase();
-            }
+        log("SYSTEM", `建立資料夾: ${name}`);
+        const createResp = await fetch(`https://www.googleapis.com/drive/v3/files`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] })
         });
-        document.getElementById('btn_auth').onclick = () => tokenClient.requestAccessToken();
+        const folder = await createResp.json();
+        return folder.id;
     }
 
-    // --- 🪄 局部辨識 ---
-    let sX, sY, isD = false, lastRect = null;
-    canvas.onmousedown = (e) => {
-        const r = canvas.getBoundingClientRect();
-        sX = (e.clientX - r.left) * (canvas.width / r.width);
-        sY = (e.clientY - r.top) * (canvas.height / r.height);
-        isD = true;
-    };
-    canvas.onmousemove = (e) => {
-        if(!isD) return;
-        renderAll();
-        const r = canvas.getBoundingClientRect();
-        let curX = (e.clientX - r.left) * (canvas.width / r.width);
-        let curY = (e.clientY - r.top) * (canvas.height / r.height);
-        ctx.strokeStyle = "red"; ctx.lineWidth = 2; ctx.strokeRect(sX, sY, curX - sX, curY - sY);
-        lastRect = { x: sX, y: sY, w: curX - sX, h: curY - sY };
-    };
-    canvas.onmouseup = () => isD = false;
+    // --- 💾 核心儲存流程 (含查重邏輯) ---
+    document.getElementById('btn_save').onclick = async function() {
+        const name = document.getElementById('f_name').value.trim();
+        const comp = document.getElementById('f_comp').value.trim();
+        if(!name) return alert("請輸入姓名！");
 
-    async function ocrField(id) {
-        if(!lastRect) return alert("請先框選區域！");
-        log("OCR", "辨識中...");
-        const crop = document.createElement('canvas');
-        crop.width = Math.abs(lastRect.w); crop.height = Math.abs(lastRect.h);
-        const cctx = crop.getContext('2d');
-        cctx.drawImage(canvas, lastRect.x, lastRect.y, lastRect.w, lastRect.h, 0, 0, crop.width, crop.height);
-        const res = await Tesseract.recognize(crop, 'chi_tra+eng');
-        document.getElementById(id).value = res.data.text.trim().replace(/\n/g, " ");
-        if(id === 'f_proj_id') lookupProject();
-        log("SUCCESS", "完成。");
-    }
-
-// --- 請完全替換原本 script 標籤內的儲存按鈕 (btn_save) 邏輯 ---
-
-document.getElementById('btn_save').onclick = async function() {
-    const btn = this;
-    btn.disabled = true; btn.innerText = "⏳ 正在處理...";
-    log("SAVE", "啟動存檔程序...");
-
-    try {
-        // 1. 上傳圖片
-        log("STEP 1", "上傳縮圖至 Google Drive...");
-        const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
-        const metadata = { 
-            name: `名片_${document.getElementById('f_name').value || '未具名'}.jpg`, 
-            mimeType: 'image/jpeg' 
-        };
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob);
+        log("CHECK", "正在比對資料庫重複項...");
         
-        const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { 
-            method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form 
-        });
-        const dFile = await dr.json();
-        if (dFile.error) throw dFile.error;
-        log("SUCCESS", "圖片上傳完成。");
-
-        // 2. 獲取試算表並偵測分頁名稱
-        log("STEP 2", "確認試算表與工作表名稱...");
-        const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(TARGET_FILE_NAME)}' and trashed=false`, { 
-            headers: { 'Authorization': 'Bearer ' + accessToken } 
-        });
+        // 搜尋總表中的姓名
+        const sResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${encodeURIComponent(TARGET_FILE_NAME)}' and trashed=false`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
         const sData = await sResp.json();
-        
-        let sheetId = (sData.files && sData.files.length > 0) ? sData.files[0].id : null;
-        let firstSheetName = "";
+        const sheetId = sData.files?.[0]?.id;
 
-        if (!sheetId) {
-            log("SYSTEM", "建立新試算表...");
-            const cResp = await gapi.client.sheets.spreadsheets.create({ 
-                resource: { properties: { title: TARGET_FILE_NAME } } 
-            });
-            sheetId = cResp.result.spreadsheetId;
-            firstSheetName = cResp.result.sheets[0].properties.title; // ✨ 直接獲取系統建立的預設名稱
-            
-            // 寫入標題列 (使用偵測到的名稱)
-            const head = [["日期", "姓名", "公司", "手機", "電話", "Email", "案號", "案名", "自訂1", "自訂2", "自訂3", "備註", "圖片"]];
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: sheetId, range: `${firstSheetName}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: head }
-            });
-        } else {
-            // ✨ 如果檔案已存在，獲取其第一個分頁的真實名稱
+        if (sheetId) {
             const spreadsheet = await gapi.client.sheets.spreadsheets.get({ spreadsheetId: sheetId });
-            firstSheetName = spreadsheet.result.sheets[0].properties.title;
-            log("INFO", `偵測到工作表名稱為: [${firstSheetName}]`);
+            const sheetTitle = spreadsheet.result.sheets[0].properties.title;
+            const valuesResp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!B:C` });
+            const rows = valuesResp.result.values || [];
+            
+            // 尋找姓名重複
+            const dupIndex = rows.findIndex(r => r[0] === name);
+            if (dupIndex !== -1) {
+                const oldComp = rows[dupIndex][1];
+                const oldDate = (await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!A${dupIndex+1}` })).result.values[0][0];
+                const oldLink = (await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${sheetTitle}!M${dupIndex+1}` })).result.values[0][0];
+
+                document.getElementById('dupText').innerHTML = `<b>${name}</b> 已存在於資料庫。<br>現有單位：${oldComp}<br>建檔日期：${oldDate}`;
+                document.getElementById('dupModal').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+
+                // 綁定彈窗按鈕
+                document.getElementById('btn_new_person').onclick = () => { closeModal(); executeSave(sheetId, sheetTitle, "New_Person"); };
+                document.getElementById('btn_same_person').onclick = () => { closeModal(); executeSave(sheetId, sheetTitle, "Same_Person", {index: dupIndex+1, oldComp, oldDate, oldLink}); };
+                return;
+            }
         }
-
-        // 3. 寫入資料
-        log("STEP 3", `寫入資料至 [${firstSheetName}]...`);
-        const row = [
-            new Date().toLocaleDateString(),
-            document.getElementById('f_name').value, 
-            document.getElementById('f_comp').value,
-            "", // 手機 (可選)
-            document.getElementById('f_phone').value, 
-            document.getElementById('f_email').value,
-            document.getElementById('f_proj_id').value, 
-            document.getElementById('f_proj_name').value,
-            "", "", "", // 自訂欄位
-            document.getElementById('f_note').value, 
-            `https://drive.google.com/file/d/${dFile.id}/view`
-        ];
-
-        const appendResp = await gapi.client.sheets.spreadsheets.values.append({
-            spreadsheetId: sheetId,
-            range: `${firstSheetName}!A1`, // ✨ 使用動態名稱
-            valueInputOption: 'USER_ENTERED',
-            insertDataOption: 'INSERT_ROWS',
-            resource: { values: [row] }
-        });
-
-        if (appendResp.status === 200) {
-            log("SUCCESS", "✅ 存檔完成！資料已寫入總表。", "var(--success)");
-            alert("儲存成功！");
-        } else {
-            throw appendResp;
-        }
-
-    } catch (e) {
-        let errMsg = e.message || (e.result && e.result.error ? e.result.error.message : JSON.stringify(e));
-        log("ERROR", "儲存失敗原因: " + errMsg, "var(--danger)");
-        console.error("Full Error Info:", e);
-        alert("儲存失敗！原因：" + errMsg);
-    }
-    btn.disabled = false;
-    btn.innerText = "💾 5. 儲存至雲端總表";
-};
-
-    // --- 影像控制 ---
-    const pEls = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3')];
-    document.getElementById('btn_file').onclick = () => document.getElementById('upload').click();
-    document.getElementById('upload').onchange = (e) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            img.onload = () => {
-                imgRotation = 0;
-                pEls.forEach((p, i) => { p.style.display = 'block'; p.style.left = (i==0 || i==3 ? 20 : 80) + '%'; p.style.top = (i==0 || i==1 ? 20 : 80) + '%'; });
-                renderAll();
-                document.getElementById('btn_rotate').disabled = false;
-                document.getElementById('btn_warp').disabled = false;
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(e.target.files[0]);
+        executeSave(sheetId, null, "Standard");
     };
+
+    async function executeSave(sheetId, sheetTitle, mode, oldInfo = null) {
+        log("SAVE", "啟動存檔流程...");
+        try {
+            // 1. 建立目錄結構
+            const rootId = await getOrCreateFolder("惇陽名片");
+            const photoFolderId = await getOrCreateFolder("名片照片", rootId);
+
+            // 2. 處理圖片命名與舊圖更名
+            let photoName = `${document.getElementById('f_name').value}-${document.getElementById('f_comp').value}`;
+            let historyLink = "";
+
+            if (mode === "Same_Person") {
+                log("ARCHIVE", "正在處理舊名片歸檔...");
+                // 從舊連結抓 File ID
+                const oldFileId = oldInfo.oldLink.split('/d/')[1].split('/')[0];
+                const archiveName = `${document.getElementById('f_name').value}-${oldInfo.oldComp}-${oldInfo.oldDate.replace(/\//g,'-')}`;
+                await fetch(`https://www.googleapis.com/drive/v3/files/${oldFileId}`, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: archiveName })
+                });
+                historyLink = `曾任職於 ${oldInfo.oldComp} (${oldInfo.oldDate})`;
+            }
+
+            // 3. 上傳新圖片
+            const blob = await new Promise(r => wpCanvas.toBlob(r, 'image/jpeg'));
+            const metadata = { name: photoName + ".jpg", parents: [photoFolderId], mimeType: 'image/jpeg' };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob);
+            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form });
+            const dFile = await dr.json();
+
+            // 4. 寫入總表
+            let targetSheetId = sheetId;
+            if(!targetSheetId) {
+                const cResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME }, parents: [rootId] } });
+                targetSheetId = cResp.result.spreadsheetId;
+                sheetTitle = cResp.result.sheets[0].properties.title;
+                const head = [["日期", "姓名", "公司/單位", "手機", "電話", "Email", "案號", "契約案名", "自訂1", "自訂2", "自訂3", "備註", "圖片連結", "歷史關聯"]];
+                await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: targetSheetId, range: `${sheetTitle}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: head } });
+            }
+
+            const row = [
+                new Date().toLocaleDateString(),
+                document.getElementById('f_name').value,
+                document.getElementById('f_comp').value,
+                "", // 手機
+                document.getElementById('f_phone').value,
+                document.getElementById('f_email').value,
+                document.getElementById('f_proj_id').value,
+                document.getElementById('f_proj_name').value,
+                "", "", "", 
+                document.getElementById('f_note').value,
+                `https://drive.google.com/file/d/${dFile.id}/view`,
+                historyLink
+            ];
+
+            await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: targetSheetId, range: `${sheetTitle}!A1`, valueInputOption: 'USER_ENTERED', resource: { values: [row] }
+            });
+
+            log("SUCCESS", "✅ 存檔完成！檔案已歸類至『惇陽名片』資料夾。", "var(--success)");
+            alert("儲存成功！");
+        } catch (e) { log("ERROR", "儲存失敗: " + e.message, "var(--danger)"); }
+    }
+
+    // --- 影像、OCR、GAPI 初始化 (維持 v7.4 穩定邏輯) ---
     function renderAll() {
         const rot = (imgRotation / 90) % 2 !== 0;
         canvas.width = rot ? img.height : img.width; canvas.height = rot ? img.width : img.height;
         ctx.save(); ctx.translate(canvas.width / 2, canvas.height / 2); ctx.rotate(imgRotation * Math.PI / 180);
         ctx.drawImage(img, -img.width / 2, -img.height / 2); ctx.restore();
     }
+    document.getElementById('upload').onchange = (e) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => { img.onload = () => { imgRotation = 0; resetPoints(); renderAll(); document.getElementById('btn_rotate').disabled = false; document.getElementById('btn_warp').disabled = false; }; img.src = ev.target.result; };
+        reader.readAsDataURL(e.target.files[0]);
+    };
+    function resetPoints() { const r = document.getElementById('canvasContainer').getBoundingClientRect(); pEls.forEach((p, i) => { p.style.display = 'block'; p.style.left = (i==0 || i==3 ? 20 : 80) + '%'; p.style.top = (i==0 || i==1 ? 20 : 80) + '%'; }); }
     document.getElementById('btn_rotate').onclick = () => { imgRotation = (imgRotation + 90) % 360; renderAll(); };
     document.getElementById('btn_warp').onclick = () => {
         const r = document.getElementById('canvasContainer').getBoundingClientRect();
@@ -286,27 +252,45 @@ document.getElementById('btn_save').onclick = async function() {
         document.getElementById('btn_save').disabled = false;
         log("SUCCESS", "縮圖生成。");
     };
-    pEls.forEach(p => {
-        p.onmousedown = (e) => {
-            const move = (me) => {
-                const r = document.getElementById('canvasContainer').getBoundingClientRect();
-                p.style.left = ((me.clientX - r.left) / r.width * 100) + '%';
-                p.style.top = ((me.clientY - r.top) / r.height * 100) + '%';
-            };
-            document.onmousemove = move;
-            document.onmouseup = () => document.onmousemove = null;
-        };
-    });
+    const pEls = [document.getElementById('p0'), document.getElementById('p1'), document.getElementById('p2'), document.getElementById('p3')];
+    pEls.forEach(p => { p.onmousedown = (e) => { const move = (me) => { const r = document.getElementById('canvasContainer').getBoundingClientRect(); p.style.left = ((me.clientX - r.left) / r.width * 100) + '%'; p.style.top = ((me.clientY - r.top) / r.height * 100) + '%'; }; document.onmousemove = move; document.onmouseup = () => document.onmousemove = null; }; });
 
-    // --- 啟動 ---
+    async function ocrField(id) {
+        if(!window.lastRect) return alert("請先框選區域！");
+        log("OCR", "辨識中...");
+        const crop = document.createElement('canvas'); crop.width = Math.abs(window.lastRect.w); crop.height = Math.abs(window.lastRect.h);
+        const cctx = crop.getContext('2d'); cctx.drawImage(canvas, window.lastRect.x, window.lastRect.y, window.lastRect.w, window.lastRect.h, 0, 0, crop.width, crop.height);
+        const res = await Tesseract.recognize(crop, 'chi_tra+eng');
+        document.getElementById(id).value = res.data.text.trim().replace(/\n/g, " ");
+        if(id === 'f_proj_id') lookupProject();
+        log("SUCCESS", "完成。");
+    }
+
+    let sX, sY, isD = false;
+    canvas.onmousedown = (e) => { const r = canvas.getBoundingClientRect(); sX = (e.clientX - r.left) * (canvas.width / r.width); sY = (e.clientY - r.top) * (canvas.height / r.height); isD = true; };
+    canvas.onmousemove = (e) => { if(!isD) return; renderAll(); const r = canvas.getBoundingClientRect(); ctx.strokeStyle = "red"; ctx.lineWidth = 2; ctx.strokeRect(sX, sY, (e.clientX - r.left) * (canvas.width / r.width) - sX, (e.clientY - r.top) * (canvas.height / r.height) - sY); };
+    canvas.onmouseup = (e) => { isD = false; const r = canvas.getBoundingClientRect(); window.lastRect = { x: sX, y: sY, w: (e.clientX - r.left) * (canvas.width / r.width) - sX, h: (e.clientY - r.top) * (canvas.height / r.height) - sY }; };
+
+    async function lookupProject() { const id = document.getElementById('f_proj_id').value.trim(); document.getElementById('f_proj_name').value = dbProjects[id] || "查無案名"; }
+    async function syncDatabase() {
+        log("SYNC", "同步案號資料庫...");
+        try {
+            const resp = await gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: DB_SHEET_ID, range: 'A:D' });
+            if (resp.result.values) { resp.result.values.forEach((row, idx) => { if(idx>0 && row[0]) dbProjects[row[0].trim()] = row[3] || row[2] || "未知案名"; }); log("SUCCESS", "案號資料庫就緒。"); }
+        } catch (e) { log("ERROR", "同步失敗。"); }
+    }
+
     window.onload = () => {
         gapi.load('client', async () => {
             await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest', 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'] });
-            log("SYS", "GAPI Ready.");
-            initGIS();
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets',
+                prompt: 'select_account consent',
+                callback: (resp) => { accessToken = resp.access_token; log("AUTH", "登入成功。"); syncDatabase(); }
+            });
+            document.getElementById('btn_auth').onclick = () => tokenClient.requestAccessToken();
         });
     };
 </script>
 </body>
 </html>
-
