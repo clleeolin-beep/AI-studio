@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI 實驗室 - 名片智慧處理系統 v4.6</title>
+    <title>AI 實驗室 - 名片智慧處理系統 v4.7 (雲端安全版)</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -33,7 +33,7 @@
             <button class="btn btn-blue" onclick="document.getElementById('upload').click()">📁 選取相片</button>
             <button class="btn btn-yellow" id="rotateBtn" disabled>🔄 旋轉</button>
             <button class="btn btn-yellow" id="transformBtn" disabled>🪄 辨識文字</button>
-            <button class="btn btn-blue" id="authBtn">🔑 登入 Google</button>
+            <button class="btn btn-blue" id="authBtn">🔑 登入 Google (啟動 AI)</button>
         </div>
         <div id="canvasContainer"><canvas id="mainCanvas"></canvas></div>
     </div>
@@ -54,16 +54,17 @@
 </div>
 
 <div id="monitor">
-    <div style="border-bottom: 1px solid #444; margin-bottom: 5px;">🖥️ 系統監視窗 v4.6 (自動搜尋版)</div>
+    <div style="border-bottom: 1px solid #444; margin-bottom: 5px;">🖥️ 系統監視窗 v4.7 (方案 B 安全版)</div>
     <div id="logBody"></div>
 </div>
 
 <script>
     // ==========================================
-    // 🔑 請填入您的 API KEY
+    // 🔑 基礎配置 (金鑰將從雲端讀取)
     // ==========================================
-    const GEMINI_API_KEY = "AIzaSyBu9vAOIXAUb7mtK9rjPUm9DVQPTevyTfo"; 
+    let GEMINI_API_KEY = null; 
     const CLIENT_ID = "615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com";
+    const KEY_FILE_NAME = "gemini_config.txt"; // 請確保雲端檔名正確
     const TARGET_FILE_NAME = "惇陽名片資料庫";
     // ==========================================
 
@@ -81,50 +82,76 @@
         document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
     }
 
+    // --- ✨ 核心功能：從雲端讀取金鑰 ---
+    async function fetchApiKey() {
+        log("SYSTEM", "正在檢索系統金鑰...");
+        try {
+            const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${KEY_FILE_NAME}' and trashed=false`;
+            const searchResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            const searchData = await searchResp.json();
+
+            if (searchData.files && searchData.files.length > 0) {
+                const fileId = searchData.files[0].id;
+                const contentResp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                GEMINI_API_KEY = (await contentResp.text()).trim();
+                log("SUCCESS", "AI 金鑰載入成功，系統已就緒。");
+                document.getElementById('transformBtn').disabled = false;
+            } else {
+                log("ERROR", "找不到 gemini_config.txt，請確認檔案已分享給您。");
+            }
+        } catch (e) { log("ERROR", "讀取金鑰失敗: " + e.message); }
+    }
+
     // --- Google API 初始化 ---
     function gapiLoaded() { 
         gapi.load('client', async () => {
             await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest', 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'] });
-            log("SYSTEM", "Google 服務已就緒。");
+            log("SYSTEM", "Google 服務已連接。");
         });
     }
     function gisLoaded() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            callback: (resp) => { accessToken = resp.access_token; log("AUTH", "授權成功！"); }
+            // ✨ 重要：權限範圍加入了 drive.readonly 才能讀取 txt 檔
+            scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
+            callback: (resp) => { 
+                accessToken = resp.access_token; 
+                log("AUTH", "驗證成功！正在啟動 AI 模組..."); 
+                fetchApiKey(); // 登入後立即抓取金鑰
+            }
         });
     }
     document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
 
-    // --- 圖片處理 ---
+    // --- OCR 與 AI 解析 (略，維持 v4.6 邏輯但使用動態金鑰) ---
     document.getElementById('upload').onchange = (e) => {
         const reader = new FileReader();
         reader.onload = (ev) => {
-            img.onload = () => { imgRotation = 0; renderImage(); document.getElementById('rotateBtn').disabled = false; document.getElementById('transformBtn').disabled = false; };
+            img.onload = () => { imgRotation = 0; renderImage(); document.getElementById('rotateBtn').disabled = false; };
             img.src = ev.target.result;
         };
         reader.readAsDataURL(e.target.files[0]);
     };
     function renderImage() {
         const isRotated = (imgRotation / 90) % 2 !== 0;
-        mainCanvas.width = isRotated ? img.height : img.width;
-        mainCanvas.height = isRotated ? img.width : img.height;
+        mainCanvas.width = isRotated ? img.height : img.width; mainCanvas.height = isRotated ? img.width : img.height;
         ctx.save(); ctx.translate(mainCanvas.width/2, mainCanvas.height/2); ctx.rotate(imgRotation * Math.PI / 180);
         ctx.drawImage(img, -img.width/2, -img.height/2); ctx.restore();
     }
     document.getElementById('rotateBtn').onclick = () => { imgRotation = (imgRotation + 90) % 360; renderImage(); };
 
-    // --- OCR 與 AI 解析 ---
     document.getElementById('transformBtn').onclick = async () => {
-        log("OCR", "辨識中...");
+        if (!GEMINI_API_KEY) { alert("金鑰尚未載入，請確認 Google 登入狀態。"); return; }
+        log("OCR", "影像掃描中...");
         cpCtx.drawImage(mainCanvas, 0, 0, mainCanvas.width, mainCanvas.height, 0, 0, 300, 180);
         const result = await Tesseract.recognize(mainCanvas, 'chi_tra+eng');
         callGemini(result.data.text);
     };
 
     async function callGemini(ocrText) {
-        log("AI", "正在解析資料內容...");
+        log("AI", "智慧分析中...");
         const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
         const prompt = `你是一個專業秘書。請從文字中提取:姓名、公司、案號、電話、Email。
                         文字內容：${ocrText}
@@ -140,39 +167,30 @@
             document.getElementById('field_email').value = res.email;
             log("SUCCESS", "AI 解析完成。");
             document.getElementById('saveBtn').disabled = false;
-        } catch (e) { log("ERROR", "AI 解析出錯。"); }
+        } catch (e) { log("ERROR", "AI 解析失敗。"); }
     }
 
-    // --- ✨ 核心：自動搜尋或建立試算表 ---
+    // --- (其餘 getOrCreateSheet 與儲存邏輯維持 v4.6) ---
     async function getOrCreateSheet() {
         log("CLOUD", `正在搜尋檔案：${TARGET_FILE_NAME}...`);
         const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
         const searchResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
         const searchData = await searchResp.json();
-
-        if (searchData.files && searchData.files.length > 0) {
-            log("SUCCESS", "找到現有資料庫。");
-            return searchData.files[0].id;
-        } else {
-            log("SYSTEM", "找不到檔案，正在建立新資料庫...");
-            const createResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
-            const newId = createResp.result.spreadsheetId;
-            const header = [["日期", "姓名", "公司", "案號", "電話", "Email", "名片連結"]];
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: newId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: header }
-            });
-            return newId;
-        }
+        if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
+        log("SYSTEM", "建立新資料庫...");
+        const createResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
+        const newId = createResp.result.spreadsheetId;
+        const header = [["日期", "姓名", "公司", "案號", "電話", "Email", "名片連結"]];
+        await gapi.client.sheets.spreadsheets.values.update({
+            spreadsheetId: newId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: header }
+        });
+        return newId;
     }
 
-    // --- 💾 儲存程序 ---
     document.getElementById('saveBtn').onclick = async () => {
-        if (!accessToken) { alert("請先點擊登入！"); return; }
-        log("CLOUD", "開始備份資料...");
+        log("CLOUD", "同步資料至雲端...");
         try {
             const sheetId = await getOrCreateSheet();
-            
-            // 1. 上傳圖片
             const blob = await new Promise(res => document.getElementById('colorPreview').toBlob(res, 'image/jpeg'));
             const metadata = { name: `名片_${document.getElementById('field_name').value}.jpg`, mimeType: 'image/jpeg' };
             const form = new FormData();
@@ -182,22 +200,9 @@
                 method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form
             });
             const driveFile = await driveResp.json();
-
-            // 2. 寫入 Sheets
-            const row = [
-                new Date().toLocaleDateString(),
-                document.getElementById('field_name').value,
-                document.getElementById('field_company').value,
-                document.getElementById('field_project').value,
-                document.getElementById('field_phone').value,
-                document.getElementById('field_email').value,
-                `https://drive.google.com/file/d/${driveFile.id}/view`
-            ];
-            await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] }
-            });
-            log("SUCCESS", "✅ 儲存成功！");
-            alert("資料已成功同步至「惇陽名片資料庫」");
+            const row = [new Date().toLocaleDateString(), document.getElementById('field_name').value, document.getElementById('field_company').value, document.getElementById('field_project').value, document.getElementById('field_phone').value, document.getElementById('field_email').value, `https://drive.google.com/file/d/${driveFile.id}/view` ];
+            await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] } });
+            log("SUCCESS", "儲存成功！"); alert("已存入「惇陽名片資料庫」");
         } catch (e) { log("ERROR", "儲存失敗: " + e.message); }
     };
 </script>
