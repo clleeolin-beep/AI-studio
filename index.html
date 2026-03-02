@@ -33,7 +33,7 @@
         <p style="opacity: 0.7; font-size: 14px; margin-bottom: 30px;">設計A組內部平台 (需授權登入)</p>
         
         <div id="g_id_onload"
-             data-client_id="992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com"
+             data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
              data-callback="handleAuth">
         </div>
         <div class="g_id_signin" data-type="standard" data-shape="pill"></div>
@@ -50,7 +50,6 @@
         <div class="tab" onclick="switchTool(this, 'inspection_tool.html')">📋 施工抽查</div>
         <div class="tab" onclick="switchTool(this, 'Weather.html')">📊 氣象分析</div>
         <div class="tab" onclick="switchTool(this, 'WeatherData.html')">🌦️ 氣象彙整</div>
-        <div class="tab" onclick="switchTool(this, 'BusinessCard_Vision.html')"> 名片彙整</div>        
         <div class="tab" onclick="switchTool(this, 'tutorial.html')">📖 操作教程</div>
         <div class="tab" style="border-left: 2px solid #e2e8f0; margin-left: 10px; color: #6366f1;" onclick="switchTool(this, 'AI實驗室-Github串聯NAS.html')">🚀 架構計畫</div>
     </nav>
@@ -61,36 +60,33 @@
 
     <script>
         // --- 權限名單設定 ---
+        // 請在此處加入所有允許登入的 Email（包含公司帳號）
         const allowedEmails = [
             "cl.lee.olin@gmail.com",
-    "0757troph@gmail.com","Roserain0516@gmail.com","cccrj0929@gmail.com",
-    "hank881016@gmail.com","twjackal@gmail.com","lucis.willow@gmail.com",
-    "daphnetang111@gmail.com","jangpp7@gmail.com","kenwu880316@gmail.com",
-    "g520g7@gmail.com","adad154154@gmail.com","wu.yingu@gmail.com",
-    "maoyuanweng19901210@gmail.com","juby90884@gmail.com","paida19595@gmail.com",
-    "tsaisujing@gmail.com","b0287751@gmail.com","awencoacc012@gmail.com",
-    "a75121723@gmail.com","copic.wang@gmail.com","swallowa81@gmail.com"                     
+            "0757troph@gmail.com", "Roserain0516@gmail.com", "cccrj0929@gmail.com",
+            "hank881016@gmail.com", "twjackal@gmail.com", "lucis.willow@gmail.com",
+            "daphnetang111@gmail.com", "jangpp7@gmail.com", "kenwu880316@gmail.com",
+            "g520g7@gmail.com", "adad154154@gmail.com", "wu.yingu@gmail.com",
+            "maoyuanweng19901210@gmail.com", "juby90884@gmail.com", "paida19595@gmail.com",
+            "tsaisujing@gmail.com", "b0287751@gmail.com", "awencoacc012@gmail.com",
+            "a75121723@gmail.com", "copic.wang@gmail.com", "swallowa81@gmail.com"
         ];
 
-// --- 登入回傳處理 ---
+        // --- 登入回傳處理 ---
         function handleAuth(response) {
             try {
-                // 解析 Google 回傳的資訊 (JWT)
                 const base64Url = response.credential.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const payload = JSON.parse(window.atob(base64));
                 
-                // 【重點 1】將登入者的 Email 轉為小寫
                 const userEmail = payload.email.toLowerCase();
-
                 console.log("嘗試登入者:", userEmail);
 
-                // 【重點 2】將名單內的 Email 全部轉為小寫再進行比對
-                const isAuthorized = allowedEmails.map(e => e.toLowerCase()).includes(userEmail) || 
-                                     userEmail.endsWith("@dunyang.com.tw");
+                // --- 修正點：移除網域自動授權，僅比對名單 ---
+                const isAuthorized = allowedEmails.map(e => e.toLowerCase()).includes(userEmail);
 
                 if (isAuthorized) {
-                    console.log("驗證成功，進入系統");
+                    console.log("驗證成功");
                     const authScreen = document.getElementById('auth-screen');
                     authScreen.style.opacity = '0';
                     setTimeout(() => {
@@ -99,8 +95,9 @@
                     }, 500);
                 } else {
                     console.error("授權失敗");
-                    document.getElementById('err-log').style.display = 'block';
-                    document.getElementById('err-log').innerText = "未授權帳號: " + userEmail;
+                    const errLog = document.getElementById('err-log');
+                    errLog.style.display = 'block';
+                    errLog.innerText = "未授權帳號: " + userEmail;
                 }
             } catch (error) {
                 console.error("登入程序發生錯誤:", error);
@@ -111,39 +108,15 @@
         // --- 分頁切換功能 ---
         function switchTool(el, fileName) {
             if (!el || !fileName) return;
-
-            // 1. 更新標籤樣式
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             el.classList.add('active');
-            
-            // 2. 更新 iframe 網址 (增加 ./ 確保 GitHub 相對路徑正確)
             const frame = document.getElementById('tool-frame');
-            const targetUrl = "./" + fileName;
-            
-            console.log("切換至:", targetUrl);
-            frame.src = targetUrl;
+            frame.src = "./" + fileName;
         }
 
-        // 偵錯輔助：如果 5 秒後沒反應，提示使用者
         window.onload = function() {
-            console.log("系統已就緒，等待 Google SDK 載入...");
+            console.log("系統已就緒，等待 Google 驗證...");
         };
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
