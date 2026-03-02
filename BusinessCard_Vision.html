@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>AI 實驗室 - 名片智慧處理系統 v4.7.1 Safe</title>
+    <title>AI 實驗室 - 名片智慧處理系統 v4.7.2 Safe</title>
     <script src="https://unpkg.com/tesseract.js@v5.0.0/dist/tesseract.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
@@ -10,20 +10,16 @@
         :root { --primary: #3498db; --success: #27ae60; --warning: #f1c40f; --dark: #2c3e50; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; margin: 0; padding: 15px; }
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
-        
         #canvasContainer { background: #333; border-radius: 8px; min-height: 400px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border: 2px solid #ddd; }
         canvas { max-width: 100%; height: auto; cursor: crosshair; }
-        
         .form-panel { padding: 10px; border-left: 1px solid #eee; }
         input[type="text"] { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         label { font-size: 12px; font-weight: bold; color: var(--dark); margin-top: 8px; display: block; }
-        
         .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; margin-bottom: 10px; transition: 0.3s; }
         .btn-blue { background: var(--primary); }
         .btn-yellow { background: var(--warning); color: #333; }
         .btn-save { background: var(--success); width: 100%; font-size: 1.1em; margin-top: 15px; }
         .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
-
         #monitor { position: fixed; bottom: 0; left: 0; right: 0; height: 140px; background: #1a1a1a; color: #0f0; padding: 10px; font-family: monospace; font-size: 12px; overflow-y: auto; border-top: 3px solid var(--primary); z-index: 1000; }
     </style>
 </head>
@@ -36,7 +32,7 @@
             <input type="file" id="upload" accept="image/*" style="display:none">
             <button class="btn btn-blue" onclick="document.getElementById('upload').click()">📁 選取相片</button>
             <button class="btn btn-yellow" id="rotateBtn" disabled>🔄 旋轉</button>
-            <button class="btn btn-yellow" id="transformBtn" disabled title="需先登入並載入金鑰">🪄 辨識文字</button>
+            <button class="btn btn-yellow" id="transformBtn" disabled>🪄 辨識文字</button>
             <button class="btn btn-blue" id="authBtn">🔑 登入 Google (啟動 AI)</button>
         </div>
         <div id="canvasContainer">
@@ -50,30 +46,30 @@
             <canvas id="colorPreview" width="300" height="180" style="border: 2px solid white; background: #ccc;"></canvas>
             <p style="font-size: 10px; color: #666;">名片封面縮圖</p>
         </div>
-        
         <label>姓名：</label><input type="text" id="field_name">
         <label>公司：</label><input type="text" id="field_company">
         <label>關聯案號：</label><input type="text" id="field_project">
         <label>電話：</label><input type="text" id="field_phone">
         <label>Email：</label><input type="text" id="field_email">
-
         <button class="btn btn-save" id="saveBtn" disabled>💾 3. 儲存至雲端資料庫</button>
     </div>
 </div>
 
 <div id="monitor">
-    <div style="border-bottom: 1px solid #444; margin-bottom: 5px; color: #aaa;">🖥️ 系統監視窗 v4.7.1 Safe Mode</div>
+    <div style="border-bottom: 1px solid #444; margin-bottom: 5px; color: #aaa;">🖥️ 系統監視窗 v4.7.2 Safe Mode</div>
     <div id="logBody"></div>
 </div>
 
 <script>
     // ==========================================
-    // ⚙️ 核心配置
+    // ⚙️ 核心配置 (已對準您的 Google 文件)
     // ==========================================
     let GEMINI_API_KEY = null; 
     const CLIENT_ID = "615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com";
-    const KEY_DOC_ID = "1cbhhhJbkJnrQYXnl-xgnscGR0uzZem6x7s1cI7kV6oM"; // 您提供的 Google Doc ID
+    const KEY_DOC_ID = "1cbhhhJbkJnrQYXnl-xgnscGR0uzZem6x7s1cI7kV6oM"; 
     const TARGET_FILE_NAME = "惇陽名片資料庫";
+    const TARGET_MODEL = "models/gemini-1.5-flash";
+    const API_VERSION = "v1beta"; // 使用測試版路徑以解決 404 問題
     // ==========================================
 
     let accessToken = null;
@@ -90,195 +86,119 @@
         document.getElementById('monitor').scrollTop = document.getElementById('monitor').scrollHeight;
     }
 
-    // --- 🔑 從 Google Doc 讀取金鑰 ---
-    async function fetchApiKeyFromDoc() {
-        log("SYSTEM", "正在從 Google 文件讀取系統金鑰...");
+    // --- ✨ 新增：模型有效性檢查 ---
+    async function validateModel() {
+        log("SYSTEM", "正在檢測模型狀態...");
         try {
-            // 對於 Google Doc，需要使用 export 介面轉為純文字
-            const url = `https://www.googleapis.com/drive/v3/files/${KEY_DOC_ID}/export?mimeType=text/plain`;
-            const resp = await fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + accessToken }
-            });
-            
-            if (resp.ok) {
-                const rawText = await resp.text();
-                // 移除可能的空格或換行
-                GEMINI_API_KEY = rawText.trim();
-                log("SUCCESS", "AI 金鑰載入成功，AI 功能已啟動。");
+            const resp = await fetch(`https://generativelanguage.googleapis.com/${API_VERSION}/models?key=${GEMINI_API_KEY}`);
+            const data = await resp.json();
+            if (data.models && data.models.some(m => m.name === TARGET_MODEL)) {
+                log("SUCCESS", `確認 ${TARGET_MODEL} 於 ${API_VERSION} 模式可用。`);
                 document.getElementById('transformBtn').disabled = false;
             } else {
-                log("ERROR", "無法存取金鑰文件，請確認您已被加入該文件的檢視者名單。");
+                log("WARNING", "指定模型未在清單中，將嘗試強制執行。");
+                document.getElementById('transformBtn').disabled = false;
             }
-        } catch (e) {
-            log("ERROR", "連線至 Google 文件失敗: " + e.message);
-        }
+        } catch (e) { log("ERROR", "模型檢測失敗。"); }
     }
 
-    // --- Google API 授權初始化 ---
+    // --- 🔑 從 Google Doc 讀取金鑰 ---
+    async function fetchApiKeyFromDoc() {
+        log("SYSTEM", "正在讀取雲端金鑰文件...");
+        try {
+            const url = `https://www.googleapis.com/drive/v3/files/${KEY_DOC_ID}/export?mimeType=text/plain`;
+            const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+            if (resp.ok) {
+                GEMINI_API_KEY = (await resp.text()).trim();
+                log("SUCCESS", "金鑰載入成功。");
+                await validateModel(); // 載入後立刻檢查
+            } else { log("ERROR", "讀取金鑰失敗，請檢查權限。"); }
+        } catch (e) { log("ERROR", "連線失敗: " + e.message); }
+    }
+
+    // --- 初始化授權 ---
     function gapiInit() {
         gapi.load('client', async () => {
-            await gapi.client.init({
-                discoveryDocs: [
-                    'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
-                    'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'
-                ]
-            });
-            log("SYSTEM", "Google API 服務載入完畢。");
+            await gapi.client.init({ discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest', 'https://www.googleapis.com/discovery/v1/apis/sheets/v4/rest'] });
+            log("SYSTEM", "Google 服務已就緒。");
         });
     }
-
     function gisInit() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
-            // 權限包含：讀取雲端文件、上傳圖片、寫入試算表
             scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
-            callback: (resp) => {
-                accessToken = resp.access_token;
-                log("AUTH", "帳號授權成功！");
-                fetchApiKeyFromDoc(); // 登入後自動執行金鑰抓取
-            }
+            callback: (resp) => { accessToken = resp.access_token; log("AUTH", "授權成功！"); fetchApiKeyFromDoc(); }
         });
     }
     document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken();
 
-    // --- 影像處理邏輯 ---
+    // --- 影像與 OCR ---
     document.getElementById('upload').onchange = (e) => {
-        const file = e.target.files[0];
         const reader = new FileReader();
-        reader.onload = (ev) => {
-            img.onload = () => {
-                imgRotation = 0;
-                renderImage();
-                document.getElementById('rotateBtn').disabled = false;
-            };
-            img.src = ev.target.result;
-        };
-        reader.readAsDataURL(file);
+        reader.onload = (ev) => { img.onload = () => { imgRotation = 0; renderImage(); document.getElementById('rotateBtn').disabled = false; }; img.src = ev.target.result; };
+        reader.readAsDataURL(e.target.files[0]);
     };
-
     function renderImage() {
-        const isRotated = (imgRotation / 90) % 2 !== 0;
-        mainCanvas.width = isRotated ? img.height : img.width;
-        mainCanvas.height = isRotated ? img.width : img.height;
-        ctx.save();
-        ctx.translate(mainCanvas.width / 2, mainCanvas.height / 2);
-        ctx.rotate(imgRotation * Math.PI / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        ctx.restore();
+        const rotated = (imgRotation / 90) % 2 !== 0;
+        mainCanvas.width = rotated ? img.height : img.width; mainCanvas.height = rotated ? img.width : img.height;
+        ctx.save(); ctx.translate(mainCanvas.width/2, mainCanvas.height/2); ctx.rotate(imgRotation * Math.PI / 180);
+        ctx.drawImage(img, -img.width/2, -img.height/2); ctx.restore();
     }
-
     document.getElementById('rotateBtn').onclick = () => { imgRotation = (imgRotation + 90) % 360; renderImage(); };
 
-    // --- OCR 與 AI 智慧辨識 ---
     document.getElementById('transformBtn').onclick = async () => {
-        if (!GEMINI_API_KEY) {
-            alert("金鑰尚未載入，請先完成 Google 登入。");
-            return;
-        }
-        log("OCR", "辨識中...");
-        // 製作縮圖預覽
+        log("OCR", "掃描中...");
         cpCtx.drawImage(mainCanvas, 0, 0, mainCanvas.width, mainCanvas.height, 0, 0, 300, 180);
-        
         const result = await Tesseract.recognize(mainCanvas, 'chi_tra+eng');
         callGemini(result.data.text);
     };
 
     async function callGemini(ocrText) {
-        log("AI", "正在解析資料內容...");
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-        
-        const prompt = `你是一個專業秘書。請從文字中提取:姓名、公司、案號、電話、Email。
-                        文字內容：${ocrText}
-                        請只回傳 JSON 格式：{"name":"","company":"","project":"","phone":"","email":""}`;
-
+        log("AI", "智慧分析中...");
+        const url = `https://generativelanguage.googleapis.com/${API_VERSION}/${TARGET_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        const prompt = `請解析文字提取 JSON: {"name":"","company":"","project":"","phone":"","email":""}。文字：${ocrText}`;
         try {
-            const resp = await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
+            const resp = await fetch(url, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
             const data = await resp.json();
-            
-            if (data.error) { log("ERROR", "AI 請求錯誤: " + data.error.message); return; }
-
-            const cleanText = data.candidates[0].content.parts[0].text.replace(/```json|```/g, "").trim();
-            const res = JSON.parse(cleanText);
-            
-            document.getElementById('field_name').value = res.name || "";
-            document.getElementById('field_company').value = res.company || "";
-            document.getElementById('field_project').value = res.project || "";
-            document.getElementById('field_phone').value = res.phone || "";
-            document.getElementById('field_email').value = res.email || "";
-            
-            log("SUCCESS", "AI 解析完成。");
-            document.getElementById('saveBtn').disabled = false;
-        } catch (e) {
-            log("ERROR", "AI 解析過程發生錯誤。");
-        }
+            if (data.error) { log("ERROR", data.error.message); return; }
+            const res = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, ""));
+            document.getElementById('field_name').value = res.name;
+            document.getElementById('field_company').value = res.company;
+            document.getElementById('field_project').value = res.project;
+            document.getElementById('field_phone').value = res.phone;
+            document.getElementById('field_email').value = res.email;
+            log("SUCCESS", "解析完成。"); document.getElementById('saveBtn').disabled = false;
+        } catch (e) { log("ERROR", "解析錯誤。"); }
     }
 
-    // --- 自動搜尋或建立試算表 ---
+    // --- 儲存與搜尋 ---
     async function getOrCreateSheet() {
         const searchUrl = `https://www.googleapis.com/drive/v3/files?q=name='${TARGET_FILE_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
         const searchResp = await fetch(searchUrl, { headers: { 'Authorization': 'Bearer ' + accessToken } });
         const searchData = await searchResp.json();
-
-        if (searchData.files && searchData.files.length > 0) {
-            return searchData.files[0].id;
-        } else {
-            log("SYSTEM", "找不到檔案，正在建立新資料庫...");
-            const createResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
-            const newId = createResp.result.spreadsheetId;
-            const header = [["日期", "姓名", "公司", "案號", "電話", "Email", "圖片連結"]];
-            await gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: newId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: header }
-            });
-            return newId;
-        }
+        if (searchData.files.length > 0) return searchData.files[0].id;
+        const createResp = await gapi.client.sheets.spreadsheets.create({ resource: { properties: { title: TARGET_FILE_NAME } } });
+        const newId = createResp.result.spreadsheetId;
+        const header = [["日期", "姓名", "公司", "案號", "電話", "Email", "圖片"]];
+        await gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: newId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: header } });
+        return newId;
     }
 
-    // --- 💾 雲端儲存流程 ---
     document.getElementById('saveBtn').onclick = async () => {
-        log("CLOUD", "正在上傳至雲端...");
+        log("CLOUD", "同步中...");
         try {
             const sheetId = await getOrCreateSheet();
-            
-            // 1. 上傳圖片到 Drive
-            const blob = await new Promise(res => document.getElementById('colorPreview').toBlob(res, 'image/jpeg'));
+            const blob = await new Promise(r => document.getElementById('colorPreview').toBlob(r, 'image/jpeg'));
             const metadata = { name: `名片_${document.getElementById('field_name').value}.jpg`, mimeType: 'image/jpeg' };
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', blob);
-
-            const driveResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + accessToken },
-                body: form
-            });
-            const driveFile = await driveResp.json();
-
-            // 2. 寫入 Sheets
-            const row = [
-                new Date().toLocaleDateString(),
-                document.getElementById('field_name').value,
-                document.getElementById('field_company').value,
-                document.getElementById('field_project').value,
-                document.getElementById('field_phone').value,
-                document.getElementById('field_email').value,
-                `https://drive.google.com/file/d/${driveFile.id}/view`
-            ];
-
-            await gapi.client.sheets.spreadsheets.values.append({
-                spreadsheetId: sheetId,
-                range: 'Sheet1!A1',
-                valueInputOption: 'USER_ENTERED',
-                resource: { values: [row] }
-            });
-
-            log("SUCCESS", "✅ 存檔成功！");
-            alert("名片資料已存入雲端！");
-        } catch (e) {
-            log("ERROR", "儲存失敗: " + e.message);
-        }
+            const dr = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + accessToken }, body: form });
+            const dFile = await dr.json();
+            const row = [new Date().toLocaleDateString(), document.getElementById('field_name').value, document.getElementById('field_company').value, document.getElementById('field_project').value, document.getElementById('field_phone').value, document.getElementById('field_email').value, `https://drive.google.com/file/d/${dFile.id}/view` ];
+            await gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: sheetId, range: 'Sheet1!A1', valueInputOption: 'USER_ENTERED', resource: { values: [row] } });
+            log("SUCCESS", "✅ 儲存成功！"); alert("已存入資料庫");
+        } catch (e) { log("ERROR", "儲存失敗"); }
     };
 </script>
 <script async defer src="https://apis.google.com/js/api.js" onload="gapiInit()"></script>
