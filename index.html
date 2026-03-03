@@ -21,15 +21,13 @@
         .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
         .content-area { flex-grow: 1; background: #000; position: relative; }
         iframe { width: 100%; height: 100%; border: none; }
-
-        /* 除錯視窗樣式 */
         #debug-console { 
-            width: 100%; height: 150px; background: #000; color: #0f0; 
-            font-family: monospace; font-size: 11px; padding: 10px; 
-            margin-top: 20px; border-radius: 8px; border: 1px solid #334155;
-            overflow-y: auto; text-align: left; line-height: 1.4;
+            width: 100%; height: 180px; background: #000; color: #0f0; 
+            font-family: monospace; font-size: 11px; padding: 12px; 
+            margin-top: 25px; border-radius: 8px; border: 1px solid #00f2ff;
+            overflow-y: auto; text-align: left; line-height: 1.5;
         }
-        .log-item { border-bottom: 1px solid #222; margin-bottom: 2px; }
+        .log-item { border-bottom: 1px solid #1a1a1a; padding: 2px 0; }
         .log-err { color: #ff4b4b; }
         .log-success { color: #00f2ff; }
     </style>
@@ -51,9 +49,7 @@
             </div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
             
-            <div id="debug-console">
-                <div class="log-item">系統準備就緒...</div>
-            </div>
+            <div id="debug-console"></div>
         </div>
     </div>
 
@@ -70,91 +66,91 @@
         <main class="content-area"><iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe></main>
     </div>
 
+    <script>
+        const debugEl = document.getElementById('debug-console');
+        window.sysLog = function(msg, type = '') {
+            const div = document.createElement('div');
+            div.className = 'log-item' + (type ? ' log-' + type : '');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if(debugEl) {
+                debugEl.appendChild(div);
+                debugEl.scrollTop = debugEl.scrollHeight;
+            }
+            console.log(`[DEBUG] ${msg}`);
+        };
+        window.sysLog("核心腳本加載中...");
+    </script>
+
+    <script>
+        window.handleCredentialResponse = async function(response) {
+            window.sysLog("Google 驗證完成，開始解析憑證...", "success");
+            try {
+                const base64Url = response.credential.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const payload = JSON.parse(atob(base64));
+                const userEmail = payload.email.toLowerCase();
+                window.sysLog("登入者：" + userEmail);
+
+                // 等待 Module 腳本把 appConfig 準備好
+                if (!window.appConfig) {
+                    window.sysLog("正在讀取設定檔，請稍候...");
+                    const res = await fetch('./manifest.json?v=' + Date.now());
+                    window.appConfig = await res.json();
+                }
+
+                const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+                window.sysLog("正在比對授權名單...");
+
+                if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
+                    window.sysLog("驗證通過！解鎖系統介面。", "success");
+                    sessionStorage.setItem('ai_lab_auth', 'true');
+                    sessionStorage.setItem('user_email', userEmail);
+                    sessionStorage.setItem('user_name', payload.name);
+                    
+                    // 呼叫 Module 內的啟動函式
+                    if (window.startSystem) window.startSystem();
+                } else {
+                    window.sysLog("存取拒絕：此帳號不在白名單內。", "err");
+                }
+            } catch (e) {
+                window.sysLog("驗證邏輯出錯：" + e.message, "err");
+            }
+        };
+    </script>
+
     <script type="module">
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        const debugEl = document.getElementById('debug-console');
-        function sysLog(msg, type = '') {
-            const div = document.createElement('div');
-            div.className = 'log-item ' + (type === 'err' ? 'log-err' : (type === 'ok' ? 'log-success' : ''));
-            div.innerText = `> ${new Date().toLocaleTimeString()}: ${msg}`;
-            debugEl.appendChild(div);
-            debugEl.scrollTop = debugEl.scrollHeight;
-        }
-
-        window.appConfig = null;
-
-        async function bootstrap() {
-            try {
-                sysLog("正在獲取 manifest.json...");
-                const response = await fetch('./manifest.json?v=' + Date.now());
-                if (!response.ok) throw new Error("讀取設定檔失敗(404)");
-                window.appConfig = await response.json();
-                
-                sysLog("設定檔加載成功，版本: " + window.appConfig.ai_lab_config.version, "ok");
-                document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
-
-                if (sessionStorage.getItem('ai_lab_auth') === 'true') {
-                    sysLog("偵測到已有 Session，自動登入中...");
-                    unlockSystem();
-                }
-            } catch (e) {
-                sysLog("初始化錯誤: " + e.message, "err");
-            }
-        }
-
-        window.handleCredentialResponse = async (response) => {
-            sysLog("收到 Google 回傳憑證", "ok");
-
-            if (!window.appConfig) {
-                sysLog("配置未完成，嘗試手動補抓...");
-                const res = await fetch('./manifest.json');
-                window.appConfig = await res.json();
-            }
-
-            try {
-                const payload = JSON.parse(atob(response.credential.split('.')[1]));
-                const userEmail = payload.email.toLowerCase();
-                sysLog("登入者 Email: " + userEmail);
-                
-                const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
-                sysLog("正在比對白名單 (名單人數: " + allowedUsers.length + ")...");
-
-                const isAuthorized = allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw");
-
-                if (isAuthorized) {
-                    sysLog("驗證成功！進入系統...", "ok");
-                    sessionStorage.setItem('ai_lab_auth', 'true');
-                    sessionStorage.setItem('user_email', userEmail);
-                    sessionStorage.setItem('user_name', payload.name);
-                    unlockSystem();
-                } else {
-                    sysLog("拒絕存取：此帳號不在白名單中", "err");
-                    sysLog("請檢查 manifest.json 是否已包含: " + userEmail, "err");
-                }
-            } catch (err) {
-                sysLog("解析錯誤: " + err.message, "err");
-            }
+        window.startSystem = function() {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-layout').style.display = 'flex';
+            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+            
+            window.DebugSystem = new DebugSystem();
+            const loader = new AppLoader(window.appConfig);
+            loader.renderMenu('menu-container');
         };
 
-        function unlockSystem() {
+        async function init() {
             try {
-                document.getElementById('auth-overlay').style.display = 'none';
-                document.getElementById('main-layout').style.display = 'flex';
-                document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-                
-                window.DebugSystem = new DebugSystem();
-                const loader = new AppLoader(window.appConfig);
-                loader.renderMenu('menu-container');
-                sysLog("介面渲染完成", "ok");
+                window.sysLog("讀取 manifest.json...");
+                const response = await fetch('./manifest.json?v=' + Date.now());
+                window.appConfig = await response.json();
+                document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
+                window.sysLog("設定檔加載成功。", "success");
+
+                if (sessionStorage.getItem('ai_lab_auth') === 'true') {
+                    window.sysLog("偵測到有效工作階段，自動解鎖...");
+                    window.startSystem();
+                }
             } catch (e) {
-                sysLog("解鎖介面失敗: " + e.message, "err");
+                window.sysLog("配置加載失敗：" + e.message, "err");
             }
         }
 
         window.logout = () => { sessionStorage.clear(); location.reload(); };
-        bootstrap();
+        init();
     </script>
 </body>
 </html>
