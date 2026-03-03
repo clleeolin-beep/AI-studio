@@ -14,31 +14,43 @@
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
         body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
         
-        /* 頂部導航 */
-        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; }
+        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; }
         
-        /* 登入遮罩 */
         #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; }
         
-        /* 主佈局修復：使用 Flex 並確保高度扣除 Navbar */
-        #main-layout { display: none; height: calc(100vh - 56px); width: 100%; }
+        /* 主佈局：重要，高度必須扣除 Navbar */
+        #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         
-        /* 側邊欄修復 */
-        .sidebar { width: 260px; min-width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
-        #menu-container { flex-grow: 1; }
+        /* 側邊欄：分組存放選單與 Debug Log */
+        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; }
+        
+        #menu-container { flex-grow: 1; overflow-y: auto; }
 
-        /* 內容區修復：確保 Iframe 撐滿 */
-        .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; width: 100%; }
-        iframe { width: 100%; height: 100%; border: none; display: block; }
+        /* 分類收放樣式 */
+        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
+        .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; background: rgba(0, 0, 0, 0.2); }
+        .module-group.collapsed { max-height: 0; }
+        .bi-chevron-down { transition: transform 0.3s; font-size: 10px; }
+        .collapsed .bi-chevron-down { transform: rotate(-90deg); }
 
-        /* 左側選單樣式對齊 */
-        .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; }
+        /* Debug 視窗：固定在側邊欄底部 */
+        #debug-log { 
+            height: 220px; background: rgba(0,0,0,0.8); border-top: 2px solid var(--lab-cyan); 
+            font-family: 'Consolas', monospace; font-size: 11px; color: #00ff00; 
+            padding: 10px; overflow-y: auto; word-break: break-all; flex-shrink: 0;
+        }
+
+        /* 內容區：強制 Iframe 撐滿 */
+        .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; overflow: hidden; }
+        iframe { width: 100%; height: 100%; border: none; display: block; position: absolute; top: 0; left: 0; }
+
+        .nav-link { color: #94a3b8; padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; }
         .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
         .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
 
-        #debug-console { width: 100%; height: 150px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; margin-top: 20px; border-radius: 8px; border: 1px solid #00f2ff; overflow-y: auto; text-align: left; }
+        #debug-console-init { width: 100%; height: 120px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; margin-top: 20px; border-radius: 8px; border: 1px solid #00f2ff; overflow-y: auto; text-align: left; }
     </style>
 </head>
 <body>
@@ -47,10 +59,10 @@
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">權限驗證中 (v2.2.0)</p>
+            <p class="text-muted mb-4 small">權限驗證中 (Debug 強化版)</p>
             <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
-            <div id="debug-console"></div>
+            <div id="debug-console-init"></div>
         </div>
     </div>
 
@@ -63,17 +75,23 @@
     </nav>
 
     <div id="main-layout">
-        <aside class="sidebar"><div id="menu-container"></div></aside>
+        <aside class="sidebar">
+            <div id="menu-container"></div>
+            <div id="debug-log"></div> 
+        </aside>
         <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
     </div>
 
     <script>
+        // 登入前專用 Log
         window.sysLog = function(msg, type = '') {
-            const debugEl = document.getElementById('debug-console');
+            const debugEl = document.getElementById('debug-console-init');
+            if(!debugEl) return;
             const div = document.createElement('div');
             div.style.color = (type === 'err' ? '#ff4b4b' : (type === 'success' ? '#00f2ff' : '#0f0'));
             div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            if(debugEl) { debugEl.appendChild(div); debugEl.scrollTop = debugEl.scrollHeight; }
+            debugEl.appendChild(div);
+            debugEl.scrollTop = debugEl.scrollHeight;
         };
 
         function base64UrlDecode(str) {
@@ -117,9 +135,13 @@
             document.getElementById('main-layout').style.display = 'flex';
             document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
             
-            // 重要：DebugSystem 必須掛載到 window 供 Iframe 使用
-            if (DebugSystem) window.DebugSystem = new DebugSystem();
+            // 掛載 DebugSystem (對接側邊欄底部的 #debug-log)
+            if (DebugSystem) {
+                window.DebugSystem = new DebugSystem();
+                window.DebugSystem.log("AI STUDIO 核心啟動成功", "SUCCESS");
+            }
             
+            // 渲染分類選單
             if (AppLoader && window.appConfig) {
                 const loader = new AppLoader(window.appConfig);
                 loader.renderMenu('menu-container');
@@ -132,7 +154,7 @@
                 window.appConfig = await response.json();
                 document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') window.startSystem();
-            } catch (e) { window.sysLog("初始化失敗: " + e.message, "err"); }
+            } catch (e) { console.error("Init Error", e); }
         }
         init();
         window.logout = () => { sessionStorage.clear(); location.reload(); };
