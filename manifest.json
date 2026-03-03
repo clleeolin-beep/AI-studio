@@ -1,0 +1,143 @@
+{
+  "name": "惇陽 AI 實驗室 (AI Lab Studio)",
+  "short_name": "AI Lab",
+  "description": "專業工程、空間分析、專案管理與現場會勘自動化整合平台",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f0f2f5",
+  "theme_color": "#1A5276",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "ai_lab_config": {
+    "framework": "Modular-Component-V1",
+    "version": "1.0.0",
+    "naming_convention": "init[ModuleName]",
+    "core_systems": {
+      "loader": "core/AppLoader.js",
+      "event_bus": "core/EventBus.js",
+      "auth_service": "core/AuthService.js",
+      "offline_sync": "core/OfflineSync.js",
+      "debug_monitor": "core/DebugSystem.js"
+    },
+    "hardware_permissions": [
+      "camera",
+      "geolocation",
+      "local_storage",
+      "file_system"
+    ],
+    "modules": [
+      {
+        "id": "MapEngine",
+        "name": "實績與空間地圖",
+        "path": "modules/MapEngine.js",
+        "entry_point": "window.initMapEngine",
+        "description": "3D地形渲染、WKT 幾何繪製與雙向連動",
+        "status": "active",
+        "requires_hardware": ["geolocation"],
+        "offline_support": false
+      },
+      {
+        "id": "InspectionTool",
+        "name": "現場會勘工具",
+        "path": "modules/InspectionTool.js",
+        "entry_point": "window.initInspectionTool",
+        "description": "工程現場查驗、拍照記錄與表單填寫",
+        "status": "active",
+        "requires_hardware": ["camera", "geolocation"],
+        "offline_support": true
+      },
+      {
+        "id": "CalcEngine",
+        "name": "工程計算與估算",
+        "path": "modules/CalcEngine.js",
+        "entry_point": "window.initCalcEngine",
+        "description": "提供工程數值計算、面積與預算估算",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": true
+      },
+      {
+        "id": "WeatherMonitor",
+        "name": "氣象監測系統",
+        "path": "modules/WeatherMonitor.js",
+        "entry_point": "window.initWeatherMonitor",
+        "description": "即時氣象API串接與歷史數據圖表視覺化",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": false
+      },
+      {
+        "id": "GanttSystem",
+        "name": "專案甘特圖排程",
+        "path": "modules/GanttSystem.js",
+        "entry_point": "window.initGanttSystem",
+        "description": "專案進度管理、時間軸與任務依賴設定",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": true
+      },
+      {
+        "id": "BusinessCard",
+        "name": "名片與人脈管理",
+        "path": "modules/BusinessCard.js",
+        "entry_point": "window.initBusinessCard",
+        "description": "視覺化OCR名片辨識與聯絡人建檔",
+        "status": "active",
+        "requires_hardware": ["camera"],
+        "offline_support": false
+      },
+      {
+        "id": "DocumentEngine",
+        "name": "技術文件與報告",
+        "path": "modules/DocumentEngine.js",
+        "entry_point": "window.initDocumentEngine",
+        "description": "自動化報告產製、文件管理與匯出",
+        "status": "active",
+        "requires_hardware": ["file_system"],
+        "offline_support": true
+      },
+      {
+        "id": "GreenAnalysis",
+        "name": "綠能與環境分析",
+        "path": "modules/GreenAnalysis.js",
+        "entry_point": "window.initGreenAnalysis",
+        "description": "綠建築指標、環境友善分析工具",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": false
+      },
+      {
+        "id": "TreeNavigation",
+        "name": "樹狀組織導覽",
+        "path": "modules/TreeNavigation.js",
+        "entry_point": "window.initTreeNavigation",
+        "description": "複雜資料結構的階層式視窗展示",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": true
+      },
+      {
+        "id": "NasSyncService",
+        "name": "NAS 與 GitHub 串聯",
+        "path": "modules/NasSyncService.js",
+        "entry_point": "window.initNasSyncService",
+        "description": "底層數據庫同步、雲端檔案掛載與備份",
+        "status": "active",
+        "requires_hardware": [],
+        "offline_support": false
+      }
+    ]
+  }
+}
