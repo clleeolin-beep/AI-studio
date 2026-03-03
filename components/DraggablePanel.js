@@ -1,7 +1,8 @@
 /**
- * @fileoverview DraggablePanel.js - 惇陽 AI 實驗室 互動 UI 模組 v1.1
- * [分組模塊邏輯：依賴檢查與守衛邏輯]
- * 功能：建立可拖移、最小化、支援動態內容注入的浮動面板。
+ * @fileoverview DraggablePanel.js - 惇陽 AI 實驗室 互動 UI 模組 v1.2
+ * @module components/DraggablePanel
+ * @description 建立可拖移、最小化、支援動態內容注入的浮動面板。
+ * 已對接全域 DebugSystem 通訊協定。
  */
 
 // --- 模組防禦性檢查 ---
@@ -9,9 +10,15 @@ if (typeof document === 'undefined') {
     console.error('[DraggablePanel] 嚴重錯誤：此模組僅支援瀏覽器環境。');
 }
 
-class DraggablePanel {
+export default class DraggablePanel {
     /**
      * @param {Object} options - 配置參數
+     * @param {string} options.id - 面板唯一 ID
+     * @param {string} options.title - 面板顯示標題
+     * @param {number} [options.width=350] - 面板寬度
+     * @param {number} [options.top=20] - 初始頂部偏移
+     * @param {number} [options.left=20] - 初始左側偏移
+     * @param {boolean} [options.isClosable=true] - 是否顯示關閉按鈕
      */
     constructor(options) {
         this.options = {
@@ -33,7 +40,7 @@ class DraggablePanel {
     }
 
     /**
-     * [分組一：DOM 結構建立]
+     * 初始化 DOM 結構
      * @private
      */
     _init() {
@@ -57,7 +64,7 @@ class DraggablePanel {
             transition: 'width 0.3s ease'
         });
 
-        // 2. 建立標題欄 (拖移點) - 使用實驗室招牌配色
+        // 2. 建立標題欄 (拖移點) - 實驗室招牌配色 (Cyan/Dark)
         this.header = document.createElement('div');
         this.header.className = 'panel-header d-flex justify-content-between align-items-center p-2';
         Object.assign(this.header.style, {
@@ -93,7 +100,7 @@ class DraggablePanel {
     }
 
     /**
-     * [分組二：交互與拖拽邏輯]
+     * 綁定事件監聽
      * @private
      */
     _bindEvents() {
@@ -106,8 +113,8 @@ class DraggablePanel {
             isDragging = true;
             offsetX = e.clientX - this.container.offsetLeft;
             offsetY = e.clientY - this.container.offsetTop;
-            this.container.style.zIndex = '1100'; // 點擊時暫時置於最頂層
-            this.container.style.transition = 'none'; // 拖動時關閉動畫以防延遲
+            this.container.style.zIndex = '1100'; // 置頂
+            this.container.style.transition = 'none'; 
         });
 
         // 拖拽移動
@@ -117,7 +124,7 @@ class DraggablePanel {
             let left = e.clientX - offsetX;
             let top = e.clientY - offsetY;
             
-            // 邊界檢查：防止面板移出視窗
+            // 邊界檢查
             const maxX = window.innerWidth - this.container.offsetWidth;
             const maxY = window.innerHeight - this.header.offsetHeight;
             left = Math.max(0, Math.min(left, maxX));
@@ -136,17 +143,15 @@ class DraggablePanel {
             }
         });
 
-        // 最小化控制
+        // UI 控制
         this.header.querySelector('.minimize-btn').addEventListener('click', () => this.toggleMinimize());
-
-        // 關閉控制
         if (this.options.isClosable) {
             this.header.querySelector('.close-btn').addEventListener('click', () => this.destroy());
         }
     }
 
     /**
-     * [分組三：外部接口 - 內容注入]
+     * 注入新內容
      * @param {string|HTMLElement} content 
      */
     setContent(content) {
@@ -160,7 +165,7 @@ class DraggablePanel {
     }
 
     /**
-     * [分組四：狀態管理]
+     * 切換最小化/展開狀態
      */
     toggleMinimize() {
         this.isMinimized = !this.isMinimized;
@@ -175,18 +180,27 @@ class DraggablePanel {
     }
 
     /**
-     * [分組五：系統銷毀與日誌]
+     * 銷毀組件
      */
     destroy() {
         this.container.remove();
         this.log(`面板 ${this.options.id} 已關閉並銷毀`);
     }
 
-    log(msg) {
+    /**
+     * 對接全域偵錯中樞
+     * @param {string} msg 
+     * @param {string} [level="INFO"]
+     */
+    log(msg, level = "INFO") {
         if (window.parent && typeof window.parent.postMessage === 'function') {
-            window.parent.postMessage({ type: 'debug', module: 'DraggablePanel', msg: msg }, '*');
+            window.parent.postMessage({ 
+                source: 'AI_STUDIO_APP', // 關鍵補全：與 DebugSystem 標籤對齊
+                type: 'debug', 
+                module: 'DraggablePanel', 
+                msg: msg,
+                level: level
+            }, '*');
         }
     }
 }
-
-export default DraggablePanel;
