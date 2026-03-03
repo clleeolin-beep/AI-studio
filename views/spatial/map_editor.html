@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖資編輯工具 | AI Studio</title>
+    <style>
+        :root {
+            --accent-cyan: #00f2ff;
+            --bg-dark: #0b0e14;
+            --panel-bg: rgba(20, 30, 48, 0.9);
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background: var(--bg-dark);
+            color: white;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            width: 100%; height: 100%;
+            background: #1a1a1a;
+        }
+
+        /* 編輯控制面板 */
+        .editor-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        h3 { margin-top: 0; color: var(--accent-cyan); font-size: 1.1rem; border-bottom: 1px solid #34495e; padding-bottom: 10px; }
+
+        .tool-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
+
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        button {
+            background: #1A5276;
+            border: 1px solid var(--accent-cyan);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        button:hover { background: var(--accent-cyan); color: #000; }
+        button.active { background: #e74c3c; border-color: #ff4444; }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #000;
+            border: 1px solid #34495e;
+            color: var(--accent-cyan);
+            font-family: monospace;
+            font-size: 11px;
+            padding: 5px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            resize: none;
+        }
+
+        .status { font-size: 12px; margin-top: 10px; color: #5dade2; }
+    </style>
+</head>
+<body>
+
+<div class="editor-panel">
+    <h3>🛠️ 圖資編輯工具</h3>
+    
+    <div class="tool-group">
+        <label>繪圖工具</label>
+        <div class="btn-grid">
+            <button id="draw-point" onclick="setMode('point')">📍 標註點</button>
+            <button id="draw-line" onclick="setMode('line')">📏 測距線</button>
+            <button id="draw-poly" onclick="setMode('polygon')">⬢ 繪多邊形</button>
+            <button onclick="clearMap()" style="background:#555;">🗑️ 清除全部</button>
+        </div>
+    </div>
+
+    <div class="tool-group">
+        <label>WKT 輸出 (Well-Known Text)</label>
+        <textarea id="wkt-output" readonly placeholder="繪製完成後自動生成座標字串..."></textarea>
+        <button onclick="copyWKT()" style="width: 100%; margin-top: 5px;">📋 複製 WKT</button>
+    </div>
+
+    <div id="editor-status" class="status">狀態: 準備就緒</div>
+</div>
+
+<div id="map"></div>
+
+<script src="../../components/MapEngine.js"></script>
+
+<script>
+    let currentMode = null;
+
+    // 1. 與母視窗 DebugSystem 連動
+    function log(msg, level = "INFO") {
+        if (window.parent) {
+            window.parent.postMessage({
+                type: 'debug',
+                module: 'MapEditor',
+                msg: msg,
+                level: level
+            }, '*');
+        }
+    }
+
+    // 2. 初始化地圖
+    document.addEventListener('DOMContentLoaded', () => {
+        log("編輯器頁面載入完成", "SUCCESS");
+        
+        try {
+            if (typeof MapEngine !== 'undefined') {
+                // 初始化地圖並開啟編輯功能
+                MapEngine.init('map', {
+                    center: [121.509, 25.045], // 預設台北
+                    zoom: 13,
+                    editable: true
+                });
+                log("MapEngine 引擎連線成功", "SUCCESS");
+            } else {
+                throw new Error("找不到 MapEngine.js 組件");
+            }
+        } catch (e) {
+            log(e.message, "ERROR");
+            document.getElementById('editor-status').innerText = "狀態: 引擎載入失敗";
+        }
+    });
+
+    // 3. 設定繪製模式
+    function setMode(mode) {
+        // UI 回饋
+        document.querySelectorAll('.btn-grid button').forEach(btn => btn.classList.remove('active'));
+        if (mode) document.getElementById('draw-' + mode.substring(0,4)).classList.add('active');
+
+        currentMode = mode;
+        log(`切換繪製模式: ${mode}`, "INFO");
+        document.getElementById('editor-status').innerText = `狀態: 正在繪製 ${mode}...`;
+
+        // 呼叫引擎開啟繪圖
+        if (window.MapEngine && MapEngine.startDrawing) {
+            MapEngine.startDrawing(mode, (result) => {
+                handleDrawComplete(result);
+            });
+        }
+    }
+
+    // 4. 繪製完成處理
+    function handleDrawComplete(result) {
+        // 假設 result 包含 wkt 字串
+        const wktField = document.getElementById('wkt-output');
+        wktField.value = result.wkt;
+        
+        log("繪製完成，已生成 WKT 資料", "SUCCESS");
+        document.getElementById('editor-status').innerText = "狀態: 繪製完成";
+        
+        // 移除按鈕選取狀態
+        document.querySelectorAll('.btn-grid button').forEach(btn => btn.classList.remove('active'));
+    }
+
+    // 5. 清除地圖
+    function clearMap() {
+        if (confirm("確定要清除地圖上所有暫存內容嗎？")) {
+            if (MapEngine.clear) MapEngine.clear();
+            document.getElementById('wkt-output').value = "";
+            document.getElementById('editor-status').innerText = "狀態: 已清除";
+            log("用戶清除地圖暫存內容", "WARN");
+        }
+    }
+
+    // 6. 複製功能
+    function copyWKT() {
+        const text = document.getElementById('wkt-output');
+        if (!text.value) return alert("尚無資料可複製");
+        
+        text.select();
+        document.execCommand('copy');
+        log("已複製 WKT 字串至剪貼簿", "INFO");
+        alert("WKT 已複製");
+    }
+</script>
+</body>
+</html>
