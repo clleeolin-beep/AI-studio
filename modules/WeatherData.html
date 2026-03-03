@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>氣候資料智慧工具 V69</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --blue: #3498db; --danger: #e74c3c; --purple: #8e44ad; --orange: #e67e22; }
+        body { font-family: "Microsoft JhengHei", sans-serif; max-width: 950px; margin: 40px auto; padding: 20px; background-color: #f4f7f6; }
+        .card { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 25px; border-top: 5px solid var(--primary); }
+        .card.cleaner { border-top-color: var(--danger); }
+        .card.cloud { border-top-color: var(--purple); }
+        .card.scan { border-top-color: var(--orange); }
+        h2 { margin: 0 0 10px 0; color: var(--primary); font-size: 1.4em; }
+        .desc { color: #7f8c8d; font-size: 0.85em; margin-bottom: 15px; }
+        .section { margin-bottom: 15px; padding: 12px; background: #f9f9f9; border-radius: 8px; border: 1px solid #eee; }
+        label { font-weight: bold; font-size: 0.9em; color: var(--primary); margin-right: 10px; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-family: inherit; }
+        button { padding: 12px 20px; font-size: 15px; cursor: pointer; color: white; border: none; border-radius: 6px; width: 100%; transition: 0.3s; }
+        button:disabled { background: #ccc !important; cursor: not-allowed; opacity: 0.6; }
+        .btn-merge { background: var(--blue); }
+        .btn-clean { background: var(--danger); }
+        .btn-cloud { background: var(--purple); }
+        .btn-scan { background: var(--orange); }
+        #status { margin-top: 20px; padding: 15px; border-radius: 6px; background: #2c3e50; color: #ecf0f1; font-size: 0.9em; white-space: pre-line; border-left: 5px solid var(--accent); }
+        .diag-box { font-family: monospace; font-size: 0.8em; color: #3be200; background: #1a1a1a; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #444; line-height: 1.6; max-height: 350px; overflow-y: auto; }
+        .diag-err { color: #ff5555; }
+        .diag-info { color: #3498db; }
+        .diag-success { color: #55ff55; }
+        .diag-warn { color: #f1c40f; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>📂 第一區：彙整與地理資訊注入 (免登入/強制去重輸出)</h2>
+        <p class="desc">在此區放入任何帶有 (1) 污染的檔案，系統皆會自動洗淨、去重。</p>
+        <div class="section"><input type="file" id="mergeInput" multiple accept=".csv, .xlsx"></div>
+        <button id="mergeBtn" class="btn-merge" disabled>執行洗淨與彙整下載</button>
+    </div>
+
+    <div class="card cleaner">
+        <h2>🧹 第二區：10 年滾動清理 (智慧日期對位)</h2>
+        <div class="section">
+            <label>清理基準：</label>
+            <select id="cleanBasis">
+                <option value="year">以年份為基準</option>
+                <option value="month">以月份為基準</option>
+                <option value="day" selected>以日期為基準</option>
+            </select>
+        </div>
+        <div class="section"><input type="file" id="cleanInput" accept=".xlsx"></div>
+        <button id="cleanBtn" class="btn-clean" disabled>執行清理下載</button>
+    </div>
+
+    <div class="card cloud">
+        <h2>☁️ 第三區：智慧同步</h2>
+        <p class="desc">直接以洗淨後的純淨資料強制覆蓋雲端，徹底消滅歷史錯誤堆疊。</p>
+        <div class="section">
+            <input type="file" id="syncInput" multiple accept=".csv, .xlsx">
+        </div>
+        <button id="syncBtn" class="btn-cloud" disabled>授權並執行同步判讀</button>
+        <div id="diag" class="diag-box">診斷：等待匯入檔案...</div>
+    </div>
+
+    <div class="card scan">
+        <h2>🔍 第四區：雲端資料庫健康與異常排錯偵測</h2>
+        <p class="desc">精準揪出您試算表中被 "(1)" 污染的假性重複日期，請掃描後利用第三區修復。</p>
+        <button id="scanBtn" class="btn-scan">授權並執行健康與排錯掃描</button>
+        <div id="diagScan" class="diag-box">偵測報告：等待啟動...</div>
+    </div>
+
+    <div id="status">準備中...</div>
+
+    <script>
+        const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
+        const MASTER_SS_ID = '12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg';
+        const FOLDER_ID = '1HqmjT4H1Z1optd8QV3W21GSfgoL6894F';
+        
+        let STATION_DB = {};
+        let tokenClient, accessToken = null;
+        const status = document.getElementById('status');
+        const diag = document.getElementById('diag');
+        const diagScan = document.getElementById('diagScan');
+
+        window.stationLoader = (json) => {
+            if (json?.table) {
+                let rows = json.table.rows;
+                let rowsCount = rows.length;
+                let i = 0;
+                while (i < rowsCount) {
+                    let r = rows[i];
+                    let id = String(r.c[0]?.v || "").trim();
+                    if (id !== "") {
+                        STATION_DB[id] = { 
+                            city: String(r.c[6]?.v || ""), name: String(r.c[1]?.v || ""), alt: String(r.c[3]?.v || ""), 
+                            lon: String(r.c[4]?.v || ""), lat: String(r.c[5]?.v || ""), addr: String(r.c[7]?.v || "") 
+                        };
+                    }
+                    i++;
+                }
+                status.innerText = "✅ 系統就緒。測站對照表載入完成。";
+            }
+        };
+        const s = document.createElement('script');
+        s.src = `https://docs.google.com/spreadsheets/d/${MASTER_SS_ID}/gviz/tq?tqx=responseHandler:stationLoader`;
+        document.body.appendChild(s);
+
+        window.onload = () => {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata https://www.googleapis.com/auth/drive.readonly',
+                callback: (resp) => { 
+                    accessToken = resp.access_token; 
+                    if (window.pendingAction === 'sync') { startFolderSync(); } 
+                    else if (window.pendingAction === 'scan') { startCloudScan(); }
+                }
+            });
+        };
+
+        function sanitizeString(v) {
+            if (v === null || v === undefined) return "";
+            let str = String(v);
+            str = str.replace(/[\r\n\t]+/g, " ");
+            str = str.trim();
+            if (str === '/' || str === '-' || str === 'X' || str === '...' || str === 'T') {
+                return "";
+            }
+            return str;
+        }
+
+        function formatDateKey(rawDate) {
+            let str = sanitizeString(rawDate);
+            str = str.replace(/\s*\(\d+\)/g, ""); 
+            if (str === "") return "";
+            let parts = str.split('/');
+            if (parts.length === 3) {
+                let y = String(parts[0]).trim();
+                let m = String(parts[1]).trim();
+                let d = String(parts[2]).trim();
+                if (m.length === 1) { m = '0' + m; }
+                if (d.length === 1) { d = '0' + d; }
+                return y + '/' + m + '/' + d;
+            }
+            return str;
+        }
+
+        // 核心引擎：第一區與第三區共用。強迫執行絕對矩陣展開，阻絕所有錯位與污染
+        async function parseFile(file) {
+            let fileBase = file.name;
+            fileBase = fileBase.replace(/\.csv$/i, "");
+            fileBase = fileBase.replace(/\.xlsx$/i, "");
+            fileBase = fileBase.replace(/\s*\(\d+\)/g, ""); // 暴力切除檔名中的 (1), (2) 污染
+            fileBase = fileBase.trim();
+            
+            let nameParts = fileBase.split('-');
+            let stnId = nameParts[0];
+            if (stnId === undefined || stnId === "") { stnId = fileBase; }
+            
+            let yr = "";
+            if (nameParts[1] !== undefined) { yr = nameParts[1]; }
+            
+            let mo = "";
+            if (nameParts[2] !== undefined) { mo = nameParts[2]; }
+            
+            let isCsv = file.name.toLowerCase().endsWith('.csv');
+            
+            let results = await new Promise(res => {
+                if(isCsv) {
+                    Papa.parse(file, { complete: r => res(r.data) });
+                } else {
+                    let reader = new FileReader();
+                    reader.onload = e => { 
+                        let wb = XLSX.read(e.target.result); 
+                        res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1, raw: false, defval: ""})); 
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+
+            if (isCsv && nameParts.length >= 2 && results.length >= 2) {
+                let info = STATION_DB[stnId];
+                if (info === undefined) {
+                    info = { city: "-", name: "-", alt: "-", lon: "-", lat: "-", addr: "-" };
+                }
+                
+                let rawChHeaders = results[0];
+                if (rawChHeaders === undefined) { rawChHeaders = new Array(); }
+                
+                let rawEnHeaders = results[1];
+                if (rawEnHeaders === undefined) { rawEnHeaders = new Array(); }
+                
+                let header1 = new Array();
+                header1.push(String('站碼')); header1.push(String('縣市')); header1.push(String('站名')); header1.push(String('海拔高度')); header1.push(String('緯度')); header1.push(String('經度')); header1.push(String('地址位置')); header1.push(String('年')); header1.push(String('月')); header1.push(String('日期'));
+                header1.push(sanitizeString(rawChHeaders[0])); header1.push(sanitizeString(rawChHeaders[1])); header1.push(sanitizeString(rawChHeaders[2])); header1.push(sanitizeString(rawChHeaders[3])); header1.push(sanitizeString(rawChHeaders[4])); header1.push(sanitizeString(rawChHeaders[5])); header1.push(sanitizeString(rawChHeaders[6])); header1.push(sanitizeString(rawChHeaders[7])); header1.push(sanitizeString(rawChHeaders[8])); header1.push(sanitizeString(rawChHeaders[9])); header1.push(sanitizeString(rawChHeaders[10])); header1.push(sanitizeString(rawChHeaders[11])); header1.push(sanitizeString(rawChHeaders[12])); header1.push(sanitizeString(rawChHeaders[13])); header1.push(sanitizeString(rawChHeaders[14])); header1.push(sanitizeString(rawChHeaders[15])); header1.push(sanitizeString(rawChHeaders[16])); header1.push(sanitizeString(rawChHeaders[17])); header1.push(sanitizeString(rawChHeaders[18])); header1.push(sanitizeString(rawChHeaders[19])); header1.push(sanitizeString(rawChHeaders[20])); header1.push(sanitizeString(rawChHeaders[21])); header1.push(sanitizeString(rawChHeaders[22])); header1.push(sanitizeString(rawChHeaders[23])); header1.push(sanitizeString(rawChHeaders[24])); header1.push(sanitizeString(rawChHeaders[25])); header1.push(sanitizeString(rawChHeaders[26])); header1.push(sanitizeString(rawChHeaders[27])); header1.push(sanitizeString(rawChHeaders[28])); header1.push(sanitizeString(rawChHeaders[29])); header1.push(sanitizeString(rawChHeaders[30])); header1.push(sanitizeString(rawChHeaders[31])); header1.push(sanitizeString(rawChHeaders[32])); header1.push(sanitizeString(rawChHeaders[33])); header1.push(sanitizeString(rawChHeaders[34])); header1.push(sanitizeString(rawChHeaders[35])); header1.push(sanitizeString(rawChHeaders[36])); header1.push(sanitizeString(rawChHeaders[37])); header1.push(sanitizeString(rawChHeaders[38])); header1.push(sanitizeString(rawChHeaders[39])); header1.push(sanitizeString(rawChHeaders[40])); header1.push(sanitizeString(rawChHeaders[41])); header1.push(sanitizeString(rawChHeaders[42])); header1.push(sanitizeString(rawChHeaders[43])); header1.push(sanitizeString(rawChHeaders[44])); header1.push(sanitizeString(rawChHeaders[45])); header1.push(sanitizeString(rawChHeaders[46])); header1.push(sanitizeString(rawChHeaders[47])); header1.push(sanitizeString(rawChHeaders[48])); header1.push(sanitizeString(rawChHeaders[49])); header1.push(sanitizeString(rawChHeaders[50])); header1.push(sanitizeString(rawChHeaders[51])); header1.push(sanitizeString(rawChHeaders[52])); header1.push(sanitizeString(rawChHeaders[53])); header1.push(sanitizeString(rawChHeaders[54])); header1.push(sanitizeString(rawChHeaders[55]));
+
+                let header2 = new Array();
+                header2.push(String('ID')); header2.push(String('City')); header2.push(String('Station')); header2.push(String('Alt')); header2.push(String('Lat')); header2.push(String('Lon')); header2.push(String('Addr')); header2.push(String('Yr')); header2.push(String('Mo')); header2.push(String('Date'));
+                header2.push(sanitizeString(rawEnHeaders[0])); header2.push(sanitizeString(rawEnHeaders[1])); header2.push(sanitizeString(rawEnHeaders[2])); header2.push(sanitizeString(rawEnHeaders[3])); header2.push(sanitizeString(rawEnHeaders[4])); header2.push(sanitizeString(rawEnHeaders[5])); header2.push(sanitizeString(rawEnHeaders[6])); header2.push(sanitizeString(rawEnHeaders[7])); header2.push(sanitizeString(rawEnHeaders[8])); header2.push(sanitizeString(rawEnHeaders[9])); header2.push(sanitizeString(rawEnHeaders[10])); header2.push(sanitizeString(rawEnHeaders[11])); header2.push(sanitizeString(rawEnHeaders[12])); header2.push(sanitizeString(rawEnHeaders[13])); header2.push(sanitizeString(rawEnHeaders[14])); header2.push(sanitizeString(rawEnHeaders[15])); header2.push(sanitizeString(rawEnHeaders[16])); header2.push(sanitizeString(rawEnHeaders[17])); header2.push(sanitizeString(rawEnHeaders[18])); header2.push(sanitizeString(rawEnHeaders[19])); header2.push(sanitizeString(rawEnHeaders[20])); header2.push(sanitizeString(rawEnHeaders[21])); header2.push(sanitizeString(rawEnHeaders[22])); header2.push(sanitizeString(rawEnHeaders[23])); header2.push(sanitizeString(rawEnHeaders[24])); header2.push(sanitizeString(rawEnHeaders[25])); header2.push(sanitizeString(rawEnHeaders[26])); header2.push(sanitizeString(rawEnHeaders[27])); header2.push(sanitizeString(rawEnHeaders[28])); header2.push(sanitizeString(rawEnHeaders[29])); header2.push(sanitizeString(rawEnHeaders[30])); header2.push(sanitizeString(rawEnHeaders[31])); header2.push(sanitizeString(rawEnHeaders[32])); header2.push(sanitizeString(rawEnHeaders[33])); header2.push(sanitizeString(rawEnHeaders[34])); header2.push(sanitizeString(rawEnHeaders[35])); header2.push(sanitizeString(rawEnHeaders[36])); header2.push(sanitizeString(rawEnHeaders[37])); header2.push(sanitizeString(rawEnHeaders[38])); header2.push(sanitizeString(rawEnHeaders[39])); header2.push(sanitizeString(rawEnHeaders[40])); header2.push(sanitizeString(rawEnHeaders[41])); header2.push(sanitizeString(rawEnHeaders[42])); header2.push(sanitizeString(rawEnHeaders[43])); header2.push(sanitizeString(rawEnHeaders[44])); header2.push(sanitizeString(rawEnHeaders[45])); header2.push(sanitizeString(rawEnHeaders[46])); header2.push(sanitizeString(rawEnHeaders[47])); header2.push(sanitizeString(rawEnHeaders[48])); header2.push(sanitizeString(rawEnHeaders[49])); header2.push(sanitizeString(rawEnHeaders[50])); header2.push(sanitizeString(rawEnHeaders[51])); header2.push(sanitizeString(rawEnHeaders[52])); header2.push(sanitizeString(rawEnHeaders[53])); header2.push(sanitizeString(rawEnHeaders[54])); header2.push(sanitizeString(rawEnHeaders[55]));
+
+                let explicitRows = new Array();
+                let resultsCount = results.length;
+                let rIndex = 2;
+                while (rIndex < resultsCount) {
+                    let currentRow = results[rIndex];
+                    if (currentRow !== undefined && currentRow[0] !== undefined) {
+                        let rawDateString = sanitizeString(currentRow[0]);
+                        rawDateString = rawDateString.replace(/\s*\(\d+\)/g, "");
+                        
+                        let parsedDate = ""; 
+                        let parsedYear = ""; 
+                        let parsedMonth = "";
+
+                        if (rawDateString.includes('/')) {
+                            parsedDate = rawDateString;
+                            let dateParts = parsedDate.split('/');
+                            parsedYear = dateParts[0]; 
+                            parsedMonth = dateParts[1];
+                        } else {
+                            let paddedDay = rawDateString;
+                            if (paddedDay.length === 1) { paddedDay = '0' + paddedDay; }
+                            parsedDate = yr + '/' + mo + '/' + paddedDay;
+                            parsedYear = yr; 
+                            parsedMonth = mo;
+                        }
+                        
+                        parsedDate = formatDateKey(parsedDate);
+
+                        let rowMatrix = new Array();
+                        rowMatrix.push(String(stnId)); rowMatrix.push(String(info.city)); rowMatrix.push(String(info.name)); rowMatrix.push(String(info.alt)); rowMatrix.push(String(info.lat)); rowMatrix.push(String(info.lon)); rowMatrix.push(String(info.addr)); rowMatrix.push(String(parsedYear)); rowMatrix.push(String(parsedMonth)); rowMatrix.push(String(parsedDate));
+                        rowMatrix.push(sanitizeString(currentRow[0])); rowMatrix.push(sanitizeString(currentRow[1])); rowMatrix.push(sanitizeString(currentRow[2])); rowMatrix.push(sanitizeString(currentRow[3])); rowMatrix.push(sanitizeString(currentRow[4])); rowMatrix.push(sanitizeString(currentRow[5])); rowMatrix.push(sanitizeString(currentRow[6])); rowMatrix.push(sanitizeString(currentRow[7])); rowMatrix.push(sanitizeString(currentRow[8])); rowMatrix.push(sanitizeString(currentRow[9])); rowMatrix.push(sanitizeString(currentRow[10])); rowMatrix.push(sanitizeString(currentRow[11])); rowMatrix.push(sanitizeString(currentRow[12])); rowMatrix.push(sanitizeString(currentRow[13])); rowMatrix.push(sanitizeString(currentRow[14])); rowMatrix.push(sanitizeString(currentRow[15])); rowMatrix.push(sanitizeString(currentRow[16])); rowMatrix.push(sanitizeString(currentRow[17])); rowMatrix.push(sanitizeString(currentRow[18])); rowMatrix.push(sanitizeString(currentRow[19])); rowMatrix.push(sanitizeString(currentRow[20])); rowMatrix.push(sanitizeString(currentRow[21])); rowMatrix.push(sanitizeString(currentRow[22])); rowMatrix.push(sanitizeString(currentRow[23])); rowMatrix.push(sanitizeString(currentRow[24])); rowMatrix.push(sanitizeString(currentRow[25])); rowMatrix.push(sanitizeString(currentRow[26])); rowMatrix.push(sanitizeString(currentRow[27])); rowMatrix.push(sanitizeString(currentRow[28])); rowMatrix.push(sanitizeString(currentRow[29])); rowMatrix.push(sanitizeString(currentRow[30])); rowMatrix.push(sanitizeString(currentRow[31])); rowMatrix.push(sanitizeString(currentRow[32])); rowMatrix.push(sanitizeString(currentRow[33])); rowMatrix.push(sanitizeString(currentRow[34])); rowMatrix.push(sanitizeString(currentRow[35])); rowMatrix.push(sanitizeString(currentRow[36])); rowMatrix.push(sanitizeString(currentRow[37])); rowMatrix.push(sanitizeString(currentRow[38])); rowMatrix.push(sanitizeString(currentRow[39])); rowMatrix.push(sanitizeString(currentRow[40])); rowMatrix.push(sanitizeString(currentRow[41])); rowMatrix.push(sanitizeString(currentRow[42])); rowMatrix.push(sanitizeString(currentRow[43])); rowMatrix.push(sanitizeString(currentRow[44])); rowMatrix.push(sanitizeString(currentRow[45])); rowMatrix.push(sanitizeString(currentRow[46])); rowMatrix.push(sanitizeString(currentRow[47])); rowMatrix.push(sanitizeString(currentRow[48])); rowMatrix.push(sanitizeString(currentRow[49])); rowMatrix.push(sanitizeString(currentRow[50])); rowMatrix.push(sanitizeString(currentRow[51])); rowMatrix.push(sanitizeString(currentRow[52])); rowMatrix.push(sanitizeString(currentRow[53])); rowMatrix.push(sanitizeString(currentRow[54])); rowMatrix.push(sanitizeString(currentRow[55]));
+                        
+                        explicitRows.push(rowMatrix);
+                    }
+                    rIndex++;
+                }
+                return { stnId: String(stnId), headers: [header1, header2], rows: explicitRows };
+            } else {
+                let existingHeader1 = new Array(); 
+                let existingHeader2 = new Array(); 
+                let existingRows = new Array();
+                
+                let rawRow1 = results[0];
+                if (rawRow1 === undefined) { rawRow1 = new Array(); }
+                let rawRow2 = results[1];
+                if (rawRow2 === undefined) { rawRow2 = new Array(); }
+                
+                existingHeader1.push(sanitizeString(rawRow1[0])); existingHeader1.push(sanitizeString(rawRow1[1])); existingHeader1.push(sanitizeString(rawRow1[2])); existingHeader1.push(sanitizeString(rawRow1[3])); existingHeader1.push(sanitizeString(rawRow1[4])); existingHeader1.push(sanitizeString(rawRow1[5])); existingHeader1.push(sanitizeString(rawRow1[6])); existingHeader1.push(sanitizeString(rawRow1[7])); existingHeader1.push(sanitizeString(rawRow1[8])); existingHeader1.push(sanitizeString(rawRow1[9])); existingHeader1.push(sanitizeString(rawRow1[10])); existingHeader1.push(sanitizeString(rawRow1[11])); existingHeader1.push(sanitizeString(rawRow1[12])); existingHeader1.push(sanitizeString(rawRow1[13])); existingHeader1.push(sanitizeString(rawRow1[14])); existingHeader1.push(sanitizeString(rawRow1[15])); existingHeader1.push(sanitizeString(rawRow1[16])); existingHeader1.push(sanitizeString(rawRow1[17])); existingHeader1.push(sanitizeString(rawRow1[18])); existingHeader1.push(sanitizeString(rawRow1[19])); existingHeader1.push(sanitizeString(rawRow1[20])); existingHeader1.push(sanitizeString(rawRow1[21])); existingHeader1.push(sanitizeString(rawRow1[22])); existingHeader1.push(sanitizeString(rawRow1[23])); existingHeader1.push(sanitizeString(rawRow1[24])); existingHeader1.push(sanitizeString(rawRow1[25])); existingHeader1.push(sanitizeString(rawRow1[26])); existingHeader1.push(sanitizeString(rawRow1[27])); existingHeader1.push(sanitizeString(rawRow1[28])); existingHeader1.push(sanitizeString(rawRow1[29])); existingHeader1.push(sanitizeString(rawRow1[30])); existingHeader1.push(sanitizeString(rawRow1[31])); existingHeader1.push(sanitizeString(rawRow1[32])); existingHeader1.push(sanitizeString(rawRow1[33])); existingHeader1.push(sanitizeString(rawRow1[34])); existingHeader1.push(sanitizeString(rawRow1[35])); existingHeader1.push(sanitizeString(rawRow1[36])); existingHeader1.push(sanitizeString(rawRow1[37])); existingHeader1.push(sanitizeString(rawRow1[38])); existingHeader1.push(sanitizeString(rawRow1[39])); existingHeader1.push(sanitizeString(rawRow1[40])); existingHeader1.push(sanitizeString(rawRow1[41])); existingHeader1.push(sanitizeString(rawRow1[42])); existingHeader1.push(sanitizeString(rawRow1[43])); existingHeader1.push(sanitizeString(rawRow1[44])); existingHeader1.push(sanitizeString(rawRow1[45])); existingHeader1.push(sanitizeString(rawRow1[46])); existingHeader1.push(sanitizeString(rawRow1[47])); existingHeader1.push(sanitizeString(rawRow1[48])); existingHeader1.push(sanitizeString(rawRow1[49])); existingHeader1.push(sanitizeString(rawRow1[50])); existingHeader1.push(sanitizeString(rawRow1[51])); existingHeader1.push(sanitizeString(rawRow1[52])); existingHeader1.push(sanitizeString(rawRow1[53])); existingHeader1.push(sanitizeString(rawRow1[54])); existingHeader1.push(sanitizeString(rawRow1[55])); existingHeader1.push(sanitizeString(rawRow1[56])); existingHeader1.push(sanitizeString(rawRow1[57])); existingHeader1.push(sanitizeString(rawRow1[58])); existingHeader1.push(sanitizeString(rawRow1[59])); existingHeader1.push(sanitizeString(rawRow1[60])); existingHeader1.push(sanitizeString(rawRow1[61])); existingHeader1.push(sanitizeString(rawRow1[62])); existingHeader1.push(sanitizeString(rawRow1[63])); existingHeader1.push(sanitizeString(rawRow1[64])); existingHeader1.push(sanitizeString(rawRow1[65]));
+                
+                existingHeader2.push(sanitizeString(rawRow2[0])); existingHeader2.push(sanitizeString(rawRow2[1])); existingHeader2.push(sanitizeString(rawRow2[2])); existingHeader2.push(sanitizeString(rawRow2[3])); existingHeader2.push(sanitizeString(rawRow2[4])); existingHeader2.push(sanitizeString(rawRow2[5])); existingHeader2.push(sanitizeString(rawRow2[6])); existingHeader2.push(sanitizeString(rawRow2[7])); existingHeader2.push(sanitizeString(rawRow2[8])); existingHeader2.push(sanitizeString(rawRow2[9])); existingHeader2.push(sanitizeString(rawRow2[10])); existingHeader2.push(sanitizeString(rawRow2[11])); existingHeader2.push(sanitizeString(rawRow2[12])); existingHeader2.push(sanitizeString(rawRow2[13])); existingHeader2.push(sanitizeString(rawRow2[14])); existingHeader2.push(sanitizeString(rawRow2[15])); existingHeader2.push(sanitizeString(rawRow2[16])); existingHeader2.push(sanitizeString(rawRow2[17])); existingHeader2.push(sanitizeString(rawRow2[18])); existingHeader2.push(sanitizeString(rawRow2[19])); existingHeader2.push(sanitizeString(rawRow2[20])); existingHeader2.push(sanitizeString(rawRow2[21])); existingHeader2.push(sanitizeString(rawRow2[22])); existingHeader2.push(sanitizeString(rawRow2[23])); existingHeader2.push(sanitizeString(rawRow2[24])); existingHeader2.push(sanitizeString(rawRow2[25])); existingHeader2.push(sanitizeString(rawRow2[26])); existingHeader2.push(sanitizeString(rawRow2[27])); existingHeader2.push(sanitizeString(rawRow2[28])); existingHeader2.push(sanitizeString(rawRow2[29])); existingHeader2.push(sanitizeString(rawRow2[30])); existingHeader2.push(sanitizeString(rawRow2[31])); existingHeader2.push(sanitizeString(rawRow2[32])); existingHeader2.push(sanitizeString(rawRow2[33])); existingHeader2.push(sanitizeString(rawRow2[34])); existingHeader2.push(sanitizeString(rawRow2[35])); existingHeader2.push(sanitizeString(rawRow2[36])); existingHeader2.push(sanitizeString(rawRow2[37])); existingHeader2.push(sanitizeString(rawRow2[38])); existingHeader2.push(sanitizeString(rawRow2[39])); existingHeader2.push(sanitizeString(rawRow2[40])); existingHeader2.push(sanitizeString(rawRow2[41])); existingHeader2.push(sanitizeString(rawRow2[42])); existingHeader2.push(sanitizeString(rawRow2[43])); existingHeader2.push(sanitizeString(rawRow2[44])); existingHeader2.push(sanitizeString(rawRow2[45])); existingHeader2.push(sanitizeString(rawRow2[46])); existingHeader2.push(sanitizeString(rawRow2[47])); existingHeader2.push(sanitizeString(rawRow2[48])); existingHeader2.push(sanitizeString(rawRow2[49])); existingHeader2.push(sanitizeString(rawRow2[50])); existingHeader2.push(sanitizeString(rawRow2[51])); existingHeader2.push(sanitizeString(rawRow2[52])); existingHeader2.push(sanitizeString(rawRow2[53])); existingHeader2.push(sanitizeString(rawRow2[54])); existingHeader2.push(sanitizeString(rawRow2[55])); existingHeader2.push(sanitizeString(rawRow2[56])); existingHeader2.push(sanitizeString(rawRow2[57])); existingHeader2.push(sanitizeString(rawRow2[58])); existingHeader2.push(sanitizeString(rawRow2[59])); existingHeader2.push(sanitizeString(rawRow2[60])); existingHeader2.push(sanitizeString(rawRow2[61])); existingHeader2.push(sanitizeString(rawRow2[62])); existingHeader2.push(sanitizeString(rawRow2[63])); existingHeader2.push(sanitizeString(rawRow2[64])); existingHeader2.push(sanitizeString(rawRow2[65]));
+                
+                let resLen = results.length;
+                let k = 2;
+                while (k < resLen) {
+                    let rMatrix = new Array();
+                    let targetRow = results[k];
+                    rMatrix.push(sanitizeString(targetRow[0])); rMatrix.push(sanitizeString(targetRow[1])); rMatrix.push(sanitizeString(targetRow[2])); rMatrix.push(sanitizeString(targetRow[3])); rMatrix.push(sanitizeString(targetRow[4])); rMatrix.push(sanitizeString(targetRow[5])); rMatrix.push(sanitizeString(targetRow[6])); rMatrix.push(sanitizeString(targetRow[7])); rMatrix.push(sanitizeString(targetRow[8])); 
+                    
+                    let targetDate = sanitizeString(targetRow[9]);
+                    targetDate = formatDateKey(targetDate);
+                    rMatrix.push(targetDate);
+                    
+                    rMatrix.push(sanitizeString(targetRow[10])); rMatrix.push(sanitizeString(targetRow[11])); rMatrix.push(sanitizeString(targetRow[12])); rMatrix.push(sanitizeString(targetRow[13])); rMatrix.push(sanitizeString(targetRow[14])); rMatrix.push(sanitizeString(targetRow[15])); rMatrix.push(sanitizeString(targetRow[16])); rMatrix.push(sanitizeString(targetRow[17])); rMatrix.push(sanitizeString(targetRow[18])); rMatrix.push(sanitizeString(targetRow[19])); rMatrix.push(sanitizeString(targetRow[20])); rMatrix.push(sanitizeString(targetRow[21])); rMatrix.push(sanitizeString(targetRow[22])); rMatrix.push(sanitizeString(targetRow[23])); rMatrix.push(sanitizeString(targetRow[24])); rMatrix.push(sanitizeString(targetRow[25])); rMatrix.push(sanitizeString(targetRow[26])); rMatrix.push(sanitizeString(targetRow[27])); rMatrix.push(sanitizeString(targetRow[28])); rMatrix.push(sanitizeString(targetRow[29])); rMatrix.push(sanitizeString(targetRow[30])); rMatrix.push(sanitizeString(targetRow[31])); rMatrix.push(sanitizeString(targetRow[32])); rMatrix.push(sanitizeString(targetRow[33])); rMatrix.push(sanitizeString(targetRow[34])); rMatrix.push(sanitizeString(targetRow[35])); rMatrix.push(sanitizeString(targetRow[36])); rMatrix.push(sanitizeString(targetRow[37])); rMatrix.push(sanitizeString(targetRow[38])); rMatrix.push(sanitizeString(targetRow[39])); rMatrix.push(sanitizeString(targetRow[40])); rMatrix.push(sanitizeString(targetRow[41])); rMatrix.push(sanitizeString(targetRow[42])); rMatrix.push(sanitizeString(targetRow[43])); rMatrix.push(sanitizeString(targetRow[44])); rMatrix.push(sanitizeString(targetRow[45])); rMatrix.push(sanitizeString(targetRow[46])); rMatrix.push(sanitizeString(targetRow[47])); rMatrix.push(sanitizeString(targetRow[48])); rMatrix.push(sanitizeString(targetRow[49])); rMatrix.push(sanitizeString(targetRow[50])); rMatrix.push(sanitizeString(targetRow[51])); rMatrix.push(sanitizeString(targetRow[52])); rMatrix.push(sanitizeString(targetRow[53])); rMatrix.push(sanitizeString(targetRow[54])); rMatrix.push(sanitizeString(targetRow[55])); rMatrix.push(sanitizeString(targetRow[56])); rMatrix.push(sanitizeString(targetRow[57])); rMatrix.push(sanitizeString(targetRow[58])); rMatrix.push(sanitizeString(targetRow[59])); rMatrix.push(sanitizeString(targetRow[60])); rMatrix.push(sanitizeString(targetRow[61])); rMatrix.push(sanitizeString(targetRow[62])); rMatrix.push(sanitizeString(targetRow[63])); rMatrix.push(sanitizeString(targetRow[64])); rMatrix.push(sanitizeString(targetRow[65]));
+                    
+                    existingRows.push(rMatrix);
+                    k++;
+                }
+                return { stnId: String(stnId), headers: [existingHeader1, existingHeader2], rows: existingRows };
+            }
+        }
+
+        // --- 第一區：導入全域矩陣下載功能 ---
+        document.getElementById('mergeInput').onchange = () => { document.getElementById('mergeBtn').disabled = false; };
+        document.getElementById('mergeBtn').onclick = async () => {
+            const files = Array.from(document.getElementById('mergeInput').files);
+            const bundle = {};
+            status.innerText = "⏳ 正在第一區執行全域矩陣展開與去重彙整...";
+            
+            let filesCount = files.length;
+            let i = 0;
+            while (i < filesCount) {
+                let res = await parseFile(files[i]);
+                if (bundle[res.stnId] === undefined) { 
+                    bundle[res.stnId] = { headers: res.headers, dataMap: new Map() }; 
+                }
+                let rowsCount = res.rows.length;
+                let j = 0;
+                while (j < rowsCount) {
+                    let r = res.rows[j];
+                    let absoluteDateKey = r[9];
+                    if (absoluteDateKey !== undefined && absoluteDateKey !== "") {
+                        // 在此處透過 Map 進行絕對去重，同一個日期的資料會自動被最後一筆蓋掉
+                        bundle[res.stnId].dataMap.set(String(absoluteDateKey), r);
+                    }
+                    j++;
+                }
+                i++;
+            }
+            
+            for (const stnId in bundle) {
+                let keys = Array.from(bundle[stnId].dataMap.keys()).sort((a,b) => new Date(a) - new Date(b));
+                let keysCount = keys.length;
+                let sortedRows = new Array();
+                let k = 0;
+                while (k < keysCount) { 
+                    sortedRows.push(bundle[stnId].dataMap.get(keys[k])); 
+                    k++;
+                }
+                
+                let sheetData = new Array();
+                sheetData.push(bundle[stnId].headers[0]); 
+                sheetData.push(bundle[stnId].headers[1]);
+                let r = 0;
+                while (r < keysCount) { 
+                    sheetData.push(sortedRows[r]); 
+                    r++;
+                }
+                
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), stnId);
+                XLSX.writeFile(wb, `${stnId}.xlsx`);
+            }
+            status.innerText = "✅ 第一區彙整完成。檔案已通過嚴格的檔名淨化與矩陣去重，無任何錯位污染";
+        };
+
+        // --- 第二區邏輯 ---
+        document.getElementById('cleanInput').onchange = () => { document.getElementById('cleanBtn').disabled = false; };
+        document.getElementById('cleanBtn').onclick = async () => {
+            const basis = document.getElementById('cleanBasis').value;
+            const now = new Date();
+            let dynamicCutoff;
+            if (basis === 'year') { dynamicCutoff = new Date(now.getFullYear()-10, 0, 1); }
+            else if (basis === 'month') { dynamicCutoff = new Date(now.getFullYear(), now.getMonth()-120, 1); }
+            else { dynamicCutoff = new Date(now.getFullYear()-10, now.getMonth(), now.getDate()); }
+            
+            const wb = XLSX.read(await document.getElementById('cleanInput').files[0].arrayBuffer());
+            const outWb = XLSX.utils.book_new();
+            let sheetNames = wb.SheetNames;
+            let snCount = sheetNames.length;
+            let s = 0;
+            while (s < snCount) {
+                let name = sheetNames[s];
+                let rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header: 1, raw: false, defval: ""});
+                if (rows.length >= 2) {
+                    let idx = 0;
+                    if (rows[0][0] === "站碼") { idx = 9; }
+                    let filtered = new Array();
+                    let rCount = rows.length;
+                    let r = 2;
+                    while (r < rCount) {
+                        let rowDate = new Date(rows[r][idx]);
+                        if (rowDate >= dynamicCutoff) { filtered.push(rows[r]); }
+                        r++;
+                    }
+                    let sheetData = new Array();
+                    sheetData.push(rows[0]); sheetData.push(rows[1]);
+                    let fCount = filtered.length;
+                    let f = 0;
+                    while (f < fCount) { sheetData.push(filtered[f]); f++; }
+                    XLSX.utils.book_append_sheet(outWb, XLSX.utils.aoa_to_sheet(sheetData), name);
+                }
+                s++;
+            }
+            XLSX.writeFile(outWb, `清理報告_${new Date().getTime()}.xlsx`);
+        };
+
+        // --- 第三區邏輯 ---
+        document.getElementById('syncInput').onchange = () => { 
+            if (document.getElementById('syncInput').files.length > 0) { document.getElementById('syncBtn').disabled = false; }
+        };
+        document.getElementById('syncBtn').onclick = () => {
+            window.pendingAction = 'sync';
+            diag.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 第三區啟動：全域矩陣更新中...<br>`;
+            if (accessToken !== null) { startFolderSync(); } 
+            else { tokenClient.requestAccessToken({prompt: 'none'}); }
+        };
+
+        async function startFolderSync() {
+            const files = Array.from(document.getElementById('syncInput').files);
+            const bundle = {}; 
+
+            try {
+                let filesCount = files.length;
+                let i = 0;
+                while (i < filesCount) {
+                    let res = await parseFile(files[i]);
+                    if (bundle[res.stnId] === undefined) { 
+                        bundle[res.stnId] = { headers: res.headers, dataMap: new Map() }; 
+                    }
+                    let rowsCount = res.rows.length;
+                    let j = 0;
+                    while (j < rowsCount) {
+                        let r = res.rows[j];
+                        let absoluteDateKey = r[9];
+                        if(absoluteDateKey !== undefined && absoluteDateKey !== "") {
+                            bundle[res.stnId].dataMap.set(String(absoluteDateKey), r);
+                        }
+                        j++;
+                    }
+                    i++;
+                }
+
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const driveFiles = (await driveRes.json()).files || [];
+
+                for (const stnId in bundle) {
+                    diag.innerHTML += `<span class="diag-info">🚀 正在透過絕對矩陣覆蓋測站 [${stnId}]...</span><br>`;
+                    const targetFileName = `${stnId}.xlsx`;
+                    let targetFile = driveFiles.find(f => f.name === targetFileName);
+                    let ssid, existingData = [];
+
+                    if (targetFile) {
+                        ssid = targetFile.id;
+                        const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                        existingData = (await getRes.json()).values || [];
+                    } else {
+                        diag.innerHTML += `   └─ ➕ 建立新檔案...<br>`;
+                        const create = await fetch(`https://www.googleapis.com/drive/v3/files`, {
+                            method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: targetFileName, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] })
+                        });
+                        let createJson = await create.json();
+                        ssid = createJson.id;
+                    }
+
+                    const finalMap = new Map();
+                    let exCount = existingData.length;
+                    let originalCount = 0;
+                    
+                    let ex = 2;
+                    while (ex < exCount) {
+                        let r = existingData[ex];
+                        if (r !== undefined && r[9] !== undefined) {
+                            let cleanDate = formatDateKey(r[9]);
+                            if (cleanDate !== "") {
+                                let strictRow = new Array();
+                                strictRow.push(sanitizeString(r[0])); strictRow.push(sanitizeString(r[1])); strictRow.push(sanitizeString(r[2])); strictRow.push(sanitizeString(r[3])); strictRow.push(sanitizeString(r[4])); strictRow.push(sanitizeString(r[5])); strictRow.push(sanitizeString(r[6])); strictRow.push(sanitizeString(r[7])); strictRow.push(sanitizeString(r[8])); strictRow.push(cleanDate);
+                                strictRow.push(sanitizeString(r[10])); strictRow.push(sanitizeString(r[11])); strictRow.push(sanitizeString(r[12])); strictRow.push(sanitizeString(r[13])); strictRow.push(sanitizeString(r[14])); strictRow.push(sanitizeString(r[15])); strictRow.push(sanitizeString(r[16])); strictRow.push(sanitizeString(r[17])); strictRow.push(sanitizeString(r[18])); strictRow.push(sanitizeString(r[19]));
+                                strictRow.push(sanitizeString(r[20])); strictRow.push(sanitizeString(r[21])); strictRow.push(sanitizeString(r[22])); strictRow.push(sanitizeString(r[23])); strictRow.push(sanitizeString(r[24])); strictRow.push(sanitizeString(r[25])); strictRow.push(sanitizeString(r[26])); strictRow.push(sanitizeString(r[27])); strictRow.push(sanitizeString(r[28])); strictRow.push(sanitizeString(r[29]));
+                                strictRow.push(sanitizeString(r[30])); strictRow.push(sanitizeString(r[31])); strictRow.push(sanitizeString(r[32])); strictRow.push(sanitizeString(r[33])); strictRow.push(sanitizeString(r[34])); strictRow.push(sanitizeString(r[35])); strictRow.push(sanitizeString(r[36])); strictRow.push(sanitizeString(r[37])); strictRow.push(sanitizeString(r[38])); strictRow.push(sanitizeString(r[39]));
+                                strictRow.push(sanitizeString(r[40])); strictRow.push(sanitizeString(r[41])); strictRow.push(sanitizeString(r[42])); strictRow.push(sanitizeString(r[43])); strictRow.push(sanitizeString(r[44])); strictRow.push(sanitizeString(r[45])); strictRow.push(sanitizeString(r[46])); strictRow.push(sanitizeString(r[47])); strictRow.push(sanitizeString(r[48])); strictRow.push(sanitizeString(r[49]));
+                                strictRow.push(sanitizeString(r[50])); strictRow.push(sanitizeString(r[51])); strictRow.push(sanitizeString(r[52])); strictRow.push(sanitizeString(r[53])); strictRow.push(sanitizeString(r[54])); strictRow.push(sanitizeString(r[55])); strictRow.push(sanitizeString(r[56])); strictRow.push(sanitizeString(r[57])); strictRow.push(sanitizeString(r[58])); strictRow.push(sanitizeString(r[59]));
+                                strictRow.push(sanitizeString(r[60])); strictRow.push(sanitizeString(r[61])); strictRow.push(sanitizeString(r[62])); strictRow.push(sanitizeString(r[63])); strictRow.push(sanitizeString(r[64])); strictRow.push(sanitizeString(r[65]));
+
+                                finalMap.set(String(cleanDate), JSON.stringify(strictRow));
+                                originalCount++;
+                            }
+                        }
+                        ex++;
+                    }
+                    
+                    let uniqueBeforeNew = finalMap.size;
+                    let duplicatesRemoved = originalCount - uniqueBeforeNew;
+                    if (duplicatesRemoved > 0) {
+                        diag.innerHTML += `   └─ 🧹 已自動將雲端舊資料中 ${duplicatesRemoved} 筆被污染的重複日期淨化消除。<br>`;
+                    }
+
+                    let add = 0;
+                    let upd = 0;
+                    let bKeys = Array.from(bundle[stnId].dataMap.keys());
+                    let bKeysCount = bKeys.length;
+                    
+                    let bk = 0;
+                    while (bk < bKeysCount) {
+                        let dateKey = bKeys[bk];
+                        let rawRow = bundle[stnId].dataMap.get(dateKey);
+                        
+                        let strictRow = new Array();
+                        strictRow.push(sanitizeString(rawRow[0])); strictRow.push(sanitizeString(rawRow[1])); strictRow.push(sanitizeString(rawRow[2])); strictRow.push(sanitizeString(rawRow[3])); strictRow.push(sanitizeString(rawRow[4])); strictRow.push(sanitizeString(rawRow[5])); strictRow.push(sanitizeString(rawRow[6])); strictRow.push(sanitizeString(rawRow[7])); strictRow.push(sanitizeString(rawRow[8])); strictRow.push(String(dateKey));
+                        strictRow.push(sanitizeString(rawRow[10])); strictRow.push(sanitizeString(rawRow[11])); strictRow.push(sanitizeString(rawRow[12])); strictRow.push(sanitizeString(rawRow[13])); strictRow.push(sanitizeString(rawRow[14])); strictRow.push(sanitizeString(rawRow[15])); strictRow.push(sanitizeString(rawRow[16])); strictRow.push(sanitizeString(rawRow[17])); strictRow.push(sanitizeString(rawRow[18])); strictRow.push(sanitizeString(rawRow[19]));
+                        strictRow.push(sanitizeString(rawRow[20])); strictRow.push(sanitizeString(rawRow[21])); strictRow.push(sanitizeString(rawRow[22])); strictRow.push(sanitizeString(rawRow[23])); strictRow.push(sanitizeString(rawRow[24])); strictRow.push(sanitizeString(rawRow[25])); strictRow.push(sanitizeString(rawRow[26])); strictRow.push(sanitizeString(rawRow[27])); strictRow.push(sanitizeString(rawRow[28])); strictRow.push(sanitizeString(rawRow[29]));
+                        strictRow.push(sanitizeString(rawRow[30])); strictRow.push(sanitizeString(rawRow[31])); strictRow.push(sanitizeString(rawRow[32])); strictRow.push(sanitizeString(rawRow[33])); strictRow.push(sanitizeString(rawRow[34])); strictRow.push(sanitizeString(rawRow[35])); strictRow.push(sanitizeString(rawRow[36])); strictRow.push(sanitizeString(rawRow[37])); strictRow.push(sanitizeString(rawRow[38])); strictRow.push(sanitizeString(rawRow[39]));
+                        strictRow.push(sanitizeString(rawRow[40])); strictRow.push(sanitizeString(rawRow[41])); strictRow.push(sanitizeString(rawRow[42])); strictRow.push(sanitizeString(rawRow[43])); strictRow.push(sanitizeString(rawRow[44])); strictRow.push(sanitizeString(rawRow[45])); strictRow.push(sanitizeString(rawRow[46])); strictRow.push(sanitizeString(rawRow[47])); strictRow.push(sanitizeString(rawRow[48])); strictRow.push(sanitizeString(rawRow[49]));
+                        strictRow.push(sanitizeString(rawRow[50])); strictRow.push(sanitizeString(rawRow[51])); strictRow.push(sanitizeString(rawRow[52])); strictRow.push(sanitizeString(rawRow[53])); strictRow.push(sanitizeString(rawRow[54])); strictRow.push(sanitizeString(rawRow[55])); strictRow.push(sanitizeString(rawRow[56])); strictRow.push(sanitizeString(rawRow[57])); strictRow.push(sanitizeString(rawRow[58])); strictRow.push(sanitizeString(rawRow[59]));
+                        strictRow.push(sanitizeString(rawRow[60])); strictRow.push(sanitizeString(rawRow[61])); strictRow.push(sanitizeString(rawRow[62])); strictRow.push(sanitizeString(rawRow[63])); strictRow.push(sanitizeString(rawRow[64])); strictRow.push(sanitizeString(rawRow[65]));
+                        
+                        let old = finalMap.get(String(dateKey));
+                        let neo = JSON.stringify(strictRow);
+                        
+                        if (old === undefined) { add++; } else { upd++; }
+                        finalMap.set(String(dateKey), neo);
+                        
+                        bk++;
+                    }
+
+                    let sortedKeys = Array.from(finalMap.keys()).sort((a,b)=>new Date(a)-new Date(b));
+                    let skCount = sortedKeys.length;
+                    let sortedRows = new Array();
+                    let sk = 0;
+                    while (sk < skCount) {
+                        sortedRows.push(JSON.parse(finalMap.get(sortedKeys[sk])));
+                        sk++;
+                    }
+                    
+                    let finalOutput = new Array();
+                    finalOutput.push(bundle[stnId].headers[0]);
+                    finalOutput.push(bundle[stnId].headers[1]);
+                    let fo = 0;
+                    while (fo < skCount) {
+                        finalOutput.push(sortedRows[fo]);
+                        fo++;
+                    }
+
+                    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1:ZZ20000:clear`, { method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                    const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ssid}/values/A1?valueInputOption=USER_ENTERED`, {
+                        method: 'PUT', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ values: finalOutput })
+                    });
+
+                    if(updateRes.ok) {
+                        diag.innerHTML += `<span class="diag-success">   └─ ✅ 絕對對齊寫入成功：新增 ${add} / 強制覆蓋 ${upd} / 雲端總筆數 ${sortedRows.length}。</span><br>`;
+                    }
+                }
+                status.innerText = "✅ 第三區同步完畢。所有防呆機制已運作，不會再產生錯位與重複檔案。";
+            } catch (err) { diag.innerHTML += `<span class="diag-err">❌ 錯誤: ${err.message}</span>`; }
+        }
+
+        // --- 第四區：排錯與異常偵測功能 ---
+        document.getElementById('scanBtn').onclick = () => {
+            window.pendingAction = 'scan';
+            diagScan.innerHTML = `[${new Date().toLocaleTimeString()}] ⏳ 啟動極限排錯程序...<br>`;
+            if (accessToken !== null) { startCloudScan(); }
+            else { tokenClient.requestAccessToken({prompt: 'none'}); }
+        };
+
+        async function startCloudScan() {
+            try {
+                const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}' in parents and trashed = false&fields=files(id, name)`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                const driveData = await driveRes.json();
+                const driveFiles = driveData.files || [];
+                
+                let fileCount = driveFiles.length;
+                if (fileCount === 0) { diagScan.innerHTML += `<span class="diag-err">⚠️ 資料夾為空。</span><br>`; return; }
+                diagScan.innerHTML += `<span class="diag-success">✅ 共發現 ${fileCount} 個測站，開始裸日期比對排錯...</span><hr>`;
+
+                let fIndex = 0;
+                while (fIndex < fileCount) {
+                    let fileObj = driveFiles[fIndex];
+                    let fileName = fileObj.name;
+                    let fileId = fileObj.id;
+                    
+                    diagScan.innerHTML += `<span><b>測站：${fileName}</b></span><br>`;
+
+                    const getRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${fileId}/values/A1:ZZ20000`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                    const sheetData = await getRes.json();
+                    let values = sheetData.values;
+                    if (values === undefined) { values = new Array(); }
+                    let vLen = values.length;
+
+                    if (vLen <= 2) { 
+                        diagScan.innerHTML += `<span class="diag-err">   └─ ❌ 無有效數據。</span><br><br>`; 
+                        fIndex++; 
+                        continue; 
+                    }
+
+                    let existingMonths = {}; 
+                    let dateSeen = {}; 
+                    let duplicateDatesCount = 0;
+                    let sampleDuplicate = "";
+
+                    let minTime = Infinity; 
+                    let maxTime = -Infinity;
+                    let minDateStr = ""; 
+                    let maxDateStr = "";
+
+                    let i = 2;
+                    while (i < vLen) {
+                        let row = values[i];
+                        if (row !== undefined && row[9] !== undefined) {
+                            let rawDateVal = sanitizeString(row[9]);
+                            if (rawDateVal !== "") {
+                                let cleanDate = formatDateKey(rawDateVal);
+                                
+                                if (dateSeen[cleanDate] === true) {
+                                    duplicateDatesCount++;
+                                    if (sampleDuplicate === "") { sampleDuplicate = cleanDate; }
+                                } else {
+                                    dateSeen[cleanDate] = true;
+                                }
+
+                                if (cleanDate.includes('/')) {
+                                    let dTime = new Date(cleanDate).getTime();
+                                    if (!isNaN(dTime)) {
+                                        if (dTime < minTime) { minTime = dTime; minDateStr = cleanDate; }
+                                        if (dTime > maxTime) { maxTime = dTime; maxDateStr = cleanDate; }
+                                        let dateParts = cleanDate.split('/');
+                                        if (dateParts.length >= 2) {
+                                            let yM = String(dateParts[0]) + '/' + String(dateParts[1]);
+                                            existingMonths[yM] = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        i++;
+                    }
+
+                    if (minDateStr === "" || maxDateStr === "") { 
+                        diagScan.innerHTML += `<span class="diag-err">   └─ ❌ 無法解析有效的日期格式。</span><br><br>`; 
+                        fIndex++; 
+                        continue; 
+                    }
+                    diagScan.innerHTML += `   └─ 📅 數據範圍：${minDateStr} ~ ${maxDateStr}<br>`;
+
+                    if (duplicateDatesCount > 0) {
+                        diagScan.innerHTML += `<span class="diag-err">   └─ ❌ [排錯警報] 發現 ${duplicateDatesCount} 筆假性污染的重複異常！<br>      (例如: ${sampleDuplicate})<br>      💡 請使用第三區重新上傳並點擊同步，系統將自動壓平癒合。</span><br>`;
+                    } else {
+                        diagScan.innerHTML += `<span class="diag-success">   └─ 🟢 結構良好：無重複日期。</span><br>`;
+                    }
+
+                    let minD = new Date(minTime); 
+                    let maxD = new Date(maxTime);
+                    let startY = minD.getFullYear(); 
+                    let startM = minD.getMonth() + 1;
+                    let endY = maxD.getFullYear(); 
+                    let endM = maxD.getMonth() + 1;
+
+                    let currY = startY; 
+                    let currM = startM;
+                    let missingMonthsArray = new Array();
+
+                    while (currY < endY || (currY === endY && currM <= endM)) {
+                        let stringM = String(currM);
+                        let paddedM = stringM;
+                        if (stringM.length === 1) { paddedM = '0' + stringM; }
+                        let checkYM = String(currY) + '/' + paddedM;
+                        
+                        if (existingMonths[checkYM] !== true) { 
+                            missingMonthsArray.push(checkYM); 
+                        }
+                        currM++;
+                        if (currM > 12) { currM = 1; currY++; }
+                    }
+
+                    let missingCount = missingMonthsArray.length;
+                    if (missingCount === 0) {
+                        diagScan.innerHTML += `<span class="diag-success">   └─ 🟢 月份完整：期間內無遺漏任何月份。</span><br><br>`;
+                    } else {
+                        let missingReport = "";
+                        let m = 0;
+                        while (m < missingCount) {
+                            missingReport += missingMonthsArray[m];
+                            if (m < missingCount - 1) { missingReport += ", "; }
+                            m++;
+                        }
+                        diagScan.innerHTML += `<span class="diag-warn">   └─ ⚠️ [遺漏警報] 缺失 ${missingCount} 個月份：<br>      [ ${missingReport} ]</span><br><br>`;
+                    }
+                    fIndex++;
+                }
+                diagScan.innerHTML += `<hr><span class="diag-success">✅ 健康與排錯分析完成。</span><br>`;
+            } catch (err) { diagScan.innerHTML += `<span class="diag-err">❌ 掃描失敗: ${err.message}</span>`; }
+        }
+    </script>
+</body>
+</html>

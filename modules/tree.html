@@ -1,0 +1,150 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>工程工項選取工具 - 自動排序版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        html, body { background: #f1f5f9; margin: 0; padding: 0; font-family: 'Microsoft JhengHei', sans-serif; }
+        .header { position: sticky; top: 0; background: #ffffff; padding: 15px; z-index: 100; border-bottom: 2px solid #0f172a; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        #search { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; box-sizing: border-box; font-size: 16px; outline: none; }
+        .container { max-width: 800px; margin: 0 auto; padding: 15px; padding-bottom: 180px; }
+        .item-card { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 12px; border-left: 6px solid #94a3b8; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s; }
+        .item-card:hover { background: #f8fafc; }
+        .item-card.selected { border-left-color: #2563eb; background: #eff6ff; }
+        .item-title { font-size: 16px; font-weight: bold; color: #1e293b; margin-bottom: 6px; line-height: 1.4; }
+        .item-info { font-size: 13px; color: #64748b; display: flex; gap: 20px; align-items: center; }
+        .price-tag { color: #059669; font-weight: bold; margin-left: auto; font-size: 15px; }
+        
+        #selection-panel { position: fixed; bottom: 0; left: 0; right: 0; background: white; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); padding: 15px 25px; z-index: 200; border-top: 1px solid #e2e8f0; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .btn-export { background: #2563eb; color: white; border: none; padding: 16px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 17px; }
+        #status { text-align: center; padding: 20px; color: #64748b; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div style="max-width:800px; margin:0 auto;">
+        <input type="text" id="search" placeholder="🔍 搜尋工序、項次或名稱..." oninput="render()">
+    </div>
+</div>
+
+<div class="container">
+    <div id="status">同步雲端資料中...</div>
+    <div id="item-list"></div>
+</div>
+
+<div id="selection-panel" style="display:none;">
+    <div class="panel-header">
+        <span style="font-weight:bold; color:#1e293b;">📋 已選取 <span id="count" style="color:#2563eb;">0</span> 項</span>
+        <button onclick="clearAll()" style="background:none; border:none; color:#ef4444; cursor:pointer; text-decoration:underline; font-size: 13px;">全部清除</button>
+    </div>
+    <button class="btn-export" onclick="exportToCSV()">📊 依項次順序產生 CSV 報表</button>
+</div>
+
+<script>
+    // 使用您的試算表 ID: 1YWhmI9lNoJ5lZLsjwcQs1wASHT4urooHY6cGCoI9ohk
+    const SS_ID = "1YWhmI9lNoJ5lZLsjwcQs1wASHT4urooHY6cGCoI9ohk";
+    const SHEET_NAME = "修樹"; 
+    let projectData = [];
+    let cart = []; 
+
+    function loadData() {
+        const cbName = "callback_sort_version";
+        window[cbName] = (json) => {
+            if (json.table) {
+                projectData = json.table.rows.map((row, idx) => {
+                    const get = (i) => (row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
+                    return {
+                        rowId: idx,
+                        process: String(get(0)).trim(), 
+                        itemNum: String(get(1)).trim(), 
+                        name: String(get(2)).trim(),    
+                        unit: String(get(3)).trim(),    
+                        price: String(get(4)).trim(),   
+                        searchKey: (get(0) + get(1) + get(2)).toLowerCase()
+                    };
+                }).filter(p => p.name && p.name !== "名稱" && p.name !== "工項名稱");
+                document.getElementById('status').innerText = `已連線：${projectData.length} 筆資料`;
+                render();
+            }
+        };
+        const script = document.createElement('script');
+        script.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:${cbName}&sheet=${encodeURIComponent(SHEET_NAME)}`;
+        document.body.appendChild(script);
+    }
+
+    function render() {
+        const query = document.getElementById('search').value.toLowerCase().trim();
+        const listEl = document.getElementById('item-list');
+        listEl.innerHTML = '';
+        const filtered = projectData.filter(p => p.searchKey.includes(query));
+        filtered.forEach(item => {
+            const isSelected = cart.some(c => c.rowId === item.rowId);
+            const card = document.createElement('div');
+            card.className = `item-card ${isSelected ? 'selected' : ''}`;
+            card.onclick = () => toggleSelect(item);
+            card.innerHTML = `
+                <div class="item-title">${item.name}</div>
+                <div class="item-info">
+                    <span>工序: ${item.process}</span>
+                    <span>項次: ${item.itemNum}</span>
+                    <span class="price-tag">$${item.price} / ${item.unit}</span>
+                </div>
+            `;
+            listEl.appendChild(card);
+        });
+    }
+
+    function toggleSelect(item) {
+        const index = cart.findIndex(c => c.rowId === item.rowId);
+        if (index > -1) {
+            cart.splice(index, 1);
+        } else {
+            cart.push(item);
+        }
+        updatePanel();
+        render();
+    }
+
+    function updatePanel() {
+        const panel = document.getElementById('selection-panel');
+        document.getElementById('count').innerText = cart.length;
+        panel.style.display = cart.length > 0 ? 'block' : 'none';
+    }
+
+    function clearAll() { 
+        if(confirm("確定清空選取清單？")) {
+            cart = []; updatePanel(); render(); 
+        }
+    }
+
+    // 核心功能：依照項次邏輯排序後匯出
+    function exportToCSV() {
+        if (cart.length === 0) return;
+
+        // 排序逻辑：
+        // 1. 先按「工序」排序 (處理字串與數字混和)
+        // 2. 若工序相同，按「項次」排序
+        const sortedCart = [...cart].sort((a, b) => {
+            if (a.process !== b.process) {
+                return a.process.localeCompare(b.process, undefined, {numeric: true, sensitivity: 'base'});
+            }
+            return a.itemNum.localeCompare(b.itemNum, undefined, {numeric: true, sensitivity: 'base'});
+        });
+
+        let csv = "\ufeff工序,項次,工項名稱,單位,單價\n";
+        csv += sortedCart.map(c => `"${c.process}","${c.itemNum}","${c.name}","${c.unit}","${c.price}"`).join("\n");
+        
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `工程報表(依項次排序)_${new Date().getTime()}.csv`;
+        link.click();
+    }
+
+    loadData();
+</script>
+</body>
+</html>

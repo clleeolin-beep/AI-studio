@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工程全方位換算器 (企業配色版)</title>
+    <style>
+        :root { 
+            --deep-brown: #80350E;  /* 標籤文字顏色 */
+            --bright-orange: #E97132; /* 選中標籤底色/強調色 */
+            --pure-white: #ffffff;    /* 背景色 */
+            --soft-white: #fcfcfc;    /* 卡片微灰底色 */
+            --border-line: #e0e0e0;
+            --text-dark: #333333;
+        }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f0f0; margin: 0; padding: 20px; color: var(--text-dark); }
+        
+        .container { max-width: 1200px; margin: auto; background: var(--pure-white); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* 標籤列樣式 */
+        .tabs { display: flex; background: #ffffff; border-bottom: 3px solid var(--bright-orange); overflow-x: auto; }
+        .tab-btn { 
+            padding: 16px 32px; 
+            border: none; 
+            background: none; 
+            color: var(--deep-brown); 
+            cursor: pointer; 
+            font-size: 1.05rem; 
+            font-weight: bold;
+            transition: 0.3s; 
+            white-space: nowrap; 
+        }
+        .tab-btn:hover { background: #fff5f0; }
+        /* 選中狀態：底色變橘色，文字變白色 */
+        .tab-btn.active { 
+            background: var(--bright-orange); 
+            color: #ffffff; 
+        }
+        
+        .tab-content { display: none; padding: 30px; animation: fadeIn 0.3s; background: var(--pure-white); }
+        .tab-content.active { display: block; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+        
+        /* 卡片樣式 */
+        .card { border: 1px solid var(--border-line); padding: 20px; border-radius: 6px; background: var(--soft-white); }
+        .card h3 { 
+            margin-top: 0; 
+            color: var(--deep-brown); 
+            border-left: 6px solid var(--bright-orange); 
+            padding-left: 12px; 
+            font-size: 1.15rem; 
+            margin-bottom: 20px; 
+        }
+        
+        .input-row { display: flex; align-items: center; margin-bottom: 14px; }
+        .input-row label { flex: 1.2; font-size: 0.9rem; color: #555; font-weight: bold; }
+        .input-row input, .input-row select { 
+            flex: 1.8; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 1rem; 
+            background: #ffffff; 
+        }
+        .input-row input:focus { border-color: var(--bright-orange); outline: none; box-shadow: 0 0 5px rgba(233, 113, 50, 0.2); }
+        
+        .unit { width: 65px; margin-left: 10px; font-size: 0.85rem; color: #777; }
+        
+        /* 結果欄位 */
+        .res { background: #fff9f5 !important; border-color: var(--bright-orange) !important; font-weight: bold; color: var(--deep-brown); }
+        
+        .formula-note { font-size: 0.75rem; color: #666; margin-top: 15px; background: #fdfdfd; border: 1px dashed #ddd; padding: 12px; border-radius: 4px; line-height: 1.4; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab(event, 'tab-steel')">型鋼/鋼構</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab-wood')">木材才積/土地/重量</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab-elec-water')">水電/排水/馬力</button>
+    </div>
+
+    <div id="tab-steel" class="tab-content active">
+        <div class="grid">
+            <div class="card">
+                <h3>常用型鋼 (CNS 標準規格)</h3>
+                
+                <div class="input-row">
+                    <label>型鋼種類</label>
+                    <select id="steel-list" onchange="updateSteelSpec()">
+                        <optgroup label="H型鋼">
+                            <option value="17.2">H 100x100x6x8 (17.2kg/m)</option>
+                            <option value="21.3">H 200x100x5.5x8 (21.3kg/m)</option>
+                            <option value="94.0">H 300x300x10x15 (94kg/m)</option>
+                        </optgroup>
+                        <optgroup label="C型鋼">
+                            <option value="4.5">C 75x45x15x2.3 (4.5kg/m)</option>
+                            <option value="9.36">C 100x50x5x7.5 (9.36kg/m)</option>
+                        </optgroup>
+                        <option value="0">--- 手動輸入 ---</option>
+                    </select>
+                </div>
+                <div class="input-row"><label>單位重</label><input type="number" id="st-unit-w" value="17.2"><span class="unit">kg/m</span></div>
+                <div class="input-row"><label>總長度</label><input type="number" id="st-total-l" value="1"><span class="unit">M</span></div>
+                <div class="input-row"><label>型鋼總重</label><input type="number" id="st-total-w" class="res" readonly><span class="unit">kg</span></div>
+            </div>
+
+            <div class="card">
+                <h3>鋼構自定義 (管/棒/方)</h3>
+                <div class="input-row">
+                    <label>形狀</label>
+                    <select id="st-shape" onchange="toggleStUI()">
+                        <option value="round_p">圓管 (空心)</option>
+                        <option value="round_b">圓棒 (實心)</option>
+                        <option value="sq_p">方/扁管 (矩形)</option>
+                    </select>
+                </div>
+                <div class="input-row"><label id="lbl-v1">外徑/寬</label><input type="number" id="st-v1"><span class="unit">mm</span></div>
+                <div class="input-row" id="row-v2"><label id="lbl-v2">內徑/高</label><input type="number" id="st-v2"><span class="unit">mm</span></div>
+                <div class="input-row" id="row-t" style="display:none;"><label>厚度 (t)</label><input type="number" id="st-t"><span class="unit">mm</span></div>
+                <div class="input-row"><label>長度 (L)</label><input type="number" id="st-l" value="1"><span class="unit">M</span></div>
+                <div class="input-row"><label>計算重量</label><input type="number" id="st-res-w" class="res" readonly><span class="unit">kg</span></div>
+            </div>
+
+            <div class="card">
+                <h3>竹節鋼筋 (CNS 560)</h3>
+                <div class="input-row">
+                    <label>號數規格</label>
+                    <select id="rb-spec">
+                        <option value="0.56">#3 (D10) - 0.56 kg/m</option>
+                        <option value="0.994">#4 (D13) - 0.994 kg/m</option>
+                        <option value="1.56">#5 (D16) - 1.56 kg/m</option>
+                        <option value="2.25">#6 (D19) - 2.25 kg/m</option>
+                    </select>
+                </div>
+                <div class="input-row"><label>長度</label><input type="number" id="rb-l" value="1"><span class="unit">M</span></div>
+                <div class="input-row"><label>支數</label><input type="number" id="rb-qty" value="1"><span class="unit">支</span></div>
+                <div class="input-row"><label>總重量</label><input type="number" id="rb-res-w" class="res" readonly><span class="unit">kg</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-wood" class="tab-content">
+        <div class="grid">
+            <div class="card">
+                <h3>木材材積換算 (長寬高/才)</h3>
+                
+                <div class="input-row"><label>長度 (L)</label><input type="number" id="wd-l" value="30.3"><span class="unit">cm</span></div>
+                <div class="input-row"><label>寬度 (W)</label><input type="number" id="wd-w" value="30.3"><span class="unit">cm</span></div>
+                <div class="input-row"><label>高度/厚度</label><input type="number" id="wd-h" value="30.3"><span class="unit">cm</span></div>
+                <hr style="border:0; border-top:1px solid #eee; margin:16px 0;">
+                <div class="input-row"><label>材積 (才)</label><input type="number" id="u-tsai" class="res"><span class="unit">才</span></div>
+                <div class="input-row"><label>立方公分</label><input type="number" id="u-cm3" class="res"><span class="unit">cm³</span></div>
+                <div class="input-row"><label>立方公尺</label><input type="number" id="u-m3" class="res"><span class="unit">m³</span></div>
+            </div>
+
+            <div class="card">
+                <h3>土地面積 (台灣)</h3>
+                <div class="input-row"><label>坪</label><input type="number" id="u-ping"></div>
+                <div class="input-row"><label>平方公尺</label><input type="number" id="u-m2"></div>
+                <div class="input-row"><label>公頃 (ha)</label><input type="number" id="u-ha"></div>
+                <div class="input-row"><label>甲</label><input type="number" id="u-jia"></div>
+            </div>
+
+            <div class="card">
+                <h3>重量單位換算</h3>
+                <div class="input-row"><label>公噸 (t)</label><input type="number" id="u-ton"></div>
+                <div class="input-row"><label>公斤 (kg)</label><input type="number" id="u-kg"></div>
+                <div class="input-row"><label>台斤</label><input type="number" id="u-twg"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-elec-water" class="tab-content">
+        <div class="grid">
+            <div class="card">
+                <h3>電機工程 (歐姆定律)</h3>
+                
+                <div class="input-row"><label>電壓 (V)</label><input type="number" id="e-v" value="220"><span class="unit">V</span></div>
+                <div class="input-row"><label>電流 (I)</label><input type="number" id="e-i"><span class="unit">A</span></div>
+                <div class="input-row"><label>功率 (P)</label><input type="number" id="e-p"><span class="unit">W</span></div>
+                <div class="input-row"><label>電阻 (R)</label><input type="number" id="e-r" class="res" readonly><span class="unit">Ω</span></div>
+            </div>
+
+            <div class="card">
+                <h3>水壓、揚程與馬力</h3>
+                <div class="input-row"><label>水壓</label><input type="number" id="w-pre"><span class="unit">kg/cm²</span></div>
+                <div class="input-row"><label>揚程</label><input type="number" id="w-head"><span class="unit">M</span></div>
+                <div class="input-row"><label>馬力 (HP)</label><input type="number" id="w-hp" class="res"><span class="unit">HP</span></div>
+                <div class="input-row"><label>功率 (kW)</label><input type="number" id="w-kw"><span class="unit">kW</span></div>
+                <div class="formula-note">1 HP = 0.746 kW</div>
+            </div>
+
+            <div class="card">
+                <h3>排水流量估算</h3>
+                <div class="input-row"><label>溝寬 (cm)</label><input type="number" id="d-w"></div>
+                <div class="input-row"><label>水深 (cm)</label><input type="number" id="d-h"></div>
+                <div class="input-row"><label>每小時流量</label><input type="number" id="d-qh" class="res" readonly><span class="unit">m³/hr</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openTab(evt, name) {
+        var i, content, links;
+        content = document.getElementsByClassName("tab-content");
+        for (i = 0; i < content.length; i++) content[i].classList.remove("active");
+        links = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < links.length; i++) links[i].classList.remove("active");
+        document.getElementById(name).classList.add("active");
+        evt.currentTarget.classList.add("active");
+    }
+
+    // --- 核心運算腳本 (同上一個版本) ---
+    const ev = document.getElementById('e-v'), ei = document.getElementById('e-i'), ep = document.getElementById('e-p'), er = document.getElementById('e-r');
+    const whp = document.getElementById('w-hp'), wkw = document.getElementById('w-kw');
+
+    function calcElectric(trigger) {
+        let V = parseFloat(ev.value) || 0, I = parseFloat(ei.value) || 0, P = parseFloat(ep.value) || 0;
+        if (trigger === 'v' || trigger === 'i') {
+            if (V && I) { ep.value = (V * I).toFixed(1); er.value = (V / I).toFixed(2); }
+        } else if (trigger === 'p') {
+            if (P && V) { ei.value = (P / V).toFixed(2); er.value = (V / (P / V)).toFixed(2); }
+        }
+    }
+
+    function syncPower(trigger) {
+        let val = parseFloat(trigger === 'hp' ? whp.value : wkw.value) || 0;
+        if (trigger === 'hp') {
+            wkw.value = (val * 0.746).toFixed(3);
+        } else {
+            whp.value = (val / 0.746).toFixed(3);
+        }
+    }
+
+    // 型鋼與鋼構
+    function updateSteelSpec() {
+        const val = document.getElementById('steel-list').value;
+        if(val !== "0") document.getElementById('st-unit-w').value = val;
+        calcSteelTable();
+    }
+    function calcSteelTable() {
+        const unitW = parseFloat(document.getElementById('st-unit-w').value) || 0;
+        const totalL = parseFloat(document.getElementById('st-total-l').value) || 0;
+        document.getElementById('st-total-w').value = (unitW * totalL).toFixed(2);
+    }
+    function toggleStUI() {
+        const s = document.getElementById('st-shape').value;
+        document.getElementById('row-v2').style.display = (s === 'round_b') ? 'none' : 'flex';
+        document.getElementById('row-t').style.display = (s === 'sq_p') ? 'flex' : 'none';
+        document.getElementById('lbl-v1').innerText = (s === 'sq_p') ? "寬度 (W)" : "外徑 (OD)";
+        document.getElementById('lbl-v2').innerText = (s === 'sq_p') ? "高度 (H)" : "內徑 (ID)";
+        calcSteelCustom();
+    }
+    function calcSteelCustom() {
+        const s = document.getElementById('st-shape').value;
+        const v1 = parseFloat(document.getElementById('st-v1').value) || 0, v2 = parseFloat(document.getElementById('st-v2').value) || 0;
+        const t = parseFloat(document.getElementById('st-t').value) || 0, l = parseFloat(document.getElementById('st-l').value) || 0;
+        let w = 0;
+        if(s==='round_p') w = (Math.pow(v1/20, 2) - Math.pow(v2/20, 2)) * Math.PI * (l*100) * 0.00785;
+        else if(s==='round_b') w = Math.pow(v1/20, 2) * Math.PI * (l*100) * 0.00785;
+        else if(s==='sq_p') w = (v1*v2 - (v1-2*t)*(v2-2*t))/100 * (l*100) * 0.00785;
+        document.getElementById('st-res-w').value = w.toFixed(2);
+    }
+
+    // 木材材積
+    function updateWood() {
+        const L = parseFloat(document.getElementById('wd-l').value) || 0, W = parseFloat(document.getElementById('wd-w').value) || 0, H = parseFloat(document.getElementById('wd-h').value) || 0;
+        const cm3 = L * W * H;
+        document.getElementById('u-cm3').value = cm3.toFixed(1);
+        document.getElementById('u-m3').value = (cm3 / 1000000).toFixed(6);
+        document.getElementById('u-tsai').value = (cm3 / 27818).toFixed(2);
+    }
+
+    // 單位連動工具
+    function setupLink(map, ids) {
+        ids.forEach(id => {
+            document.getElementById(id).addEventListener('input', e => {
+                const base = e.target.value * map[id];
+                ids.forEach(tid => { if(tid!==id) document.getElementById(tid).value = (base/map[tid]).toPrecision(6); });
+            });
+        });
+    }
+
+    window.onload = () => {
+        setupLink({'u-ping':3.3058, 'u-m2':1, 'u-ha':10000, 'u-jia':9699.17}, ['u-ping','u-m2','u-ha','u-jia']);
+        setupLink({'u-ton':1000, 'u-kg':1, 'u-twg':0.6}, ['u-ton','u-kg','u-twg']);
+
+        ev.addEventListener('input', () => calcElectric('v'));
+        ei.addEventListener('input', () => calcElectric('i'));
+        ep.addEventListener('input', () => calcElectric('p'));
+        whp.addEventListener('input', () => syncPower('hp'));
+        wkw.addEventListener('input', () => syncPower('kw'));
+
+        document.getElementById('w-pre').addEventListener('input', e => document.getElementById('w-head').value = (e.target.value * 10).toFixed(1));
+        document.getElementById('w-head').addEventListener('input', e => document.getElementById('w-pre').value = (e.target.value / 10).toFixed(1));
+
+        ['wd-l', 'wd-w', 'wd-h'].forEach(id => document.getElementById(id).addEventListener('input', updateWood));
+        
+        document.querySelectorAll('input, select').forEach(i => i.addEventListener('input', () => {
+            calcSteelTable(); calcSteelCustom(); 
+            const rbW = document.getElementById('rb-spec').value, rbL = document.getElementById('rb-l').value, rbQ = document.getElementById('rb-qty').value;
+            document.getElementById('rb-res-w').value = (rbW * rbL * rbQ).toFixed(2);
+            const dw = document.getElementById('d-w').value, dh = document.getElementById('d-h').value;
+            document.getElementById('d-qh').value = (dw*dh/10000 * 1 * 3600).toFixed(2);
+        }));
+    };
+</script>
+</body>
+</html>
