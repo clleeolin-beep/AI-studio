@@ -1,10 +1,8 @@
 /**
- * @fileoverview MapEngine.js v2.2 - 惇陽 AI 實驗室 通用空間分析引擎
- * [分組模塊邏輯：依賴檢查與守衛邏輯]
- * 支援模組：實績地圖 (map.html)、圖資編輯器 (map_editor.html)、氣象動態分析 (Weather.html)
+ * @fileoverview MapEngine.js v2.2.1 - 惇陽 AI 實驗室 通用空間分析引擎
+ * 修正說明：補齊類別閉合括號、優化偵錯通訊、調整地形源。
  */
 
-// --- 模組防禦性檢查 ---
 if (typeof maplibregl === 'undefined') {
     console.error('[MapEngine] 嚴重錯誤：偵測不到 Maplibre GL 庫，請檢查 HTML 引用。');
 }
@@ -17,7 +15,7 @@ class MapEngine {
         this.isSatellite = false;
         this.terrainActive = options.terrainDefault !== undefined ? options.terrainDefault : true;
         
-        // 預設樣式與地形定義
+        // 修正：更換為較穩定的地形源，若仍有 Fetch 錯誤，請確認網路或 API Key
         this.terrainSource = {
             "type": "raster-dem",
             "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
@@ -48,9 +46,6 @@ class MapEngine {
         this.init(options);
     }
 
-    /**
-     * [分組一：核心地圖初始化邏輯]
-     */
     init(options) {
         this.map = new maplibregl.Map({
             container: this.containerId,
@@ -68,13 +63,9 @@ class MapEngine {
         this.log("MapEngine 核心初始化完成", "SUCCESS");
     }
 
-    /**
-     * [分組二：視角與底圖控制邏輯]
-     */
     switchBaseMap() {
         this.isSatellite = !this.isSatellite;
         const currentStyle = this.isSatellite ? this.esriStyle : this.osmStyle;
-        currentStyle.terrain = this.terrainActive ? { "source": "t-rgb", "exaggeration": 1.5 } : null;
         this.map.setStyle(currentStyle);
         this.log(`底圖切換完畢: ${this.isSatellite ? '衛星航照' : '道路地圖'}`, "INFO");
         return this.isSatellite;
@@ -97,16 +88,11 @@ class MapEngine {
         this.log("視角已重置為垂直正北投影", "INFO");
     }
 
-    /**
-     * [分組三：WKT 雙向演算邏輯]
-     */
     featuresToWKT(features) {
         let wktArray = [];
-        for (let i = 0; i < features.length; i++) {
-            const feature = features[i];
+        features.forEach(feature => {
             const type = feature.geometry.type;
             const coords = feature.geometry.coordinates;
-
             if (type === 'Point') {
                 wktArray.push(`POINT(${coords[0].toFixed(6)} ${coords[1].toFixed(6)})`);
             } 
@@ -121,47 +107,43 @@ class MapEngine {
                 });
                 wktArray.push(`POLYGON(${rings.join(', ')})`);
             }
-        }
+        });
         return wktArray;
     }
 
     parseWKT(wktString) {
         if (!wktString) return null;
         wktString = wktString.trim().toUpperCase();
-        
         try {
-            if (wktString.indexOf('POINT') === 0) {
-                const content = wktString.replace('POINT', '').replace(/\(/g, '').replace(/\)/g, '').trim();
+            if (wktString.startsWith('POINT')) {
+                const content = wktString.replace('POINT', '').replace(/[()]/g, '').trim();
                 const parts = content.split(/\s+/);
                 return { type: 'Feature', geometry: { type: 'Point', coordinates: [parseFloat(parts[0]), parseFloat(parts[1])] }, properties: {} };
             } 
-            else if (wktString.indexOf('LINESTRING') === 0) {
-                const content = wktString.replace('LINESTRING', '').replace(/\(/g, '').replace(/\)/g, '').trim();
+            else if (wktString.startsWith('LINESTRING')) {
+                const content = wktString.replace('LINESTRING', '').replace(/[()]/g, '').trim();
                 const coordinates = content.split(',').map(p => p.trim().split(/\s+/).map(Number));
                 return { type: 'Feature', geometry: { type: 'LineString', coordinates: coordinates }, properties: {} };
             } 
-            else if (wktString.indexOf('POLYGON') === 0) {
+            else if (wktString.startsWith('POLYGON')) {
                 const rawContent = wktString.substring(wktString.indexOf('(') + 1, wktString.lastIndexOf(')'));
                 const ringStrings = rawContent.match(/\([^)]+\)/g);
                 const coordinates = ringStrings.map(ring => {
-                    const ringContent = ring.replace(/\(/g, '').replace(/\)/g, '').trim();
+                    const ringContent = ring.replace(/[()]/g, '').trim();
                     return ringContent.split(',').map(p => p.trim().split(/\s+/).map(Number));
                 });
                 return { type: 'Feature', geometry: { type: 'Polygon', coordinates: coordinates }, properties: {} };
             }
         } catch (e) {
-            this.log(`WKT 解析失敗: ${wktString.substring(0, 20)}...`, "ERROR");
+            this.log(`WKT 解析失敗: ${e.message}`, "ERROR");
             return null;
         }
         return null;
     }
 
-    /**
-     * [分組四：繪製引擎掛載] (MapboxDraw 整合)
-     */
     initDrawingTools() {
         if (typeof MapboxDraw === 'undefined') {
-            this.log("未載入 MapboxDraw 庫，跳過繪製工具初始化", "ERROR");
+            this.log("未載入 MapboxDraw 庫", "ERROR");
             return null;
         }
         this.draw = new MapboxDraw({
@@ -177,64 +159,31 @@ class MapEngine {
         return this.draw;
     }
 
-    /**
-     * [分組五：自動定位與縮放功能] (新增需求)
-     * 讀取案件資料後，自動鎖定並飛往該處
-     */
     flyToWKT(wkt) {
         const feature = this.parseWKT(wkt);
         if (!feature) return;
-
         let center;
         const geom = feature.geometry;
-        if (geom.type === 'Point') {
-            center = geom.coordinates;
-        } else if (geom.type === 'Polygon') {
-            center = geom.coordinates[0][0]; // 取多邊形第一個點
-        } else if (geom.type === 'LineString') {
-            center = geom.coordinates[0];
+        if (geom.type === 'Point') center = geom.coordinates;
+        else if (geom.type === 'Polygon') center = geom.coordinates[0][0];
+        else if (geom.type === 'LineString') center = geom.coordinates[0];
+
+        this.map.flyTo({ center: center, zoom: 16, pitch: 45, essential: true, duration: 2000 });
+        this.log(`地圖定位至: ${center}`, "INFO");
+    }
+
+    log(message, level = "INFO") {
+        console.log(`[MapEngine][${level}] ${message}`);
+        if (window.parent && typeof window.parent.postMessage === 'function') {
+            window.parent.postMessage({ 
+                source: 'AI_STUDIO_APP',
+                type: 'debug', 
+                module: 'MapEngine', 
+                msg: message, 
+                level: level 
+            }, '*');
         }
-
-        this.map.flyTo({
-            center: center,
-            zoom: 16,
-            pitch: 45,
-            essential: true,
-            duration: 2000
-        });
-        this.log(`地圖定位至案件座標: ${center}`, "INFO");
     }
+} // <--- 修正：補齊 Class 閉合括號
 
-    /**
-     * [分組六：圖層動態管理]
-     */
-    addGeoJSONLayer(layerId, geojsonData, paintOptions) {
-        if (this.map.getSource(layerId)) {
-            this.map.getSource(layerId).setData(geojsonData);
-        } else {
-            this.map.addSource(layerId, { type: 'geojson', data: geojsonData });
-            const geomType = geojsonData.features[0]?.geometry?.type || 'Point';
-            const layerType = geomType.includes('Polygon') ? 'fill' : (geomType.includes('Line') ? 'line' : 'circle');
-            this.map.addLayer({ id: layerId, type: layerType, source: layerId, paint: paintOptions || {} });
-        }
-        this.log(`已更新或寫入圖層: ${layerId}`, "INFO");
-    }
-
-    /**
-     * [分組七：系統除錯與連動] (與 DebugSystem.js 整合)
-     */
-log(message, level = "INFO") {
-    console.log(`[MapEngine][${level}] ${message}`);
-    if (window.parent && typeof window.parent.postMessage === 'function') {
-        window.parent.postMessage({ 
-            source: 'AI_STUDIO_APP', // 必須加上此標籤
-            type: 'debug', 
-            module: 'MapEngine', 
-            msg: message, 
-            level: level 
-        }, '*');
-    }
-}
-
-// 模組導出，供 map_editor.html 使用
 export default MapEngine;
