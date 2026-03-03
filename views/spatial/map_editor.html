@@ -3,116 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圖資編輯工具 | AI Studio</title>
+    <title>圖資編輯工具 | 惇陽 AI 實驗室</title>
     
-    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.css" rel="stylesheet" />
 
     <style>
-        :root { --accent-cyan: #00f2ff; --bg-dark: #0b0e14; --panel-bg: rgba(20, 30, 48, 0.9); }
-        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg-dark); color: white; font-family: 'Microsoft JhengHei', sans-serif; overflow: hidden; }
-        #map { width: 100%; height: 100%; background: #1a1a1a; }
-        
-        .editor-panel { 
-            position: absolute; top: 20px; left: 20px; width: 300px; 
-            background: var(--panel-bg); border: 1px solid var(--accent-cyan); 
-            border-radius: 8px; padding: 15px; z-index: 100; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+        :root {
+            --accent-cyan: #00f2ff;
+            --bg-dark: #0b0e14;
+            --panel-bg: rgba(20, 30, 48, 0.95);
+            --border-color: #34495e;
         }
-        
-        h3 { margin: 0 0 15px 0; color: var(--accent-cyan); border-bottom: 1px solid #34495e; padding-bottom: 5px; }
-        .tool-group { margin-bottom: 10px; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        
-        button { 
-            background: #1A5276; border: 1px solid var(--accent-cyan); 
-            color: white; padding: 8px; border-radius: 4px; cursor: pointer; 
-            font-size: 13px; transition: 0.2s;
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            background: var(--bg-dark);
+            color: white;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            overflow: hidden;
         }
-        button:hover { background: var(--accent-cyan); color: #000; }
-        button.active { background: #e74c3c; border-color: #ff4444; }
-        
-        textarea { 
-            width: 100%; height: 100px; background: #000; 
-            border: 1px solid #34495e; color: var(--accent-cyan); 
-            font-family: monospace; font-size: 11px; padding: 8px; 
-            margin-top: 10px; border-radius: 4px; resize: none; 
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+        }
+
+        /* 左側編輯面板 */
+        .editor-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 320px;
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        h3 { 
+            margin: 0 0 15px 0; 
+            color: var(--accent-cyan); 
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            color: #85929e;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: rgba(26, 82, 118, 0.5);
+            border: 1px solid var(--accent-cyan);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background: var(--accent-cyan);
+            color: #000;
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        button.active {
+            background: #e74c3c;
+            border-color: #ff4444;
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
+        }
+
+        /* WKT 輸出區塊 */
+        .wkt-container {
+            background: rgba(0,0,0,0.4);
+            border-radius: 6px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        textarea {
+            width: 100%;
+            height: 110px;
+            background: transparent;
+            border: none;
+            color: var(--accent-cyan);
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            padding: 5px;
+            resize: none;
+            outline: none;
             box-sizing: border-box;
         }
-        .status { font-size: 12px; color: #888; margin-top: 10px; }
+
+        .status-bar {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            color: #85929e;
+        }
+
+        #current-status { color: var(--accent-cyan); }
+
+        /* 隱藏 Mapbox 預設的按鈕，我們用自己的 UI */
+        .mapboxgl-ctrl-group { display: none !important; }
     </style>
 </head>
 <body>
 
 <div class="editor-panel">
-    <h3>🛠️ 圖資編輯工具</h3>
-    <div class="tool-group">
-        <div class="btn-grid">
-            <button id="draw-point" onclick="setMode('point')">📍 標註點</button>
-            <button id="draw-line" onclick="setMode('line')">📏 測距線</button>
-            <button id="draw-poly" onclick="setMode('polygon')">⬢ 繪多邊形</button>
-            <button onclick="clearMap()" style="background:#555;">🗑️ 清除全部</button>
-        </div>
+    <h3><span style="font-size: 20px;">🛠️</span> 圖資編輯工具</h3>
+    
+    <div class="section-label">繪製模式切換</div>
+    <div class="btn-grid">
+        <button id="btn-point" onclick="handleModeSwitch('point')">📍 標註點</button>
+        <button id="btn-line" onclick="handleModeSwitch('line')">📏 測距線</button>
+        <button id="btn-polygon" onclick="handleModeSwitch('polygon')">⬢ 繪多邊形</button>
+        <button onclick="handleClear()" style="border-color: #888;">🗑️ 清除圖層</button>
+    </div>
+
+    <div class="section-label">WKT 座標數據 (Well-Known Text)</div>
+    <div class="wkt-container">
+        <textarea id="wkt-output" readonly placeholder="請點擊上方按鈕開始在地圖上繪製..."></textarea>
     </div>
     
-    <textarea id="wkt-output" readonly placeholder="繪製完成後自動生成 WKT..."></textarea>
-    <button onclick="copyWKT()" style="width:100%; margin-top:8px;">📋 複製 WKT 座標</button>
-    <div id="editor-status" class="status">狀態: 準備就緒</div>
+    <button onclick="handleCopy()" style="width: 100%; margin-top: 12px; background: #1A5276;">
+        📋 複製 WKT 座標
+    </button>
+
+    <div class="status-bar">
+        <span>系統狀態</span>
+        <span id="current-status">初始化中...</span>
+    </div>
 </div>
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
 <script src="../../components/MapEngine.js"></script>
 
 <script>
-    function log(msg, level = "INFO") {
-        if (window.parent) {
-            window.parent.postMessage({ type: 'debug', module: 'MapEditor', msg: msg, level: level }, '*');
+    /**
+     * 通訊模組：與母視窗 DebugSystem 連動
+     */
+    function postLog(msg, level = "INFO") {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: 'debug',
+                module: 'MapEditor',
+                msg: msg,
+                level: level
+            }, '*');
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        log("編輯器載入中...", "INFO");
-        if (typeof MapEngine !== 'undefined') {
-            MapEngine.init('map', { center: [121.50, 25.04], zoom: 14 });
-            log("地圖引擎就緒", "SUCCESS");
-        }
-    });
+    /**
+     * 初始化監控
+     */
+    window.onload = function() {
+        postLog("正在檢查組件環境...", "INFO");
 
-    function setMode(mode) {
+        // 檢查第三方庫是否載入成功
+        if (typeof maplibregl === 'undefined' || typeof MapboxDraw === 'undefined') {
+            const errorMsg = "外部地圖套件載入失敗，請檢查網路或 CDN 連結";
+            postLog(errorMsg, "ERROR");
+            document.getElementById('current-status').innerText = "載入錯誤";
+            document.getElementById('current-status').style.color = "#ff4444";
+            return;
+        }
+
+        // 檢查自定義組件
+        if (typeof MapEngine === 'undefined') {
+            postLog("找不到 MapEngine.js 組件", "ERROR");
+            return;
+        }
+
+        try {
+            MapEngine.init('map', {
+                center: [121.50, 25.04],
+                zoom: 14
+            });
+            postLog("地圖編輯器初始化成功", "SUCCESS");
+            document.getElementById('current-status').innerText = "準備就緒";
+        } catch (e) {
+            postLog("初始化過程發生異常: " + e.message, "ERROR");
+        }
+    };
+
+    /**
+     * 模式切換邏輯
+     */
+    function handleModeSwitch(mode) {
+        // UI 狀態切換
         document.querySelectorAll('.btn-grid button').forEach(b => b.classList.remove('active'));
-        const btnMap = {'point':'draw-point', 'line':'draw-line', 'polygon':'draw-poly'};
-        if(btnMap[mode]) document.getElementById(btnMap[mode]).classList.add('active');
+        const activeBtn = document.getElementById('btn-' + mode);
+        if (activeBtn) activeBtn.classList.add('active');
 
-        // 呼叫引擎
+        document.getElementById('current-status').innerText = "正在繪製 " + mode;
+        postLog("使用者切換繪製模式為: " + mode, "INFO");
+
+        // 呼叫 MapEngine 開始繪圖
+        // MapEngine 會在繪製完成後透過這個 callback 把結果傳回來
         MapEngine.startDrawing(mode, (result) => {
-            document.getElementById('wkt-output').value = result.wkt;
-            log("WKT 資料已成功更新", "SUCCESS");
-            document.querySelectorAll('.btn-grid button').forEach(b => b.classList.remove('active'));
-            document.getElementById('editor-status').innerText = `狀態: 繪製完成`;
+            if (result && result.wkt) {
+                document.getElementById('wkt-output').value = result.wkt;
+                postLog("座標捕獲成功，已生成 WKT", "SUCCESS");
+                
+                // 繪完後取消按鈕高亮
+                document.querySelectorAll('.btn-grid button').forEach(b => b.classList.remove('active'));
+                document.getElementById('current-status').innerText = "繪製完成";
+            }
         });
-        
-        document.getElementById('editor-status').innerText = `狀態: 正在繪製 ${mode}...`;
     }
 
-    function clearMap() {
-        if(confirm("確定清除所有內容？")) {
+    /**
+     * 清除功能
+     */
+    function handleClear() {
+        if (confirm("確定要清除所有繪製內容嗎？")) {
             MapEngine.clear();
             document.getElementById('wkt-output').value = "";
-            log("地圖暫存已清除", "WARN");
+            document.getElementById('current-status').innerText = "準備就緒";
+            postLog("用戶清除了地圖內容", "WARN");
         }
     }
 
-    function copyWKT() {
-        const area = document.getElementById('wkt-output');
-        if(!area.value) return;
-        area.select();
+    /**
+     * 複製功能
+     */
+    function handleCopy() {
+        const output = document.getElementById('wkt-output');
+        if (!output.value) {
+            alert("目前沒有座標資料可供複製");
+            return;
+        }
+        output.select();
         document.execCommand('copy');
-        log("WKT 已複製", "INFO");
-        alert("已複製 WKT 座標");
+        postLog("WKT 資料已複製到剪貼簿", "INFO");
+        
+        const originalStatus = document.getElementById('current-status').innerText;
+        document.getElementById('current-status').innerText = "✅ 已複製到剪貼簿";
+        setTimeout(() => {
+            document.getElementById('current-status').innerText = originalStatus;
+        }, 2000);
     }
 </script>
+
 </body>
 </html>
