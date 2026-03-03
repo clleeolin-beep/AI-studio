@@ -36,7 +36,7 @@
             <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
             
             <div id="g_id_onload"
-                 data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
+                 data-client_id="992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com"
                  data-context="signin"
                  data-ux_mode="popup"
                  data-callback="handleCredentialResponse"
@@ -67,25 +67,18 @@
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        // 將變數掛載到 window，確保 handleCredentialResponse 找得到它
+        // 全域配置變數
         window.appConfig = null;
 
-        /**
-         * 啟動函式：優先加載配置
-         */
         async function bootstrap() {
             try {
                 const response = await fetch('./manifest.json');
                 if (!response.ok) throw new Error("Manifest Load Failed");
                 const data = await response.json();
                 
-                // 存入全域
                 window.appConfig = data;
-                
-                // 更新 UI
                 document.getElementById('sys-version').innerText = data.ai_lab_config.version;
 
-                // 檢查是否已登入
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
                     unlockSystem();
                 }
@@ -94,15 +87,9 @@
             }
         }
 
-        /**
-         * Google 登入回調 (掛載到 window)
-         */
         window.handleCredentialResponse = async (response) => {
-            console.log("收到 Google 回傳憑證");
-
-            // 關鍵防錯：如果 bootstrap 還沒跑完，手動補抓
+            // 預防萬一：如果配置尚未加載完成
             if (!window.appConfig) {
-                console.log("補抓 Manifest 配置...");
                 const res = await fetch('./manifest.json');
                 window.appConfig = await res.json();
             }
@@ -111,7 +98,7 @@
                 const payload = JSON.parse(atob(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
                 
-                // 根據您的 manifest.json 結構：ai_lab_config -> env -> ALLOWED_USERS
+                // 讀取 manifest 中的名單
                 const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
 
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
@@ -125,7 +112,7 @@
                     errEl.style.display = 'block';
                 }
             } catch (err) {
-                console.error("驗證處理出錯:", err);
+                console.error("驗證處理過程出錯:", err);
             }
         };
 
@@ -136,10 +123,7 @@
             document.getElementById('main-layout').style.display = 'flex';
             document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
             
-            // 初始化全域偵錯系統
             window.DebugSystem = new DebugSystem();
-            
-            // 執行 AppLoader
             const loader = new AppLoader(window.appConfig);
             loader.renderMenu('menu-container');
         }
@@ -149,7 +133,6 @@
             location.reload();
         };
 
-        // 啟動
         bootstrap();
     </script>
 </body>
