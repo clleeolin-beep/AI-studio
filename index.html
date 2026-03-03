@@ -14,19 +14,15 @@
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
         body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
         
-        /* 頂部導航 */
         .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; }
         
-        /* 登入遮罩 */
         #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; }
         
-        /* 主佈局 */
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
-        /* 浮動式 Debug 視窗 */
         #debug-log-window { 
             position: fixed; bottom: 20px; right: 20px; width: 500px; height: 350px;
             background: rgba(0, 0, 0, 0.9); border: 2px solid var(--lab-cyan); border-radius: 12px;
@@ -42,11 +38,9 @@
             padding: 10px; overflow-y: auto; word-break: break-all; user-select: text;
         }
 
-        /* 內容區 */
         .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; overflow: hidden; }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
-        /* 分類收放 CSS */
         .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
         .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
         .module-group.collapsed { max-height: 0; }
@@ -93,37 +87,49 @@
     </div>
 
 <script>
-    // 1. 基礎日誌工具：對接浮動視窗
+    /**
+     * [AI Lab 核心監聽機制]
+     * 監聽來自所有子 Iframe (如 MapEditor) 的跨域訊息
+     */
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.source === 'AI_STUDIO_APP') {
+            const { type, content } = event.data;
+            window.sysLog(content, type || 'info');
+        }
+    });
+
+    // 1. 基礎日誌工具：優化對接邏輯
     window.sysLog = function(msg, type = '') {
-        console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
-        if (window.DebugInstance && typeof window.DebugInstance.log === 'function') {
-            window.DebugInstance.log(msg, type || "INFO");
-        } else {
-            const logBox = document.getElementById('debug-log');
-            if (logBox) {
-                const div = document.createElement('div');
-                div.style.color = (type === 'err' ? '#ff4b4b' : (type === 'success' ? '#00f2ff' : '#0f0'));
-                div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                logBox.appendChild(div);
-                logBox.scrollTop = logBox.scrollHeight;
-            }
+        const typeKey = type.toLowerCase();
+        console.log(`[${typeKey.toUpperCase() || 'LOG'}] ${msg}`);
+        
+        const logBox = document.getElementById('debug-log');
+        if (logBox) {
+            const div = document.createElement('div');
+            // 統一顏色規範
+            const colors = { err: '#ff4b4b', error: '#ff4b4b', success: '#00f2ff', warn: '#ffbb33' };
+            div.style.color = colors[typeKey] || '#0f0';
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            div.style.padding = '2px 0';
+            div.innerText = `[${new Date().toLocaleTimeString('zh-TW', {hour12:false})}] ${msg}`;
+            
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
         }
     };
 
-    // 2. Base64URL 解碼
     function base64UrlDecode(str) {
         let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) { base64 += '='; }
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
-    // 3. 登入回調
     window.handleCredentialResponse = async (response) => {
         window.sysLog("收到憑證，開始驗證...", "success");
         try {
             const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
             const userEmail = payload.email.toLowerCase();
-            window.sysLog("使用者：" + userEmail);
+            window.sysLog("使用者身份：" + userEmail);
 
             if (!window.appConfig) {
                 const res = await fetch('./manifest.json?v=' + Date.now());
@@ -143,13 +149,13 @@
         } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
     };
 
-    // 4. 視窗控制與拖移
     window.toggleDebugWindow = () => {
         const win = document.getElementById('debug-log-window');
         if (!win) return;
         win.style.display = (win.style.display === 'none' || win.style.display === '') ? 'flex' : 'none';
     };
 
+    // 視窗拖移邏輯保持不變
     const dragWin = document.getElementById("debug-log-window");
     const dragHeader = document.getElementById("debug-header");
     let isDragging = false, startX, startY, transX = 0, transY = 0;
@@ -160,15 +166,12 @@
         startY = e.clientY - transY;
         dragHeader.style.cursor = 'grabbing';
     });
-
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        e.preventDefault();
         transX = e.clientX - startX;
         transY = e.clientY - startY;
         dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
     });
-
     document.addEventListener('mouseup', () => {
         isDragging = false;
         if(dragHeader) dragHeader.style.cursor = 'move';
@@ -176,22 +179,21 @@
 </script>
 
 <script type="module">
-    import * as AM from './core/AppLoader.js';
-    import * as DS from './core/DebugSystem.js';
-
-    const AppLoader = AM.default || AM.AppLoader;
-    const DebugSystem = DS.default || DS.DebugSystem;
+    import AppLoader from './core/AppLoader.js';
+    import { DebugSystem } from './core/DebugSystem.js';
 
     window.startSystem = function() {
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('main-layout').style.display = 'flex';
         document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
         
+        // 優先啟動偵錯系統
         if (DebugSystem) {
             window.DebugInstance = new DebugSystem(); 
-            window.sysLog("系統核心解鎖成功", "success");
+            window.sysLog("系統核心解鎖成功 (DebugSystem Active)", "success");
         }
         
+        // 載入應用選單
         if (AppLoader && window.appConfig) {
             const loader = new AppLoader(window.appConfig);
             loader.renderMenu('menu-container');

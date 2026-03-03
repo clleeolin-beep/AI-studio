@@ -1,7 +1,8 @@
 /**
  * @Core: AppLoader
- * @Version: 2.2.1
- * @Description: 管理 Manifest 分類選單生成、摺疊收合與模組切換
+ * @Version: 2.3.0 (Optimized)
+ * @Description: 管理 Manifest 分類選單生成、摺疊收合與模組切換。
+ * 強化點：新增 Iframe 生命週期監控與 DebugSystem 通訊橋接。
  */
 
 export default class AppLoader {
@@ -15,6 +16,7 @@ export default class AppLoader {
             return;
         }
         this.manifest = manifest;
+        this.activeModule = null;
         console.log("🧠 AppLoader 類別實例化成功");
     }
 
@@ -42,7 +44,6 @@ export default class AppLoader {
 
         // 2. 遍歷分組並生成 HTML
         Object.keys(groups).forEach(catName => {
-            // 建立分類標題 (category-item)
             const catHeader = document.createElement('div');
             catHeader.className = 'category-item';
             catHeader.innerHTML = `
@@ -50,23 +51,19 @@ export default class AppLoader {
                 <i class="bi bi-chevron-down"></i>
             `;
 
-            // 建立模組群組容器 (module-group)
             const groupDiv = document.createElement('div');
             groupDiv.className = 'module-group';
 
-            // 綁定收合事件
             catHeader.addEventListener('click', () => {
                 groupDiv.classList.toggle('collapsed');
                 catHeader.classList.toggle('collapsed');
             });
 
-            // 填充該分類下的模組
             groups[catName].forEach(mod => {
                 const item = document.createElement('a');
                 item.className = 'nav-link d-flex align-items-center';
                 item.href = '#';
                 
-                // 處理 Emoji 圖示與名稱
                 item.innerHTML = `
                     <span class="me-3" style="font-style: normal; width: 20px; text-align: center;">${mod.icon}</span>
                     <span>${mod.name}</span>
@@ -74,7 +71,7 @@ export default class AppLoader {
                 
                 item.addEventListener('click', (e) => {
                     e.preventDefault();
-                    e.stopPropagation(); // 防止觸發分類收合
+                    e.stopPropagation(); 
                     this.switchModule(mod, item);
                 });
 
@@ -104,22 +101,53 @@ export default class AppLoader {
             return;
         }
 
+        // 避免重複載入相同模組
+        if (this.activeModule === mod.name) return;
+
+        // 重置 Iframe 監聽器，確保舊的事件不會干擾新的模組
+        frame.onload = null;
+
+        // 設置生命週期 Hook：當模組載入完成時
+        frame.onload = () => {
+            this._handleModuleLoaded(mod, frame);
+        };
+
         // 切換 Iframe 地址
         if (mod.path) {
+            this.activeModule = mod.name;
             frame.src = mod.path;
         }
 
-        // 更新選單的 Active 狀態
+        // 更新 UI 狀態
         document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
-        if (el) {
-            el.classList.add('active');
-        }
+        if (el) el.classList.add('active');
 
-        // 同步顯示除錯日誌
+        console.log(`[System] 準備切換至: ${mod.name} -> ${mod.path}`);
+    }
+
+    /**
+     * 內部生命週期處理：模組載入完成後
+     * @private
+     */
+    _handleModuleLoaded(mod, frame) {
+        // 1. 同步顯示除錯日誌 (至主介面的 sysLog)
         if (window.sysLog) {
             window.sysLog(`載入模組: ${mod.name}`, "success");
         }
 
-        console.log(`[System] 切換模組: ${mod.name} -> ${mod.path}`);
+        // 2. 核心通訊校驗：通知 DebugSystem 重新檢查 Iframe
+        // 如果父視窗有 DebugSystem，則在此主動標記連線
+        console.log(`[System] 模組 [${mod.name}] 已載入完成，通訊管道建立中...`);
+
+        // 3. 針對 MapEditor 等複雜模組進行自動初始化訊號
+        try {
+            frame.contentWindow.postMessage({
+                source: 'AI_STUDIO_CORE',
+                type: 'MODULE_MOUNTED',
+                payload: { name: mod.name, time: Date.now() }
+            }, '*');
+        } catch (e) {
+            console.warn("[AppLoader] 跨域限制，無法發送 MOUNTED 訊號");
+        }
     }
 }
