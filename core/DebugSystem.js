@@ -1,114 +1,132 @@
 /**
- * @Core: DebugSystem
- * @Version: 2.3.1 (浮動面板專用版)
- * @Description: 獨立偵錯終端模組。負責全域錯誤攔截與面板輸出。
- * 已解除與 index.html window.sysLog 的循環依賴，確保系統不崩潰。
+ * @fileoverview DebugSystem - 系統偵錯核心模組
+ * @module core/DebugSystem
+ * @description 負責全域日誌攔截、異常監控及偵錯視窗的 UI 渲染。
+ * 支援跨 Context (Iframe) 的訊息彙整。
  */
 
-export default class DebugSystem {
-    /**
-     * 建構子：初始化時自動尋找面板容器並啟動監聽
-     */
+class DebugSystem {
     constructor() {
-        // 對接 index.html 中的浮動視窗 log 容器
-        this.logContainer = document.getElementById('debug-log');
-        this.maxLogs = 200; // 面板最多保留筆數，超過會自動刪除舊項
+        /** @type {Array<{type: string, msg: any, time: string}>} 日誌儲存池 */
+        this.logs = [];
+        this.isVisible = false;
+        this.dom = null;
         
-        this.setupListeners();
-        this.log("🚀 偵錯終端核心已掛載 (v2.3.1)", "SUCCESS");
+        this.init();
     }
 
     /**
-     * 設定全域錯誤監聽與跨視窗通訊
+     * 初始化偵錯系統
+     * 設置全域攔截與跨域通訊監聽
      */
-    setupListeners() {
-        // 1. 捕捉 Runtime 執行錯誤 (例如變數未定義)
-        window.onerror = (msg, url, line, col, error) => {
-            const file = url ? url.split('/').pop() : '未知來源';
-            this.log(`運行錯誤: ${msg} [${file}:${line}]`, "ERROR");
-            return false; // 讓錯誤繼續傳遞到瀏覽器 Console 方便追蹤
-        };
+    init() {
+        this._createUI();
+        this._interceptConsole();
+        this._setupMessageListener();
+        
+        console.log("[DebugSystem] 核心已啟動，監聽模式：Active");
+    }
 
-        // 2. 捕捉 Promise 未處理的拒絕 (例如 API 請求失敗)
-        window.onunhandledrejection = (event) => {
-            this.log(`非同步失敗: ${event.reason}`, "ERROR");
-        };
-
-        // 3. 監聽來自 Iframe 子頁面的訊息 (跨視窗除錯)
-        // 子頁面可用 window.parent.postMessage({type:'debug', msg:'...', level:'INFO'}, '*') 傳送日誌
+    /**
+     * 設置跨視窗訊息監聽器 (Middleware)
+     * 用於接收來自 MapEditor 或其他模組的獨立日誌
+     * @private
+     */
+    _setupMessageListener() {
         window.addEventListener('message', (event) => {
-            if (event.data && event.data.type === 'debug') {
-                const module = event.data.module || "子頁面";
-                this.log(`[${module}] ${event.data.msg}`, event.data.level || "INFO");
+            // 僅處理特定類型的偵錯訊息
+            if (event.data && event.data.source === 'AI_STUDIO_APP') {
+                const { type, content } = event.data;
+                this.addLog(type || 'info', `[Remote] ${content}`);
             }
         });
     }
 
     /**
-     * 核心輸出函式：僅負責將內容插入 DOM
-     * 注意：此函式絕不呼叫外部的 window.sysLog，以防無限遞迴
-     * @param {string} msg 訊息內容
-     * @param {string} level 級別: INFO, SUCCESS, WARN, ERROR
+     * 攔截原生 Console 物件
+     * @private
      */
-    log(msg, level = "INFO") {
-        if (!this.logContainer) {
-            this.logContainer = document.getElementById('debug-log');
-            if (!this.logContainer) {
-                console.log(`[DebugSystem Standby] ${msg}`);
-                return;
-            }
-        }
-
-        const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-        
-        // 定義配色方案
-        const colors = {
-            "ERROR": "#ff4444",
-            "SUCCESS": "#00f2ff",
-            "WARN": "#ffcc00",
-            "INFO": "#00ff00"
-        };
-        const color = colors[level.toUpperCase()] || colors["INFO"];
-
-        // 建立訊息項目節點
-        const item = document.createElement('div');
-        item.style.cssText = `
-            padding: 4px 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 11px;
-            word-break: break-all;
-            line-height: 1.5;
-            border-left: 3px solid ${color};
-            background: rgba(255,255,255,0.02);
-            margin-bottom: 2px;
-            font-family: 'Consolas', 'Monaco', monospace;
-        `;
-
-        // 組合內容
-        item.innerHTML = `
-            <span style="color:#666;">[${time}]</span> 
-            <span style="color:${color}; font-weight:bold; margin: 0 5px;">[${level.toUpperCase()}]</span> 
-            <span style="color:#eee;">${this.escape(msg)}</span>
-        `;
-
-        this.logContainer.appendChild(item);
-        
-        // 自動捲動到底部
-        this.logContainer.scrollTop = this.logContainer.scrollHeight;
-
-        // 效能優化：限制面板顯示數量
-        if (this.logContainer.childNodes.length > this.maxLogs) {
-            this.logContainer.removeChild(this.logContainer.firstChild);
-        }
+    _interceptConsole() {
+        const types = ['log', 'warn', 'error', 'debug'];
+        types.forEach(type => {
+            const original = console[type];
+            console[type] = (...args) => {
+                this.addLog(type, args.join(' '));
+                original.apply(console, args);
+            };
+        });
     }
 
     /**
-     * 防止 HTML 注入的安全工具
+     * 新增日誌項並觸發 UI 更新
+     * @param {string} type - 日誌等級 (log, error, etc.)
+     * @param {string} msg - 訊息內容
      */
-    escape(str) {
-        if (typeof str !== 'string') return String(str);
-        return str.replace(/[&<>"']/g, m => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[m]));
+    addLog(type, msg) {
+        const entry = {
+            type,
+            msg,
+            time: new Date().toLocaleTimeString('zh-TW', { hour12: false })
+        };
+        this.logs.push(entry);
+        this._renderLog(entry);
+    }
+
+    /**
+     * 建立偵錯視窗 DOM
+     * @private
+     */
+    _createUI() {
+        if (document.getElementById('debug-window')) return;
+
+        const container = document.createElement('div');
+        container.id = 'debug-window';
+        container.style.cssText = `
+            position: fixed; bottom: 0; right: 0; width: 400px; height: 300px;
+            background: rgba(0, 0, 0, 0.85); color: #00ff00; font-family: monospace;
+            z-index: 9999; overflow-y: auto; padding: 10px; font-size: 12px;
+            border-top: 2px solid #444; display: none; pointer-events: auto;
+        `;
+        this.dom = container;
+        document.body.appendChild(container);
+
+        // 快捷鍵切換 (Alt + D)
+        window.addEventListener('keydown', (e) => {
+            if (e.altKey && e.key === 'd') this.toggle();
+        });
+    }
+
+    /**
+     * 切換偵錯視窗顯示狀態
+     */
+    toggle() {
+        this.isVisible = !this.isVisible;
+        this.dom.style.display = this.isVisible ? 'block' : 'none';
+    }
+
+    /**
+     * 將日誌渲染至 UI
+     * @private
+     * @param {Object} entry 
+     */
+    _renderLog(entry) {
+        if (!this.dom) return;
+        const line = document.createElement('div');
+        line.style.borderBottom = '1px solid #222';
+        line.style.padding = '2px 0';
+        
+        const colors = { error: '#ff4444', warn: '#ffbb33', info: '#00ff00' };
+        const color = colors[entry.type] || '#ffffff';
+
+        line.innerHTML = `
+            <span style="color: #888">[${entry.time}]</span> 
+            <span style="color: ${color}">[${entry.type.toUpperCase()}]</span> 
+            <span>${entry.msg}</span>
+        `;
+        this.dom.appendChild(line);
+        this.dom.scrollTop = this.dom.scrollHeight;
     }
 }
+
+// 導出單例
+export const debugSystem = new DebugSystem();

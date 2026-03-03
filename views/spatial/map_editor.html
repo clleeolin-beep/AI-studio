@@ -14,23 +14,15 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; background: #222; }
-        
-        /* 地圖控制組 (需求 5, 6) */
         .map-controls-group { position: absolute; top: 15px; right: 15px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
         .btn-lab-tool { width: 42px; height: 42px; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: 0.2s; cursor: pointer; }
         .btn-lab-tool:hover { background: #f8f9fa; transform: translateY(-2px); color: #00f2ff; }
         .btn-active { background: #212529 !important; color: #00f2ff !important; }
-        
-        /* 狀態列 (需求 7) */
         .map-status-bar { position: absolute; bottom: 15px; left: 15px; z-index: 100; background: rgba(33, 37, 41, 0.85); color: #00f2ff; padding: 4px 15px; border-radius: 20px; font-size: 11px; border: 1px solid rgba(0,242,255,0.3); backdrop-filter: blur(4px); }
-        
-        /* 編輯面板內容樣式 */
         .editor-section { border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 12px; }
         .category-scroll-box { max-height: 110px; overflow-y: auto; background: #fff; border: 1px solid #dee2e6; padding: 8px; border-radius: 6px; }
         .search-result-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; transition: 0.2s; font-size: 13px; }
         .search-result-item:hover { background: #e9ecef; color: #0d6efd; padding-left: 5px; }
-        
-        /* 隱藏原生 Maplibre logo 做視覺優化 */
         .maplibregl-ctrl-bottom-left { display: none; }
     </style>
 </head>
@@ -52,63 +44,62 @@
     </div>
 
 <script type="module">
-    // [分組二：模組導入與初始化]
+    // [AI Lab 強化區塊：偵錯橋接器]
+    // 必須在所有邏輯執行前啟動，確保攔截到所有 console 輸出
+    const setupDebugBridge = () => {
+        ['log', 'warn', 'error'].forEach(type => {
+            const original = console[type];
+            console[type] = (...args) => {
+                original.apply(console, args);
+                if (window.parent) {
+                    window.parent.postMessage({
+                        source: 'AI_STUDIO_APP', // 對應 DebugSystem 的監聽規則
+                        type: type === 'log' ? 'info' : type,
+                        content: `[MapEditor] ${args.join(' ')}`
+                    }, '*');
+                }
+            };
+        });
+    };
+    setupDebugBridge();
+
     import MapEngine from '../../components/MapEngine.js';
     import DraggablePanel from './DraggablePanel.js';
     import EditorDataService from './EditorDataService.js';
 
     let engine, dataService, editorPanel, draw;
 
-    /**
-     * 修改後的初始化邏輯：
-     * 1. 讀取 manifest.json 取得環境變數
-     * 2. 使用配置的 SHEET_ID 啟動資料服務
-     */
     async function init() {
+        console.log("正在啟動地圖編輯器環境...");
         try {
-            // --- 新增：讀取配置檔邏輯 ---
-            // 由於 map_editor.html 在 views/spatial/，manifest 在根目錄，所以向上跳兩層
             const configResp = await fetch('../../manifest.json');
             if (!configResp.ok) throw new Error("無法讀取 manifest.json 配置檔");
             const manifest = await configResp.json();
             
-            // 從 manifest.json 的 ai_lab_config.env 中提取 ID
             const SHEET_ID = manifest.ai_lab_config.env.CASE_SHEET_ID;
-            
             if (!SHEET_ID) throw new Error("manifest.json 中未定義 CASE_SHEET_ID");
-            // --------------------------
 
-            // 1. 初始化引擎 (需求 4: 支援 3D)
+            // 1. 初始化引擎
             engine = new MapEngine('map', { center: [121.50, 23.90], zoom: 7, pitch: 0 });
             
-            // 2. 掛載繪圖工具 (需求 1: 複數點線面)
+            // 2. 掛載繪圖工具
             draw = engine.initDrawingTools();
 
-            // 3. 讀取資料服務 (改用從 manifest 讀到的 ID)
+            // 3. 讀取資料服務
             dataService = new EditorDataService(SHEET_ID);
             await dataService.fetchSheetData();
 
-            // 4. 初始化可拖移面板與事件
+            // 4. 初始化介面
             setupUI();
             bindMapEvents();
             
-            logDebug(`系統啟動成功，資料源：${SHEET_ID.substring(0, 8)}...`);
+            console.log(`系統啟動成功，資料源：${SHEET_ID.substring(0, 8)}...`);
             
         } catch (error) {
-            console.error("初始化失敗:", error);
-            // 透過 window.parent 發送錯誤訊息給 DebugSystem
-            if (window.parent) {
-                window.parent.postMessage({ 
-                    type: 'debug', 
-                    module: 'EDITOR_INIT', 
-                    msg: `初始化失敗: ${error.message}`, 
-                    level: 'ERROR' 
-                }, '*');
-            }
+            console.error(`[CRITICAL] 初始化失敗: ${error.message}`);
         }
     }
 
-    // [分組三：UI 介面建構] - 保持不變
     function setupUI() {
         editorPanel = new DraggablePanel({
             id: 'main-editor',
@@ -125,7 +116,6 @@
                 </div>
                 <div id="search-res-list" class="list-group mt-2 shadow-sm" style="max-height:110px; overflow-y:auto;"></div>
             </div>
-
             <div class="editor-section bg-light p-2 rounded border">
                 <div class="row g-2">
                     <div class="col-5"><small class="text-muted">案號</small><div id="info-id" class="fw-bold text-primary">--</div></div>
@@ -136,7 +126,6 @@
                     <textarea id="val-wkt" class="form-control form-control-sm font-monospace" rows="2" style="font-size:10px; background:#f1f3f5;" readonly></textarea>
                 </div>
             </div>
-
             <div class="editor-section">
                 <div class="row g-2">
                     <div class="col-6">
@@ -149,7 +138,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="d-grid gap-2">
                 <button class="btn btn-primary btn-sm" id="btn-copy-wkt"><i class="bi bi-clipboard"></i> 複製座標資料</button>
             </div>
@@ -159,7 +147,7 @@
     }
 
     function renderCheckboxes(list, type) {
-        if (list.length === 0) return '<small class="text-muted">無分類資料</small>';
+        if (list.length === 0) return '<small class="text-muted">無資料</small>';
         return list.map(item => `
             <div class="form-check">
                 <input class="form-check-input chk-filter" type="checkbox" value="${item}" data-type="${type}" id="chk-${type}-${item}">
@@ -168,7 +156,6 @@
         `).join('');
     }
 
-    // [分組四：搜尋與過濾邏輯] - 保持不變
     function executeSearch() {
         const query = document.getElementById('ipt-search').value;
         const filters = { class: [], status: [] };
@@ -182,10 +169,9 @@
                 <span class="badge bg-secondary me-1">${r.id}</span> ${r.name}
             </div>
         `).join('');
-        if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查與相符案件</div>';
+        if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查無相符案件</div>';
     }
 
-    // [分組五：案件鎖定與 WKT 定位] - 保持不變
     window.lockCase = (id) => {
         const target = dataService.rawRecords.find(r => r.id === id);
         if (!target) return;
@@ -200,20 +186,18 @@
                 engine.flyToWKT(target.wkt);
             }
         }
-        logDebug(`鎖定案件: ${id}`);
+        console.log(`[Action] 鎖定案件: ${id}`);
     };
 
-    // [分組六：繪圖連動 (需求 1)] - 保持不變
     function syncMapToField() {
         const data = draw.getAll();
         if (data.features.length > 0) {
             const wktArr = engine.featuresToWKT(data.features);
             document.getElementById('val-wkt').value = wktArr.join('; ');
-            logDebug("座標欄位已隨繪圖自動更新");
+            console.log("座標資料同步成功 (WKT Update)");
         }
     }
 
-    // [分組七：地圖控制按鈕 (需求 5, 6, 7)] - 保持不變
     function bindMapEvents() {
         const map = engine.map;
         document.getElementById('btn-switch-base').onclick = () => {
@@ -227,18 +211,16 @@
         };
         document.getElementById('btn-reset-pitch').onclick = () => engine.resetView();
         document.getElementById('btn-reset-north').onclick = () => map.easeTo({ bearing: 0 });
+        
         map.on('rotate', () => document.getElementById('txt-north').innerText = `N: ${Math.round(map.getBearing())}°`);
         map.on('zoom', () => document.getElementById('txt-scale').innerText = `Zoom: ${map.getZoom().toFixed(1)}`);
         map.on('mousemove', (e) => {
             document.getElementById('txt-coords').innerText = `${e.lngLat.lng.toFixed(5)}, ${e.lngLat.lat.toFixed(5)}`;
         });
+        
         map.on('draw.create', syncMapToField);
         map.on('draw.update', syncMapToField);
         map.on('draw.delete', syncMapToField);
-    }
-
-    function logDebug(msg) {
-        if (engine) engine.log(msg, "EDITOR");
     }
 
     window.onload = init;
