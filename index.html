@@ -12,24 +12,33 @@
     
     <style>
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
-        body { background: var(--lab-bg); color: white; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; margin: 0; overflow: hidden; }
-        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; z-index: 1001; }
-        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; letter-spacing: 1px; }
-        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--lab-bg); z-index: 2000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 450px; width: 90%; }
-        #main-layout { display: none; height: calc(100vh - 56px); }
-        .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
-        .content-area { flex-grow: 1; background: #000; position: relative; }
-        iframe { width: 100%; height: 100%; border: none; }
-        #debug-console { 
-            width: 100%; height: 180px; background: #000; color: #0f0; 
-            font-family: monospace; font-size: 11px; padding: 12px; 
-            margin-top: 25px; border-radius: 8px; border: 1px solid #00f2ff;
-            overflow-y: auto; text-align: left; line-height: 1.5;
-        }
-        .log-item { border-bottom: 1px solid #1a1a1a; padding: 2px 0; }
-        .log-err { color: #ff4b4b; }
-        .log-success { color: #00f2ff; }
+        body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
+        
+        /* 頂部導航 */
+        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; }
+        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; }
+        
+        /* 登入遮罩 */
+        #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; }
+        
+        /* 主佈局修復：使用 Flex 並確保高度扣除 Navbar */
+        #main-layout { display: none; height: calc(100vh - 56px); width: 100%; }
+        
+        /* 側邊欄修復 */
+        .sidebar { width: 260px; min-width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; display: flex; flex-direction: column; }
+        #menu-container { flex-grow: 1; }
+
+        /* 內容區修復：確保 Iframe 撐滿 */
+        .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; width: 100%; }
+        iframe { width: 100%; height: 100%; border: none; display: block; }
+
+        /* 左側選單樣式對齊 */
+        .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
+
+        #debug-console { width: 100%; height: 150px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; margin-top: 20px; border-radius: 8px; border: 1px solid #00f2ff; overflow-y: auto; text-align: left; }
     </style>
 </head>
 <body>
@@ -38,112 +47,61 @@
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">權限驗證中 (Base64URL 協議版)</p>
-            
-            <div id="g_id_onload"
-                 data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com"
-                 data-context="signin"
-                 data-ux_mode="popup"
-                 data-callback="handleCredentialResponse"
-                 data-auto_prompt="false">
-            </div>
-            <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
-            
+            <p class="text-muted mb-4 small">權限驗證中 (v2.2.0)</p>
+            <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+            <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
             <div id="debug-console"></div>
         </div>
     </div>
 
-    <nav class="navbar navbar-dark px-4 d-flex justify-content-between">
+    <nav class="navbar navbar-dark d-flex justify-content-between">
         <a class="navbar-brand m-0" href="#"><i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span></a>
         <div class="d-flex align-items-center">
             <span id="user-display" class="me-3 small text-muted font-monospace"></span>
-            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出"><i class="bi bi-box-arrow-right"></i></button>
+            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
         </div>
     </nav>
 
-    <div id="main-layout" class="d-flex">
+    <div id="main-layout">
         <aside class="sidebar"><div id="menu-container"></div></aside>
-        <main class="content-area"><iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe></main>
+        <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
     </div>
 
     <script>
-        const debugEl = document.getElementById('debug-console');
         window.sysLog = function(msg, type = '') {
+            const debugEl = document.getElementById('debug-console');
             const div = document.createElement('div');
-            div.className = 'log-item' + (type ? ' log-' + type : '');
+            div.style.color = (type === 'err' ? '#ff4b4b' : (type === 'success' ? '#00f2ff' : '#0f0'));
             div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            if(debugEl) {
-                debugEl.appendChild(div);
-                debugEl.scrollTop = debugEl.scrollHeight;
-            }
+            if(debugEl) { debugEl.appendChild(div); debugEl.scrollTop = debugEl.scrollHeight; }
         };
-        window.sysLog("Base64URL 協議初始化...");
-    </script>
 
-    <script>
-        /**
-         * Base64URL 解碼器 (解決 atob 報錯)
-         */
         function base64UrlDecode(str) {
-            // 1. 替換網址安全字元
             let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-            
-            // 2. 補足長度使之成為 4 的倍數 (Padding)
-            const pad = base64.length % 4;
-            if (pad) {
-                if (pad === 1) throw new Error("無效的 Base64URL 字串");
-                base64 += new Array(5 - pad).join('=');
-            }
-
-            // 3. 使用 atob 轉換並處理 Unicode 亂碼問題
-            try {
-                return decodeURIComponent(atob(base64).split('').map(function(c) {
-                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                }).join(''));
-            } catch (err) {
-                throw new Error("atob 解析失敗: " + err.message);
-            }
+            while (base64.length % 4) { base64 += '='; }
+            return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
         }
 
-        window.handleCredentialResponse = async function(response) {
-            window.sysLog("收到憑證，啟動安全解析...", "success");
+        window.handleCredentialResponse = async (response) => {
             try {
-                // 取得 JWT Payload 段落
-                const parts = response.credential.split('.');
-                if (parts.length < 2) throw new Error("JWT 格式不完整");
-
-                // 使用 Base64URL 協議解析
-                const jsonPayload = base64UrlDecode(parts[1]);
-                const payload = JSON.parse(jsonPayload);
+                const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
-                window.sysLog("解碼成功: " + userEmail, "success");
+                window.sysLog("解析成功: " + userEmail, "success");
 
-                // 確保配置已準備好
                 if (!window.appConfig) {
-                    window.sysLog("正在手動重新抓取設定檔...");
                     const res = await fetch('./manifest.json?v=' + Date.now());
                     window.appConfig = await res.json();
                 }
 
-                const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
-                
-                if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                    window.sysLog("授權通過，正在加載系統...", "success");
+                const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+                if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
                     sessionStorage.setItem('ai_lab_auth', 'true');
                     sessionStorage.setItem('user_email', userEmail);
-                    if (typeof window.startSystem === 'function') {
-                        window.startSystem();
-                    } else {
-                        window.sysLog("系統模組載入中，請稍候 1.5 秒...");
-                        setTimeout(window.startSystem, 1500);
-                    }
+                    window.startSystem ? window.startSystem() : location.reload();
                 } else {
-                    window.sysLog("存取遭拒：您不在授權清單內。", "err");
+                    window.sysLog("無權限: " + userEmail, "err");
                 }
-            } catch (e) {
-                window.sysLog("協議解析錯誤: " + e.message, "err");
-                console.error(e);
-            }
+            } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
         };
     </script>
 
@@ -155,44 +113,26 @@
         const DebugSystem = DS.default || DS.DebugSystem;
 
         window.startSystem = function() {
-            try {
-                const overlay = document.getElementById('auth-overlay');
-                const layout = document.getElementById('main-layout');
-                if (!overlay || !layout) return;
-
-                overlay.style.display = 'none';
-                layout.style.display = 'flex';
-                document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-                
-                if (DebugSystem) window.DebugSystem = new DebugSystem();
-                
-                if (AppLoader && window.appConfig) {
-                    const loader = new AppLoader(window.appConfig);
-                    loader.renderMenu('menu-container');
-                    window.sysLog("介面初始化完成。", "success");
-                } else {
-                    throw new Error("AppLoader 模組未就緒");
-                }
-            } catch (e) {
-                window.sysLog("系統啟動失敗: " + e.message, "err");
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-layout').style.display = 'flex';
+            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+            
+            // 重要：DebugSystem 必須掛載到 window 供 Iframe 使用
+            if (DebugSystem) window.DebugSystem = new DebugSystem();
+            
+            if (AppLoader && window.appConfig) {
+                const loader = new AppLoader(window.appConfig);
+                loader.renderMenu('menu-container');
             }
         };
 
         async function init() {
             try {
-                window.sysLog("加載設定檔...");
                 const response = await fetch('./manifest.json?v=' + Date.now());
                 window.appConfig = await response.json();
                 document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
-                window.sysLog("設定檔加載完成。", "success");
-
-                if (sessionStorage.getItem('ai_lab_auth') === 'true') {
-                    window.sysLog("偵測到已有工作階段，自動進入...");
-                    window.startSystem();
-                }
-            } catch (e) {
-                window.sysLog("初始化失敗: " + e.message, "err");
-            }
+                if (sessionStorage.getItem('ai_lab_auth') === 'true') window.startSystem();
+            } catch (e) { window.sysLog("初始化失敗: " + e.message, "err"); }
         }
         init();
         window.logout = () => { sessionStorage.clear(); location.reload(); };
