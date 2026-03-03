@@ -33,10 +33,10 @@
         <div class="login-box">
             <div class="mb-3" style="font-size: 3rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
+            <p class="text-muted mb-4 small">安全性管制中 (測試模式)</p>
             
             <div id="g_id_onload"
-                 data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
+                 data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com"
                  data-context="signin"
                  data-ux_mode="popup"
                  data-callback="handleCredentialResponse"
@@ -67,33 +67,36 @@
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        window.appManifest = null;
+        // 全域配置儲存
+        window.appConfig = null;
 
         async function bootstrap() {
             try {
                 const response = await fetch('./manifest.json');
-                const data = await response.json();
-                window.appManifest = data;
-                document.getElementById('sys-version').innerText = data.ai_lab_config.version;
+                window.appConfig = await response.json();
+                document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
 
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
                     unlockSystem();
                 }
             } catch (e) {
-                console.error("[System] 初始化錯誤:", e);
+                console.error("[System] 初始化失敗:", e);
             }
         }
 
         window.handleCredentialResponse = async (response) => {
-            if (!window.appManifest) {
+            // 防禦機制：確保配置已下載
+            if (!window.appConfig) {
                 const res = await fetch('./manifest.json');
-                window.appManifest = await res.json();
+                window.appConfig = await res.json();
             }
 
             try {
                 const payload = JSON.parse(atob(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
-                const allowedUsers = (window.appManifest.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+                
+                // 讀取授權名單 (比對前全部轉小寫)
+                const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
 
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
                     sessionStorage.setItem('ai_lab_auth', 'true');
@@ -102,18 +105,31 @@
                     unlockSystem();
                 } else {
                     const errEl = document.getElementById('auth-error');
-                    errEl.innerText = "未授權帳號: " + userEmail;
                     errEl.style.display = 'block';
+                    errEl.innerText = "未授權帳號: " + userEmail;
                 }
             } catch (err) {
-                console.error("[Auth] 驗證錯誤:", err);
+                console.error("[Auth] 憑證處理錯誤:", err);
             }
         };
 
         function unlockSystem() {
-            if (!window.appManifest) return;
+            if (!window.appConfig) return;
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('main-layout').style.display = 'flex';
             document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+            
             window.DebugSystem = new DebugSystem();
-            const loader = new AppLoader(
+            const loader = new AppLoader(window.appConfig);
+            loader.renderMenu('menu-container');
+        }
+
+        window.logout = () => {
+            sessionStorage.clear();
+            location.reload();
+        };
+
+        bootstrap();
+    </script>
+</body>
+</html>
