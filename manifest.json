@@ -5,7 +5,7 @@
   "display": "standalone",
   "theme_color": "#1A5276",
   "ai_lab_config": {
-    "version": "2.0.0",
+    "version": "2.2.0",
     "description": "模組化空間資訊編輯平台",
     "core": {
       "loader": "core/AppLoader.js",
@@ -23,71 +23,85 @@
         "id": "MapEditor",
         "name": "空間實績地圖",
         "icon": "🌐",
-        "path": "modules/map.html",
-        "category": "核心工具"
-      },
-      {
-        "id": "GanttManager",
-        "name": "專案進度管理",
-        "icon": "📊",
-        "path": "modules/Gantt.html",
-        "category": "工程工具"
-      },
-      {
-        "id": "NasSync",
-        "name": "NAS 自動化連動",
-        "icon": "🔗",
-        "path": "modules/AI實驗室-Github串聯NAS.html",
-        "category": "核心工具"
-      },
-      {
-        "id": "CalcEngine",
-        "name": "工程換算引擎",
-        "icon": "📐",
-        "path": "modules/calc.html",
-        "category": "工程工具"
-      },
-      {
-        "id": "GreenTool",
-        "name": "植栽選取工具",
-        "icon": "🌿",
-        "path": "modules/green.html",
-        "category": "工程工具"
-      },
-      {
-        "id": "DocAssistant",
-        "name": "公文智能助手",
-        "icon": "📝",
-        "path": "modules/doc.html",
-        "category": "工程工具"
+        "path": "views/spatial/map.html",
+        "category": "空間資訊"
       },
       {
         "id": "WeatherMonitor",
         "name": "氣象監測系統",
         "icon": "☁️",
-        "path": "modules/Weather.html",
-        "category": "環境數據"
+        "path": "views/spatial/Weather.html",
+        "category": "空間資訊"
       },
       {
         "id": "WeatherData",
         "name": "氣候資料工具",
         "icon": "📅",
-        "path": "modules/WeatherData.html",
-        "category": "環境數據"
+        "path": "views/spatial/WeatherData.html",
+        "category": "空間資訊"
+      },
+      {
+        "id": "CalcEngine",
+        "name": "工程換算引擎",
+        "icon": "📐",
+        "path": "views/productivity/calc.html",
+        "category": "生產力"
+      },
+      {
+        "id": "DocAssistant",
+        "name": "公文智能助手",
+        "icon": "📝",
+        "path": "views/productivity/doc.html",
+        "category": "生產力"
+      },
+      {
+        "id": "GreenTool",
+        "name": "植栽選取工具",
+        "icon": "🌿",
+        "path": "views/productivity/green.html",
+        "category": "生產力"
+      },
+      {
+        "id": "TreeNav",
+        "name": "數據階層導覽",
+        "icon": "🌳",
+        "path": "views/productivity/tree.html",
+        "category": "生產力"
+      },
+      {
+        "id": "GanttManager",
+        "name": "專案進度管理",
+        "icon": "📊",
+        "path": "views/management/Gantt.html",
+        "category": "管理決策"
+      },
+      {
+        "id": "InspectionTool",
+        "name": "現場會勘記錄",
+        "icon": "📸",
+        "path": "views/management/inspection_tool.html",
+        "category": "現場採集"
       },
       {
         "id": "BusinessCardVision",
         "name": "數位名片管理",
         "icon": "🪪",
-        "path": "modules/BusinessCard_Vision.html",
-        "category": "環境數據"
+        "path": "views/management/BusinessCard_Vision.html",
+        "category": "管理決策"
+      },
+      {
+        "id": "NasSync",
+        "name": "NAS 架構說明",
+        "icon": "🔗",
+        "path": "views/knowledge/AI_NAS.html",
+        "category": "知識架構"
       },
       {
         "id": "Tutorial",
         "name": "操作教學指南",
         "icon": "📖",
-        "path": "modules/tutorial.html",
-        "category": "其他"
+        "path": "views/knowledge/tutorial.html",
+        "category": "知識架構"
       }
     ]
   }

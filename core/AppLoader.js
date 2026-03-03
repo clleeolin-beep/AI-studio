@@ -1,27 +1,26 @@
 /**
  * @Core: AppLoader
- * @Description: 負責管理全平台工具的載入、導覽與 Manifest 解析
+ * @Description: 管理工具載入、分類選單生成與導覽邏輯
  */
 
 const AppLoader = {
     manifest: null,
 
-    // 系統初始化啟動
+    // 初始化啟動
     init: async function() {
-        console.log("🧠 AppLoader 正在啟動核心...");
+        console.log("🧠 AppLoader: 啟動核心中...");
         try {
-            // 加上快取清除機制，確保抓到最新的 manifest
+            // 使用時間戳防止 Manifest 快取
             const response = await fetch('manifest.json?v=' + new Date().getTime());
             if (!response.ok) throw new Error("無法讀取 manifest.json");
             
             this.manifest = await response.json();
             this.renderNavigation();
             
-            // 預設載入第一個模組 (通常是地圖)
+            // 自動載入第一個模組
             if (this.manifest.ai_lab_config.modules.length > 0) {
                 const firstMod = this.manifest.ai_lab_config.modules[0];
-                const frame = document.getElementById('content-frame');
-                if (frame) frame.src = firstMod.path;
+                this.switchModule(firstMod, document.querySelector('.menu-item'));
             }
 
             if (window.DebugSystem) {
@@ -33,49 +32,59 @@ const AppLoader = {
         }
     },
 
-    // 根據 Manifest 內容生成左側選單
+    // 生成左側選單（含分類標題）
     renderNavigation: function() {
         const menuList = document.getElementById('menu-list');
         if (!menuList) return;
         
-        menuList.innerHTML = ""; // 清空現有選單
+        menuList.innerHTML = ""; 
         const modules = this.manifest.ai_lab_config.modules;
+        
+        let lastCategory = "";
 
         modules.forEach(mod => {
+            // --- 處理分類標題 ---
+            if (mod.category && mod.category !== lastCategory) {
+                const catHeader = document.createElement('div');
+                catHeader.className = 'category-header';
+                catHeader.innerText = mod.category;
+                menuList.appendChild(catHeader);
+                lastCategory = mod.category;
+            }
+
+            // --- 建立功能項目 ---
             const item = document.createElement('div');
             item.className = 'menu-item';
-            item.innerHTML = `<span>${mod.icon || '📦'} ${mod.name}</span>`;
+            item.setAttribute('data-id', mod.id);
+            item.innerHTML = `
+                <div class="menu-icon">${mod.icon || '📦'}</div>
+                <span>${mod.name}</span>
+            `;
+            
             item.onclick = () => this.switchModule(mod, item);
-            
-            // 初始標記地圖為啟動
-            if (mod.id === "MapEditor") item.classList.add('active');
-            
             menuList.appendChild(item);
         });
     },
 
-    // 執行模組切換
+    // 切換視圖
     switchModule: function(mod, element) {
         const frame = document.getElementById('content-frame');
         const statusMsg = document.getElementById('system-msg');
         
-        if (frame) {
+        if (frame && mod) {
             frame.src = mod.path;
             
-            // 更新 UI 狀態
+            // UI 反饋
             document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
+            if (element) element.classList.add('active');
             
-            // 更新狀態文字
             if (statusMsg) statusMsg.innerText = `目前位置: ${mod.name}`;
             
-            // 紀錄到偵錯視窗
             if (window.DebugSystem) {
-                DebugSystem.log(`載入模組: ${mod.name} (${mod.path})`, 'INFO');
+                DebugSystem.log(`載入視圖: ${mod.name} -> ${mod.path}`, 'INFO');
             }
         }
     }
 };
 
-// 確保 DOM 載入後啟動
 window.addEventListener('DOMContentLoaded', () => AppLoader.init());
