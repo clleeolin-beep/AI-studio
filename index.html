@@ -8,38 +8,39 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="icon" href="data:image/x-icon;base64,="> 
-    
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <style>
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
         body { background: var(--lab-bg); color: white; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; margin: 0; overflow: hidden; }
-        
         .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; z-index: 1001; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; letter-spacing: 1px; }
-        
         #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--lab-bg); z-index: 2000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .login-box { background: #1e293b; padding: 40px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }
-        
+        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 450px; width: 90%; }
         #main-layout { display: none; height: calc(100vh - 56px); }
         .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
         .content-area { flex-grow: 1; background: #000; position: relative; }
-        
-        .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; border-left: 4px solid transparent; cursor: pointer; }
-        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
-        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
-        
         iframe { width: 100%; height: 100%; border: none; }
-        .error-box { color: #ff4b4b; background: rgba(255,75,75,0.1); padding: 10px; border-radius: 8px; margin-top: 15px; display: none; font-size: 13px; }
+
+        /* 除錯視窗樣式 */
+        #debug-console { 
+            width: 100%; height: 150px; background: #000; color: #0f0; 
+            font-family: monospace; font-size: 11px; padding: 10px; 
+            margin-top: 20px; border-radius: 8px; border: 1px solid #334155;
+            overflow-y: auto; text-align: left; line-height: 1.4;
+        }
+        .log-item { border-bottom: 1px solid #222; margin-bottom: 2px; }
+        .log-err { color: #ff4b4b; }
+        .log-success { color: #00f2ff; }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="login-box">
-            <div class="mb-3" style="font-size: 3rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
+            <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
+            <p class="text-muted mb-4 small">安全性管制中 (測試模式)</p>
             
             <div id="g_id_onload"
                  data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com"
@@ -48,26 +49,16 @@
                  data-callback="handleCredentialResponse"
                  data-auto_prompt="false">
             </div>
+            <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
             
-            <div class="g_id_signin d-flex justify-content-center" 
-                 data-type="standard" 
-                 data-shape="rectangular" 
-                 data-theme="filled_black" 
-                 data-text="signin_with" 
-                 data-size="large" 
-                 data-logo_alignment="left">
-            </div>
-            
-            <div id="auth-error" class="error-box">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i> 帳號未授權，請聯繫管理員。
+            <div id="debug-console">
+                <div class="log-item">系統準備就緒...</div>
             </div>
         </div>
     </div>
 
     <nav class="navbar navbar-dark px-4 d-flex justify-content-between">
-        <a class="navbar-brand m-0" href="#">
-            <i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span>
-        </a>
+        <a class="navbar-brand m-0" href="#"><i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span></a>
         <div class="d-flex align-items-center">
             <span id="user-display" class="me-3 small text-muted font-monospace"></span>
             <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出"><i class="bi bi-box-arrow-right"></i></button>
@@ -83,93 +74,87 @@
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        // 強制掛載到全域 window，確保 handleCredentialResponse 讀得到
+        const debugEl = document.getElementById('debug-console');
+        function sysLog(msg, type = '') {
+            const div = document.createElement('div');
+            div.className = 'log-item ' + (type === 'err' ? 'log-err' : (type === 'ok' ? 'log-success' : ''));
+            div.innerText = `> ${new Date().toLocaleTimeString()}: ${msg}`;
+            debugEl.appendChild(div);
+            debugEl.scrollTop = debugEl.scrollHeight;
+        }
+
         window.appConfig = null;
 
-        /**
-         * 讀取設定檔
-         */
-        async function loadManifest() {
+        async function bootstrap() {
             try {
-                // 加上時間戳防止快取
-                const response = await fetch('./manifest.json?v=' + new Date().getTime());
-                if (!response.ok) throw new Error("無法讀取 manifest.json");
+                sysLog("正在獲取 manifest.json...");
+                const response = await fetch('./manifest.json?v=' + Date.now());
+                if (!response.ok) throw new Error("讀取設定檔失敗(404)");
                 window.appConfig = await response.json();
                 
-                // 更新版本 UI
+                sysLog("設定檔加載成功，版本: " + window.appConfig.ai_lab_config.version, "ok");
                 document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
 
-                // 檢查 Session
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
+                    sysLog("偵測到已有 Session，自動登入中...");
                     unlockSystem();
                 }
             } catch (e) {
-                console.error("[Bootstrap Error] ", e);
+                sysLog("初始化錯誤: " + e.message, "err");
             }
         }
 
-        /**
-         * Google 登入成功後的回調
-         */
         window.handleCredentialResponse = async (response) => {
-            console.log("[Auth] 收到憑證，開始驗證...");
+            sysLog("收到 Google 回傳憑證", "ok");
 
-            // 二次防護：如果初始化太慢，手動補抓 manifest
             if (!window.appConfig) {
-                console.log("[Auth] 補抓設定檔中...");
+                sysLog("配置未完成，嘗試手動補抓...");
                 const res = await fetch('./manifest.json');
                 window.appConfig = await res.json();
             }
 
             try {
-                // 解碼 JWT 資訊
                 const payload = JSON.parse(atob(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
+                sysLog("登入者 Email: " + userEmail);
                 
-                // 取得白名單並轉小寫比對
                 const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+                sysLog("正在比對白名單 (名單人數: " + allowedUsers.length + ")...");
 
-                if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                    console.log("[Auth] 驗證成功:", userEmail);
+                const isAuthorized = allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw");
+
+                if (isAuthorized) {
+                    sysLog("驗證成功！進入系統...", "ok");
                     sessionStorage.setItem('ai_lab_auth', 'true');
                     sessionStorage.setItem('user_email', userEmail);
                     sessionStorage.setItem('user_name', payload.name);
                     unlockSystem();
                 } else {
-                    console.warn("[Auth] 帳號不在白名單中:", userEmail);
-                    const errBox = document.getElementById('auth-error');
-                    errBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> 未授權帳號：${userEmail}`;
-                    errBox.style.display = 'block';
+                    sysLog("拒絕存取：此帳號不在白名單中", "err");
+                    sysLog("請檢查 manifest.json 是否已包含: " + userEmail, "err");
                 }
             } catch (err) {
-                console.error("[Auth Logic Error] ", err);
-                alert("驗證過程發生錯誤，請按 F12 查看主控台。");
+                sysLog("解析錯誤: " + err.message, "err");
             }
         };
 
-        /**
-         * 解鎖並顯示主介面
-         */
         function unlockSystem() {
-            if (!window.appConfig) return;
-
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('main-layout').style.display = 'flex';
-            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-            
-            // 啟動全域工具
-            window.DebugSystem = new DebugSystem();
-            const loader = new AppLoader(window.appConfig);
-            loader.renderMenu('menu-container');
+            try {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('main-layout').style.display = 'flex';
+                document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+                
+                window.DebugSystem = new DebugSystem();
+                const loader = new AppLoader(window.appConfig);
+                loader.renderMenu('menu-container');
+                sysLog("介面渲染完成", "ok");
+            } catch (e) {
+                sysLog("解鎖介面失敗: " + e.message, "err");
+            }
         }
 
-        window.logout = () => {
-            sessionStorage.clear();
-            location.reload();
-        };
-
-        // 啟動初始化
-        loadManifest();
+        window.logout = () => { sessionStorage.clear(); location.reload(); };
+        bootstrap();
     </script>
 </body>
 </html>
