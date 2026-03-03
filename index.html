@@ -7,7 +7,9 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="icon" href="data:image/x-icon;base64,="> <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="icon" href="data:image/x-icon;base64,=">
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
@@ -42,9 +44,7 @@
             </div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
             
-            <div id="auth-error" class="text-danger mt-3 small" style="display:none;">
-                <i class="bi bi-exclamation-triangle-fill me-1"></i> 帳號未授權，請聯繫管理員。
-            </div>
+            <div id="auth-error" class="text-danger mt-3 small" style="display:none;"></div>
         </div>
     </div>
 
@@ -67,43 +67,52 @@
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        let manifest = null;
+        // 將變數掛載到 window，確保 handleCredentialResponse 找得到它
+        window.appConfig = null;
 
-        // 初始化：預先載入配置
+        /**
+         * 啟動函式：優先加載配置
+         */
         async function bootstrap() {
             try {
                 const response = await fetch('./manifest.json');
-                if (!response.ok) throw new Error("無法載入 manifest.json");
-                manifest = await response.json();
+                if (!response.ok) throw new Error("Manifest Load Failed");
+                const data = await response.json();
                 
-                document.getElementById('sys-version').innerText = manifest.ai_lab_config.version;
+                // 存入全域
+                window.appConfig = data;
+                
+                // 更新 UI
+                document.getElementById('sys-version').innerText = data.ai_lab_config.version;
 
-                // 檢查 Session 自動解鎖
+                // 檢查是否已登入
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
                     unlockSystem();
                 }
             } catch (e) {
-                console.error("[System] 啟動失敗:", e);
+                console.error("[System] Bootstrap Error:", e);
             }
         }
 
-        // Google 登入回調 (掛載到 window 以供 SDK 調用)
+        /**
+         * Google 登入回調 (掛載到 window)
+         */
         window.handleCredentialResponse = async (response) => {
-            console.log("[Auth] 收到憑證，驗證中...");
-            
-            // 安全機制：確保 manifest 已就緒
-            if (!manifest) {
+            console.log("收到 Google 回傳憑證");
+
+            // 關鍵防錯：如果 bootstrap 還沒跑完，手動補抓
+            if (!window.appConfig) {
+                console.log("補抓 Manifest 配置...");
                 const res = await fetch('./manifest.json');
-                manifest = await res.json();
+                window.appConfig = await res.json();
             }
 
             try {
-                // 解析 JWT
                 const payload = JSON.parse(atob(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
                 
-                // 取得授權名單並轉小寫
-                const allowedUsers = (manifest.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+                // 根據您的 manifest.json 結構：ai_lab_config -> env -> ALLOWED_USERS
+                const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
 
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
                     sessionStorage.setItem('ai_lab_auth', 'true');
@@ -111,27 +120,28 @@
                     sessionStorage.setItem('user_name', payload.name);
                     unlockSystem();
                 } else {
-                    document.getElementById('auth-error').style.display = 'block';
-                    document.getElementById('auth-error').innerText = "未授權帳號: " + userEmail;
+                    const errEl = document.getElementById('auth-error');
+                    errEl.innerText = "未授權帳號: " + userEmail;
+                    errEl.style.display = 'block';
                 }
             } catch (err) {
-                console.error("[Auth] 解析錯誤:", err);
+                console.error("驗證處理出錯:", err);
             }
         };
 
         function unlockSystem() {
+            if (!window.appConfig) return;
+
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('main-layout').style.display = 'flex';
             document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
             
-            // 全域 Debug 系統
+            // 初始化全域偵錯系統
             window.DebugSystem = new DebugSystem();
             
-            // 渲染選單
-            const loader = new AppLoader(manifest);
+            // 執行 AppLoader
+            const loader = new AppLoader(window.appConfig);
             loader.renderMenu('menu-container');
-            
-            window.DebugSystem.log("System", "歡迎進入 惇陽 AI 實驗室", "SUCCESS");
         }
 
         window.logout = () => {
@@ -139,7 +149,8 @@
             location.reload();
         };
 
-        window.onload = bootstrap;
+        // 啟動
+        bootstrap();
     </script>
 </body>
 </html>
