@@ -1,82 +1,184 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>惇陽 AI 實驗室 | AI Studio v2.0</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1A5276">
+    <title>AI Studio | 惇陽 AI 實驗室</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
     <style>
-        :root {
-            --bg-dark: #0b0e14;
-            --sidebar-bg: rgba(20, 30, 48, 0.95);
-            --primary-blue: #1A5276;
-            --accent-cyan: #00f2ff;
-            --text-main: #e0e0e0;
-            --sidebar-width: 260px;
-            --sidebar-collapsed-width: 70px;
-        }
-        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Microsoft JhengHei', sans-serif; background-color: var(--bg-dark); color: var(--text-main); overflow: hidden; }
-        #app-container { display: flex; height: 100vh; width: 100vw; }
-        #sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); border-right: 1px solid var(--primary-blue); display: flex; flex-direction: column; z-index: 100; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
-        #sidebar.collapsed { width: var(--sidebar-collapsed-width); }
-        .sidebar-header { padding: 25px 10px; text-align: center; font-size: 1.2rem; font-weight: bold; color: var(--accent-cyan); border-bottom: 1px solid rgba(26, 82, 118, 0.3); white-space: nowrap; overflow: hidden; }
-        #menu-list { flex: 1; overflow-y: auto; padding: 10px; scrollbar-width: thin; }
-        .category-header { font-size: 11px; color: #566573; margin: 15px 0 8px 12px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
-        #sidebar.collapsed .category-header { opacity: 0; height: 0; margin: 0; overflow: hidden; }
-        .menu-item { display: flex; align-items: center; padding: 12px 15px; margin-bottom: 5px; border-radius: 8px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.03); border: 1px solid transparent; overflow: hidden; }
-        #sidebar.collapsed .menu-item { padding: 12px 0; justify-content: center; }
-        .menu-item:hover { background: rgba(0, 242, 255, 0.1); border-color: var(--accent-cyan); }
-        .menu-item.active { background: var(--primary-blue); border-color: var(--accent-cyan); box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); }
-        .menu-item span { margin-left: 12px; white-space: nowrap; }
-        #sidebar.collapsed .menu-item span { display: none; }
-        .menu-icon { font-size: 1.2rem; min-width: 24px; text-align: center; }
-        .collapse-btn { height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(26, 82, 118, 0.5); color: var(--accent-cyan); font-size: 1rem; }
-        #main-viewport { flex: 1; position: relative; background: #000; }
+        :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
+        body { background: var(--lab-bg); color: white; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; margin: 0; overflow: hidden; }
+        
+        /* 頂部導航列 */
+        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; z-index: 1001; }
+        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; letter-spacing: 1px; }
+        
+        /* 登入遮罩層 (全螢幕鎖定) */
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--lab-bg); z-index: 2000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: #1e293b; padding: 40px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }
+        
+        /* 主佈局介面 */
+        #main-layout { display: none; height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
+        .content-area { flex-grow: 1; background: #000; position: relative; }
+        
+        /* 側邊選單樣式 */
+        .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; border-left: 4px solid transparent; cursor: pointer; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
+        .category-label { font-size: 11px; color: #64748b; padding: 20px 20px 8px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
+
         iframe { width: 100%; height: 100%; border: none; }
-        #global-debug { position: absolute; bottom: 50px; left: 280px; width: 500px; height: 300px; background: rgba(0, 0, 0, 0.95); border: 1px solid #ff4444; border-radius: 8px; display: none; flex-direction: column; z-index: 9999; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .debug-header { padding: 10px; background: #ff4444; color: white; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; cursor: move; }
-        #debug-log { flex: 1; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; overflow-y: auto; color: #00ff00; }
+        
+        /* 捲軸美化 */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body>
-<div id="app-container">
-    <aside id="sidebar">
-        <div class="sidebar-header">AI STUDIO</div>
-        <div id="menu-list"></div>
-        <div class="collapse-btn" onclick="toggleSidebar()">◀ 收起選單</div>
-        <div id="status-bar" style="height:30px; background:#141e30; font-size:11px; display:flex; align-items:center; padding:0 15px; color:#566573; justify-content:space-between; border-top:1px solid var(--primary-blue);">
-            <span id="system-msg">系統就緒</span>
-            <button style="background:none; border:1px solid #444; color:#888; font-size:10px; cursor:pointer;" onclick="toggleDebug()">DEBUG</button>
+
+    <div id="auth-overlay">
+        <div class="login-box">
+            <div class="mb-3" style="font-size: 3rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
+            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
+            <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
+            
+            <div id="g_id_onload"
+                 data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin d-flex justify-content-center" 
+                 data-type="standard" 
+                 data-shape="rectangular" 
+                 data-theme="filled_black" 
+                 data-text="signin_with" 
+                 data-size="large" 
+                 data-logo_alignment="left">
+            </div>
+            
+            <div id="auth-error" class="text-danger mt-3 small" style="display:none;">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> 您未在授權名單中，存取已拒絕。
+            </div>
         </div>
-    </aside>
-    <main id="main-viewport">
-        <iframe id="content-frame" src="about:blank"></iframe>
-    </main>
-</div>
-<div id="global-debug">
-    <div class="debug-header" id="debug-drag"><span>CORE MONITOR</span><span onclick="toggleDebug()" style="cursor:pointer;">✖</span></div>
-    <div id="debug-log"></div>
-</div>
-<script>
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const btn = document.querySelector('.collapse-btn');
-        sidebar.classList.toggle('collapsed');
-        btn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀ 收起選單';
-    }
-    function toggleDebug() {
-        const panel = document.getElementById('global-debug');
-        panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
-    }
-    const win = document.getElementById("global-debug");
-    const hdr = document.getElementById("debug-drag");
-    let isDrag = false, offset = [0, 0];
-    hdr.onmousedown = (e) => { isDrag = true; offset = [win.offsetLeft - e.clientX, win.offsetTop - e.clientY]; };
-    document.onmousemove = (e) => { if (isDrag) { win.style.left = (e.clientX + offset[0]) + "px"; win.style.top = (e.clientY + offset[1]) + "px"; }};
-    document.onmouseup = () => isDrag = false;
-</script>
-<script src="core/DebugSystem.js"></script>
-<script src="core/AppLoader.js"></script>
+    </div>
+
+    <nav class="navbar navbar-dark px-4 d-flex justify-content-between">
+        <a class="navbar-brand m-0" href="#">
+            <i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">v2.2</span>
+        </a>
+        <div class="d-flex align-items-center">
+            <span id="user-display" class="me-3 small text-muted font-monospace"></span>
+            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出">
+                <i class="bi bi-box-arrow-right"></i>
+            </button>
+        </div>
+    </nav>
+
+    <div id="main-layout" class="d-flex">
+        <aside class="sidebar">
+            <div id="menu-container">
+                </div>
+        </aside>
+
+        <main class="content-area">
+            <iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe>
+        </main>
+    </div>
+
+    <script type="module">
+        import AppLoader from './core/AppLoader.js';
+        import DebugSystem from './core/DebugSystem.js';
+
+        let manifest = null;
+
+        /**
+         * 系統啟動引導 (Bootstrap)
+         */
+        async function bootstrap() {
+            try {
+                // 1. 優先獲取 manifest 配置
+                const response = await fetch('./manifest.json');
+                if (!response.ok) throw new Error("Manifest Load Failed");
+                manifest = await response.json();
+                
+                // 更新版本標籤
+                document.getElementById('sys-version').innerText = manifest.ai_lab_config.version;
+
+                // 2. 檢核 Session 狀態
+                const sessionAuth = sessionStorage.getItem('ai_lab_auth');
+                if (sessionAuth === 'true') {
+                    unlockSystem();
+                } else if (!manifest.ai_lab_config.env.ENABLE_GOOGLE_AUTH) {
+                    // 若配置關閉登入功能，則直接解鎖
+                    unlockSystem();
+                }
+            } catch (e) {
+                console.error("[System] 啟動失敗:", e);
+            }
+        }
+
+        /**
+         * Google 登入回調處理
+         */
+        window.handleCredentialResponse = (response) => {
+            // 解析 JWT Payload (Base64)
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const userEmail = payload.email;
+            
+            // 讀取 manifest 中的安全名單 (ALLOWED_USERS)
+            const allowedUsers = manifest.ai_lab_config.env.ALLOWED_USERS || [];
+
+            if (allowedUsers.includes(userEmail)) {
+                console.log(`[Auth] 歡迎回來, ${payload.name}`);
+                
+                // 存入 Session
+                sessionStorage.setItem('ai_lab_auth', 'true');
+                sessionStorage.setItem('user_email', userEmail);
+                sessionStorage.setItem('user_name', payload.name);
+                
+                unlockSystem();
+            } else {
+                document.getElementById('auth-error').style.display = 'block';
+                console.error("[Auth] 存取拒絕:", userEmail);
+            }
+        };
+
+        /**
+         * 解鎖主介面並加載模組
+         */
+        function unlockSystem() {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-layout').style.display = 'flex';
+            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+            
+            // 初始化 Debug 系統並掛載至全域
+            window.DebugSystem = new DebugSystem();
+            
+            // 初始化 AppLoader 並渲染選單
+            const loader = new AppLoader(manifest);
+            loader.renderMenu('menu-container');
+            
+            window.DebugSystem.log("System", `使用者 ${sessionStorage.getItem('user_name')} 已登入`, "SUCCESS");
+        }
+
+        /**
+         * 登出邏輯
+         */
+        window.logout = () => {
+            sessionStorage.clear();
+            location.reload();
+        };
+
+        // 啟動流程
+        window.onload = bootstrap;
+    </script>
 </body>
 </html>

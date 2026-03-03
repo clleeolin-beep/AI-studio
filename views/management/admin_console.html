@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Console | AI Studio Lab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --lab-cyan: #00f2ff; --lab-bg: #121212; --lab-card: #1e1e1e; }
+        body { background-color: var(--lab-bg); color: #e0e0e0; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+        
+        .admin-card { background: var(--lab-card); border: 1px solid #333; border-radius: 16px; width: 100%; max-width: 550px; padding: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .lab-logo { color: var(--lab-cyan); font-size: 2.5rem; margin-bottom: 20px; text-shadow: 0 0 15px rgba(0,242,255,0.5); }
+        
+        .form-control { background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; font-size: 14px; }
+        .form-control:focus { background: #333; border-color: var(--lab-cyan); color: white; box-shadow: 0 0 8px rgba(0,242,255,0.2); }
+        
+        .btn-lab { background: transparent; border: 1px solid var(--lab-cyan); color: var(--lab-cyan); transition: 0.3s; font-weight: bold; }
+        .btn-lab:hover { background: var(--lab-cyan); color: #000; box-shadow: 0 0 20px rgba(0,242,255,0.4); }
+        
+        .config-item { background: #252525; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--lab-cyan); }
+        .status-badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; background: #2ecc71; color: #fff; }
+        
+        /* 新增樣式：配置產出區 */
+        .output-box { background: #000; color: #2ecc71; font-family: 'Consolas', monospace; font-size: 12px; border: 1px solid #333; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-section" class="admin-card text-center">
+        <div class="lab-logo"><i class="bi bi-shield-lock-fill"></i></div>
+        <h4 class="mb-4">AI Lab 系統管理員驗證</h4>
+        <div class="mb-3">
+            <input type="password" id="admin-pass" class="form-control form-control-lg text-center" placeholder="請輸入 ADMIN_KEY">
+        </div>
+        <button class="btn btn-lab w-100 py-2" id="btn-login">驗證並進入</button>
+        <div id="login-msg" class="text-danger mt-3 small" style="display:none;">金鑰驗證失敗，請重試。</div>
+    </div>
+
+    <div id="admin-section" class="admin-card d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="m-0 text-cyan"><i class="bi bi-gear-fill me-2"></i>系統配置管理</h5>
+            <span class="status-badge">已授權存取</span>
+        </div>
+
+        <div class="config-item">
+            <small class="text-muted d-block mb-1">地圖資料源 (Google Sheet ID)</small>
+            <div id="display-sheet-id" class="fw-bold text-break" style="font-size: 13px;">--</div>
+        </div>
+
+        <div class="config-item">
+            <small class="text-muted d-block mb-2">Google 授權名單 (每行一個 Email)</small>
+            <textarea id="user-list-editor" class="form-control mb-2" rows="4" placeholder="example@gmail.com"></textarea>
+            <button class="btn btn-sm btn-lab w-100" onclick="generateNewConfig()">產生更新代碼</button>
+        </div>
+
+        <div id="output-area" class="d-none mt-3">
+            <small class="text-warning small"><i class="bi bi-info-circle me-1"></i> 請複製下方 JSON 並覆蓋 manifest.json 中的 env 部分：</small>
+            <textarea id="config-output" class="form-control output-box mt-2" rows="5" readonly></textarea>
+            <button class="btn btn-sm btn-success w-100 mt-2" onclick="copyConfig()">複製到剪貼簿</button>
+        </div>
+
+        <div class="mt-4 pt-3 border-top border-secondary">
+            <button class="btn btn-sm btn-outline-secondary w-100" id="btn-logout">安全登出系統</button>
+        </div>
+    </div>
+
+    <script type="module">
+        let sysConfig = null;
+        let fullManifest = null;
+
+        async function loadManifest() {
+            try {
+                const response = await fetch('../../manifest.json');
+                fullManifest = await response.json();
+                sysConfig = fullManifest.ai_lab_config;
+            } catch (error) {
+                console.error("[Admin] 無法讀取配置檔:", error);
+            }
+        }
+
+        function verify() {
+            const inputKey = document.getElementById('admin-pass').value;
+            if (sysConfig && inputKey === sysConfig.env.ADMIN_KEY) {
+                showAdmin();
+            } else {
+                document.getElementById('login-msg').style.display = 'block';
+                setTimeout(() => { document.getElementById('login-msg').style.display = 'none'; }, 2000);
+            }
+        }
+
+        function showAdmin() {
+            document.getElementById('auth-section').classList.add('d-none');
+            document.getElementById('admin-section').classList.remove('d-none');
+            
+            document.getElementById('display-sheet-id').innerText = sysConfig.env.CASE_SHEET_ID || "未設定";
+            // 將名單填入編輯器
+            if (sysConfig.env.ALLOWED_USERS) {
+                document.getElementById('user-list-editor').value = sysConfig.env.ALLOWED_USERS.join('\n');
+            }
+            logToParent("管理員已成功登入權限管理後台");
+        }
+
+        // [產出配置邏輯]
+        window.generateNewConfig = () => {
+            const emails = document.getElementById('user-list-editor').value.split('\n').filter(e => e.trim());
+            
+            // 建立新的 env 物件，保留原本的其他設定
+            const newEnv = {
+                ...sysConfig.env,
+                "ALLOWED_USERS": emails
+            };
+
+            // 格式化輸出
+            const outputString = JSON.stringify({ "env": newEnv }, null, 4);
+            document.getElementById('config-output').value = outputString;
+            document.getElementById('output-area').classList.remove('d-none');
+        };
+
+        window.copyConfig = () => {
+            const el = document.getElementById('config-output');
+            el.select();
+            document.execCommand('copy');
+            alert('代碼已複製！請貼回 manifest.json 的 ai_lab_config.env 中。');
+        };
+
+        function logToParent(msg) {
+            if (window.parent) {
+                window.parent.postMessage({ type: 'debug', module: 'AdminConsole', msg: msg, level: 'WARN' }, '*');
+            }
+        }
+
+        window.onload = () => {
+            loadManifest();
+            document.getElementById('btn-login').onclick = verify;
+            document.getElementById('btn-logout').onclick = () => location.reload();
+            document.getElementById('admin-pass').onkeypress = (e) => { if (e.key === 'Enter') verify(); };
+        };
+    </script>
+</body>
+</html>

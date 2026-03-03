@@ -6,33 +6,58 @@
   "theme_color": "#1A5276",
   "ai_lab_config": {
     "version": "2.2.0",
-    "description": "模組化空間資訊編輯平台",
+    "description": "模組化空間資訊編輯平台 (正式權限控管版)",
     "core": {
       "loader": "core/AppLoader.js",
       "debug": "core/DebugSystem.js"
     },
-    "components": [
-      {
-        "id": "MapEngine",
-        "path": "components/MapEngine.js",
-        "description": "3D 地圖與 WKT 解析核心"
-      }
-    ],
+    "env": {
+      "ENABLE_GOOGLE_AUTH": true,
+      "OWNER": "cl.lee.olin@gmail.com",
+      "ALLOWED_USERS": [
+        "cl.lee.olin@gmail.com",
+        "0757troph@gmail.com",
+        "Roserain0516@gmail.com",
+        "cccrj0929@gmail.com",
+        "hank881016@gmail.com",
+        "twjackal@gmail.com",
+        "lucis.willow@gmail.com",
+        "daphnetang111@gmail.com",
+        "jangpp7@gmail.com",
+        "kenwu880316@gmail.com",
+        "g520g7@gmail.com",
+        "adad154154@gmail.com",
+        "wu.yingu@gmail.com",
+        "maoyuanweng19901210@gmail.com",
+        "juby90884@gmail.com",
+        "paida19595@gmail.com",
+        "tsaisujing@gmail.com",
+        "b0287751@gmail.com",
+        "awencoacc012@gmail.com",
+        "a75121723@gmail.com",
+        "copic.wang@gmail.com",
+        "swallowa81@gmail.com"
+      ],
+      "CASE_SHEET_ID": "1r1e0Nl7y-8BvH7I8f5I6Y5I8p9X8Y8Z",
+      "ADMIN_KEY": "AI_LAB_2026",
+      "MAP_DEFAULT_CENTER": [121.50, 23.90],
+      "TERRAIN_EXAGGERATION": 1.5
+    },
     "modules": [
       {
-  "id": "MapViewer",
-  "name": "空間實績地圖",
-  "icon": "🌐",
-  "path": "views/spatial/map.html",
-  "category": "空間資訊"
-},
-{
-  "id": "MapEditor",
-  "name": "圖資編輯工具",
-  "icon": "🛠️",
-  "path": "views/spatial/map_editor.html",
-  "category": "空間資訊"
-},
+        "id": "MapViewer",
+        "name": "空間實績地圖",
+        "icon": "🌐",
+        "path": "views/spatial/map.html",
+        "category": "空間資訊"
+      },
+      {
+        "id": "MapEditor",
+        "name": "圖資編輯工具",
+        "icon": "🛠️",
+        "path": "views/spatial/map_editor.html",
+        "category": "空間資訊"
+      },
       {
         "id": "WeatherMonitor",
         "name": "氣象監測系統",
@@ -94,6 +119,13 @@
         "name": "數位名片管理",
         "icon": "🪪",
         "path": "views/management/BusinessCard_Vision.html",
+        "category": "管理決策"
+      },
+      {
+        "id": "AdminConsole",
+        "name": "系統後台管理",
+        "icon": "⚙️",
+        "path": "views/management/admin_console.html",
         "category": "管理決策"
       },
       {

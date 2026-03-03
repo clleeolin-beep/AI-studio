@@ -51,23 +51,40 @@
         <span id="txt-coords">0.00000, 0.00000</span>
     </div>
 
-    <script type="module">
-        // [分組二：模組導入與初始化]
-        import MapEngine from '../../components/MapEngine.js';
-        import DraggablePanel from './DraggablePanel.js';
-        import EditorDataService from './EditorDataService.js';
+<script type="module">
+    // [分組二：模組導入與初始化]
+    import MapEngine from '../../components/MapEngine.js';
+    import DraggablePanel from './DraggablePanel.js';
+    import EditorDataService from './EditorDataService.js';
 
-        let engine, dataService, editorPanel, draw;
-        const SHEET_ID = '1r1e0Nl7y-8BvH7I8f5I6Y5I8p9X8Y8Z'; 
+    let engine, dataService, editorPanel, draw;
 
-        async function init() {
+    /**
+     * 修改後的初始化邏輯：
+     * 1. 讀取 manifest.json 取得環境變數
+     * 2. 使用配置的 SHEET_ID 啟動資料服務
+     */
+    async function init() {
+        try {
+            // --- 新增：讀取配置檔邏輯 ---
+            // 由於 map_editor.html 在 views/spatial/，manifest 在根目錄，所以向上跳兩層
+            const configResp = await fetch('../../manifest.json');
+            if (!configResp.ok) throw new Error("無法讀取 manifest.json 配置檔");
+            const manifest = await configResp.json();
+            
+            // 從 manifest.json 的 ai_lab_config.env 中提取 ID
+            const SHEET_ID = manifest.ai_lab_config.env.CASE_SHEET_ID;
+            
+            if (!SHEET_ID) throw new Error("manifest.json 中未定義 CASE_SHEET_ID");
+            // --------------------------
+
             // 1. 初始化引擎 (需求 4: 支援 3D)
             engine = new MapEngine('map', { center: [121.50, 23.90], zoom: 7, pitch: 0 });
             
             // 2. 掛載繪圖工具 (需求 1: 複數點線面)
             draw = engine.initDrawingTools();
 
-            // 3. 讀取資料服務
+            // 3. 讀取資料服務 (改用從 manifest 讀到的 ID)
             dataService = new EditorDataService(SHEET_ID);
             await dataService.fetchSheetData();
 
@@ -75,161 +92,156 @@
             setupUI();
             bindMapEvents();
             
-            logDebug("Map Editor 整合模組啟動成功");
-        }
-
-        // [分組三：UI 介面建構] (需求 2, 8)
-        function setupUI() {
-            editorPanel = new DraggablePanel({
-                id: 'main-editor',
-                title: '圖資編輯與資料鎖定',
-                width: 380
-            });
-
-            const html = `
-                <div class="editor-section">
-                    <label class="form-label small fw-bold text-dark">案件搜尋鎖定</label>
-                    <div class="input-group input-group-sm">
-                        <input type="text" id="ipt-search" class="form-control" placeholder="案號或名稱關鍵字...">
-                        <button class="btn btn-dark" id="btn-search-trigger"><i class="bi bi-search"></i></button>
-                    </div>
-                    <div id="search-res-list" class="list-group mt-2 shadow-sm" style="max-height:110px; overflow-y:auto;"></div>
-                </div>
-
-                <div class="editor-section bg-light p-2 rounded border">
-                    <div class="row g-2">
-                        <div class="col-5"><small class="text-muted">案號</small><div id="info-id" class="fw-bold text-primary">--</div></div>
-                        <div class="col-7"><small class="text-muted">案件簡稱</small><div id="info-name" class="fw-bold">--</div></div>
-                    </div>
-                    <div class="mt-2">
-                        <label class="small text-muted">WKT 座標數據 (繪圖後自動更新)</label>
-                        <textarea id="val-wkt" class="form-control form-control-sm font-monospace" rows="2" style="font-size:10px; background:#f1f3f5;" readonly></textarea>
-                    </div>
-                </div>
-
-                <div class="editor-section">
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="small fw-bold">類別 (複選)</label>
-                            <div class="category-scroll-box" id="cat-class-box">${renderCheckboxes(dataService.categoryData.class, 'class')}</div>
-                        </div>
-                        <div class="col-6">
-                            <label class="small fw-bold">案件狀態</label>
-                            <div class="category-scroll-box" id="cat-status-box">${renderCheckboxes(dataService.categoryData.status, 'status')}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button class="btn btn-primary btn-sm" id="btn-copy-wkt"><i class="bi bi-clipboard"></i> 複製座標資料</button>
-                </div>
-            `;
-            editorPanel.setContent(html);
-
-            // 綁定搜尋按鈕事件
-            document.getElementById('btn-search-trigger').onclick = executeSearch;
-        }
-
-        function renderCheckboxes(list, type) {
-            if (list.length === 0) return '<small class="text-muted">無分類資料</small>';
-            return list.map(item => `
-                <div class="form-check">
-                    <input class="form-check-input chk-filter" type="checkbox" value="${item}" data-type="${type}" id="chk-${type}-${item}">
-                    <label class="form-check-label small" style="font-size:11px;" for="chk-${type}-${item}">${item}</label>
-                </div>
-            `).join('');
-        }
-
-        // [分組四：搜尋與過濾邏輯]
-        function executeSearch() {
-            const query = document.getElementById('ipt-search').value;
+            logDebug(`系統啟動成功，資料源：${SHEET_ID.substring(0, 8)}...`);
             
-            // 獲取分類勾選狀態
-            const filters = { class: [], status: [] };
-            document.querySelectorAll('.chk-filter:checked').forEach(el => {
-                filters[el.dataset.type].push(el.value);
-            });
-
-            const results = dataService.search(query, filters);
-            const listEl = document.getElementById('search-res-list');
-            
-            listEl.innerHTML = results.map(r => `
-                <div class="list-group-item search-result-item p-2" onclick="window.lockCase('${r.id}')">
-                    <span class="badge bg-secondary me-1">${r.id}</span> ${r.name}
-                </div>
-            `).join('');
-            
-            if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查無相符案件</div>';
-        }
-
-        // [分組五：案件鎖定與 WKT 定位]
-        window.lockCase = (id) => {
-            const target = dataService.rawRecords.find(r => r.id === id);
-            if (!target) return;
-
-            document.getElementById('info-id').innerText = target.id;
-            document.getElementById('info-name').innerText = target.name;
-            document.getElementById('val-wkt').value = target.wkt;
-
-            // 定位地圖並載入現有 WKT
-            if (target.wkt && target.wkt.trim() !== "") {
-                const feature = engine.parseWKT(target.wkt);
-                if (feature) {
-                    draw.deleteAll();
-                    draw.add(feature);
-                    engine.flyToWKT(target.wkt);
-                }
+        } catch (error) {
+            console.error("初始化失敗:", error);
+            // 透過 window.parent 發送錯誤訊息給 DebugSystem
+            if (window.parent) {
+                window.parent.postMessage({ 
+                    type: 'debug', 
+                    module: 'EDITOR_INIT', 
+                    msg: `初始化失敗: ${error.message}`, 
+                    level: 'ERROR' 
+                }, '*');
             }
-            logDebug(`鎖定案件: ${id}`);
+        }
+    }
+
+    // [分組三：UI 介面建構] - 保持不變
+    function setupUI() {
+        editorPanel = new DraggablePanel({
+            id: 'main-editor',
+            title: '圖資編輯與資料鎖定',
+            width: 380
+        });
+
+        const html = `
+            <div class="editor-section">
+                <label class="form-label small fw-bold text-dark">案件搜尋鎖定</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" id="ipt-search" class="form-control" placeholder="案號或名稱關鍵字...">
+                    <button class="btn btn-dark" id="btn-search-trigger"><i class="bi bi-search"></i></button>
+                </div>
+                <div id="search-res-list" class="list-group mt-2 shadow-sm" style="max-height:110px; overflow-y:auto;"></div>
+            </div>
+
+            <div class="editor-section bg-light p-2 rounded border">
+                <div class="row g-2">
+                    <div class="col-5"><small class="text-muted">案號</small><div id="info-id" class="fw-bold text-primary">--</div></div>
+                    <div class="col-7"><small class="text-muted">案件簡稱</small><div id="info-name" class="fw-bold">--</div></div>
+                </div>
+                <div class="mt-2">
+                    <label class="small text-muted">WKT 座標數據 (繪圖後自動更新)</label>
+                    <textarea id="val-wkt" class="form-control form-control-sm font-monospace" rows="2" style="font-size:10px; background:#f1f3f5;" readonly></textarea>
+                </div>
+            </div>
+
+            <div class="editor-section">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="small fw-bold">類別 (複選)</label>
+                        <div class="category-scroll-box" id="cat-class-box">${renderCheckboxes(dataService.categoryData.class, 'class')}</div>
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">案件狀態</label>
+                        <div class="category-scroll-box" id="cat-status-box">${renderCheckboxes(dataService.categoryData.status, 'status')}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary btn-sm" id="btn-copy-wkt"><i class="bi bi-clipboard"></i> 複製座標資料</button>
+            </div>
+        `;
+        editorPanel.setContent(html);
+        document.getElementById('btn-search-trigger').onclick = executeSearch;
+    }
+
+    function renderCheckboxes(list, type) {
+        if (list.length === 0) return '<small class="text-muted">無分類資料</small>';
+        return list.map(item => `
+            <div class="form-check">
+                <input class="form-check-input chk-filter" type="checkbox" value="${item}" data-type="${type}" id="chk-${type}-${item}">
+                <label class="form-check-label small" style="font-size:11px;" for="chk-${type}-${item}">${item}</label>
+            </div>
+        `).join('');
+    }
+
+    // [分組四：搜尋與過濾邏輯] - 保持不變
+    function executeSearch() {
+        const query = document.getElementById('ipt-search').value;
+        const filters = { class: [], status: [] };
+        document.querySelectorAll('.chk-filter:checked').forEach(el => {
+            filters[el.dataset.type].push(el.value);
+        });
+        const results = dataService.search(query, filters);
+        const listEl = document.getElementById('search-res-list');
+        listEl.innerHTML = results.map(r => `
+            <div class="list-group-item search-result-item p-2" onclick="window.lockCase('${r.id}')">
+                <span class="badge bg-secondary me-1">${r.id}</span> ${r.name}
+            </div>
+        `).join('');
+        if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查與相符案件</div>';
+    }
+
+    // [分組五：案件鎖定與 WKT 定位] - 保持不變
+    window.lockCase = (id) => {
+        const target = dataService.rawRecords.find(r => r.id === id);
+        if (!target) return;
+        document.getElementById('info-id').innerText = target.id;
+        document.getElementById('info-name').innerText = target.name;
+        document.getElementById('val-wkt').value = target.wkt;
+        if (target.wkt && target.wkt.trim() !== "") {
+            const feature = engine.parseWKT(target.wkt);
+            if (feature) {
+                draw.deleteAll();
+                draw.add(feature);
+                engine.flyToWKT(target.wkt);
+            }
+        }
+        logDebug(`鎖定案件: ${id}`);
+    };
+
+    // [分組六：繪圖連動 (需求 1)] - 保持不變
+    function syncMapToField() {
+        const data = draw.getAll();
+        if (data.features.length > 0) {
+            const wktArr = engine.featuresToWKT(data.features);
+            document.getElementById('val-wkt').value = wktArr.join('; ');
+            logDebug("座標欄位已隨繪圖自動更新");
+        }
+    }
+
+    // [分組七：地圖控制按鈕 (需求 5, 6, 7)] - 保持不變
+    function bindMapEvents() {
+        const map = engine.map;
+        document.getElementById('btn-switch-base').onclick = () => {
+            const isSat = engine.switchBaseMap();
+            document.getElementById('btn-switch-base').classList.toggle('btn-active', isSat);
         };
+        document.getElementById('btn-toggle-3d').onclick = () => {
+            const is3D = engine.toggle3D();
+            document.getElementById('btn-toggle-3d').classList.toggle('btn-active', is3D);
+            map.easeTo({ pitch: is3D ? 45 : 0 });
+        };
+        document.getElementById('btn-reset-pitch').onclick = () => engine.resetView();
+        document.getElementById('btn-reset-north').onclick = () => map.easeTo({ bearing: 0 });
+        map.on('rotate', () => document.getElementById('txt-north').innerText = `N: ${Math.round(map.getBearing())}°`);
+        map.on('zoom', () => document.getElementById('txt-scale').innerText = `Zoom: ${map.getZoom().toFixed(1)}`);
+        map.on('mousemove', (e) => {
+            document.getElementById('txt-coords').innerText = `${e.lngLat.lng.toFixed(5)}, ${e.lngLat.lat.toFixed(5)}`;
+        });
+        map.on('draw.create', syncMapToField);
+        map.on('draw.update', syncMapToField);
+        map.on('draw.delete', syncMapToField);
+    }
 
-        // [分組六：繪圖連動 (需求 1)]
-        function syncMapToField() {
-            const data = draw.getAll();
-            if (data.features.length > 0) {
-                const wktArr = engine.featuresToWKT(data.features);
-                document.getElementById('val-wkt').value = wktArr.join('; ');
-                logDebug("座標欄位已隨繪圖自動更新");
-            }
-        }
+    function logDebug(msg) {
+        if (engine) engine.log(msg, "EDITOR");
+    }
 
-        // [分組七：地圖控制按鈕 (需求 5, 6, 7)]
-        function bindMapEvents() {
-            const map = engine.map;
-
-            document.getElementById('btn-switch-base').onclick = () => {
-                const isSat = engine.switchBaseMap();
-                document.getElementById('btn-switch-base').classList.toggle('btn-active', isSat);
-            };
-
-            document.getElementById('btn-toggle-3d').onclick = () => {
-                const is3D = engine.toggle3D();
-                document.getElementById('btn-toggle-3d').classList.toggle('btn-active', is3D);
-                map.easeTo({ pitch: is3D ? 45 : 0 });
-            };
-
-            document.getElementById('btn-reset-pitch').onclick = () => engine.resetView();
-            document.getElementById('btn-reset-north').onclick = () => map.easeTo({ bearing: 0 });
-
-            // 狀態列更新
-            map.on('rotate', () => document.getElementById('txt-north').innerText = `N: ${Math.round(map.getBearing())}°`);
-            map.on('zoom', () => document.getElementById('txt-scale').innerText = `Zoom: ${map.getZoom().toFixed(1)}`);
-            map.on('mousemove', (e) => {
-                document.getElementById('txt-coords').innerText = `${e.lngLat.lng.toFixed(5)}, ${e.lngLat.lat.toFixed(5)}`;
-            });
-
-            // 繪圖事件監聽
-            map.on('draw.create', syncMapToField);
-            map.on('draw.update', syncMapToField);
-            map.on('draw.delete', syncMapToField);
-        }
-
-        function logDebug(msg) {
-            // 需求 3: 確保 Debug 視窗能讀取動作
-            engine.log(msg, "EDITOR");
-        }
-
-        window.onload = init;
-    </script>
+    window.onload = init;
+</script>
 </body>
 </html>
