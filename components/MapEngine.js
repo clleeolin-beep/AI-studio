@@ -223,11 +223,16 @@ class MapEngine {
     /**
      * [分組七：系統除錯與連動] (與 DebugSystem.js 整合)
      */
-    log(message, level = "INFO") {
-        console.log(`[MapEngine][${level}] ${message}`);
-        if (window.parent && typeof window.parent.postMessage === 'function') {
-            window.parent.postMessage({ type: 'debug', module: 'MapEngine', msg: message, level: level }, '*');
-        }
+log(message, level = "INFO") {
+    console.log(`[MapEngine][${level}] ${message}`);
+    if (window.parent && typeof window.parent.postMessage === 'function') {
+        window.parent.postMessage({ 
+            source: 'AI_STUDIO_APP', // 必須加上此標籤
+            type: 'debug', 
+            module: 'MapEngine', 
+            msg: message, 
+            level: level 
+        }, '*');
     }
 }
 
