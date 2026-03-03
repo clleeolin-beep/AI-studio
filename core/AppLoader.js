@@ -10,12 +10,20 @@ const AppLoader = {
     init: async function() {
         console.log("🧠 AppLoader 正在啟動核心...");
         try {
-            const response = await fetch('manifest.json');
+            // 加上快取清除機制，確保抓到最新的 manifest
+            const response = await fetch('manifest.json?v=' + new Date().getTime());
             if (!response.ok) throw new Error("無法讀取 manifest.json");
             
             this.manifest = await response.json();
             this.renderNavigation();
             
+            // 預設載入第一個模組 (通常是地圖)
+            if (this.manifest.ai_lab_config.modules.length > 0) {
+                const firstMod = this.manifest.ai_lab_config.modules[0];
+                const frame = document.getElementById('content-frame');
+                if (frame) frame.src = firstMod.path;
+            }
+
             if (window.DebugSystem) {
                 DebugSystem.log(`系統版本: ${this.manifest.ai_lab_config.version} 載入成功`, 'SUCCESS');
             }
@@ -33,14 +41,13 @@ const AppLoader = {
         menuList.innerHTML = ""; // 清空現有選單
         const modules = this.manifest.ai_lab_config.modules;
 
-        // 依照類別分組 (選用)
         modules.forEach(mod => {
             const item = document.createElement('div');
             item.className = 'menu-item';
             item.innerHTML = `<span>${mod.icon || '📦'} ${mod.name}</span>`;
             item.onclick = () => this.switchModule(mod, item);
             
-            // 預設選中第一個或指定路徑
+            // 初始標記地圖為啟動
             if (mod.id === "MapEditor") item.classList.add('active');
             
             menuList.appendChild(item);
@@ -59,8 +66,13 @@ const AppLoader = {
             document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
             element.classList.add('active');
             
+            // 更新狀態文字
             if (statusMsg) statusMsg.innerText = `目前位置: ${mod.name}`;
-            if (window.DebugSystem) DebugSystem.log(`載入模組: ${mod.id} (${mod.path})`);
+            
+            // 紀錄到偵錯視窗
+            if (window.DebugSystem) {
+                DebugSystem.log(`載入模組: ${mod.name} (${mod.path})`, 'INFO');
+            }
         }
     }
 };
