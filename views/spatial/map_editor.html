@@ -10,25 +10,28 @@
     
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css" />
-    <script src="https://cdn.jsdelivr.net/npm/wellknown@0.5.0/wellknown.js"></script>
 
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; background: #eee; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; background: #222; }
         
-        /* 地圖控制按鈕樣式 (右上角) */
+        /* 地圖控制組 (需求 5, 6) */
         .map-controls-group { position: absolute; top: 15px; right: 15px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
-        .btn-lab-tool { width: 42px; height: 42px; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: 0.2s; }
-        .btn-lab-tool:hover { background: #f8f9fa; transform: translateY(-2px); }
+        .btn-lab-tool { width: 42px; height: 42px; background: white; border: 1px solid #ddd; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); transition: 0.2s; cursor: pointer; }
+        .btn-lab-tool:hover { background: #f8f9fa; transform: translateY(-2px); color: #00f2ff; }
+        .btn-active { background: #212529 !important; color: #00f2ff !important; }
         
-        /* 狀態列 (左下角) */
-        .map-status-bar { position: absolute; bottom: 15px; left: 15px; z-index: 100; background: rgba(255,255,255,0.9); padding: 5px 15px; border-radius: 20px; font-size: 12px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        /* 狀態列 (需求 7) */
+        .map-status-bar { position: absolute; bottom: 15px; left: 15px; z-index: 100; background: rgba(33, 37, 41, 0.85); color: #00f2ff; padding: 4px 15px; border-radius: 20px; font-size: 11px; border: 1px solid rgba(0,242,255,0.3); backdrop-filter: blur(4px); }
         
         /* 編輯面板內容樣式 */
         .editor-section { border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 12px; }
-        .category-scroll-box { max-height: 120px; overflow-y: auto; background: #fff; border: 1px solid #e9ecef; padding: 8px; border-radius: 6px; }
-        .search-result-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; transition: 0.2s; }
-        .search-result-item:hover { background: #f0f7ff; color: #0d6efd; }
+        .category-scroll-box { max-height: 110px; overflow-y: auto; background: #fff; border: 1px solid #dee2e6; padding: 8px; border-radius: 6px; }
+        .search-result-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; transition: 0.2s; font-size: 13px; }
+        .search-result-item:hover { background: #e9ecef; color: #0d6efd; padding-left: 5px; }
+        
+        /* 隱藏原生 Maplibre logo 做視覺優化 */
+        .maplibregl-ctrl-bottom-left { display: none; }
     </style>
 </head>
 <body>
@@ -36,200 +39,194 @@
     <div id="map"></div>
 
     <div class="map-controls-group">
-        <button id="btn-switch-base" class="btn-lab-tool" title="切換航照/道路"><i class="bi bi-map"></i></button>
-        <button id="btn-toggle-3d" class="btn-lab-tool" title="2D/3D 切換"><i class="bi bi-layers-half"></i></button>
-        <button id="btn-reset-pitch" class="btn-lab-tool" title="回到垂直投影"><i class="bi bi-box"></i></button>
-        <button id="btn-reset-north" class="btn-lab-tool" title="回到正北"><i class="bi bi-compass"></i></button>
+        <button id="btn-switch-base" class="btn-lab-tool" title="切換道路/航照"><i class="bi bi-map"></i></button>
+        <button id="btn-toggle-3d" class="btn-lab-tool" title="3D 地形開關"><i class="bi bi-layers-half"></i></button>
+        <button id="btn-reset-pitch" class="btn-lab-tool" title="重置垂直視角"><i class="bi bi-box"></i></button>
+        <button id="btn-reset-north" class="btn-lab-tool" title="重置正北"><i class="bi bi-compass"></i></button>
     </div>
 
     <div class="map-status-bar">
         <span id="txt-north">N: 0°</span> | 
-        <span id="txt-scale">比例尺 1:--</span> | 
+        <span id="txt-scale">Zoom: --</span> | 
         <span id="txt-coords">0.00000, 0.00000</span>
     </div>
 
     <script type="module">
-        import MapEngine from '../components/MapEngine.js';
+        // [分組二：模組導入與初始化]
+        import MapEngine from '../../components/MapEngine.js';
         import DraggablePanel from './DraggablePanel.js';
         import EditorDataService from './EditorDataService.js';
 
-        let mapEngine, dataService, editorPanel, draw;
-        const SHEET_ID = '1r1e0Nl7y-8BvH7I8f5I6Y5I8p9X8Y8Z'; // 您的 Google Sheet ID
+        let engine, dataService, editorPanel, draw;
+        const SHEET_ID = '1r1e0Nl7y-8BvH7I8f5I6Y5I8p9X8Y8Z'; 
 
         async function init() {
-            // 1. 初始化地圖引擎 (需求 4: 支援 3D 地形)
-            mapEngine = new MapEngine('map', {
-                center: [121.50, 23.90],
-                zoom: 7,
-                pitch: 0
-            });
+            // 1. 初始化引擎 (需求 4: 支援 3D)
+            engine = new MapEngine('map', { center: [121.50, 23.90], zoom: 7, pitch: 0 });
+            
+            // 2. 掛載繪圖工具 (需求 1: 複數點線面)
+            draw = engine.initDrawingTools();
 
-            // 2. 初始化繪圖工具 (需求 1: 複數點線面資料)
-            draw = new MapboxDraw({
-                displayControlsDefault: false,
-                controls: { polygon: true, line_string: true, point: true, trash: true }
-            });
-            mapEngine.map.addControl(draw, 'top-left');
-
-            // 3. 初始化資料服務
+            // 3. 讀取資料服務
             dataService = new EditorDataService(SHEET_ID);
             await dataService.fetchSheetData();
 
-            // 4. 初始化 UI 與 事件
-            setupEditorUI();
-            bindMapActions();
+            // 4. 初始化可拖移面板與事件
+            setupUI();
+            bindMapEvents();
             
-            logDebug("系統初始化完成，已讀取案件總表。");
+            logDebug("Map Editor 整合模組啟動成功");
         }
 
-        /**
-         * 建立編輯面板 (需求 8: 可拖移視窗)
-         */
-        function setupEditorUI() {
+        // [分組三：UI 介面建構] (需求 2, 8)
+        function setupUI() {
             editorPanel = new DraggablePanel({
-                id: 'editor-panel',
-                title: '地圖編輯工具',
+                id: 'main-editor',
+                title: '圖資編輯與資料鎖定',
                 width: 380
             });
 
             const html = `
                 <div class="editor-section">
-                    <label class="form-label small fw-bold">案件搜尋</label>
+                    <label class="form-label small fw-bold text-dark">案件搜尋鎖定</label>
                     <div class="input-group input-group-sm">
-                        <input type="text" id="ipt-search" class="form-control" placeholder="輸入案號或案名">
-                        <button class="btn btn-primary" id="btn-search-trigger"><i class="bi bi-search"></i></button>
+                        <input type="text" id="ipt-search" class="form-control" placeholder="案號或名稱關鍵字...">
+                        <button class="btn btn-dark" id="btn-search-trigger"><i class="bi bi-search"></i></button>
                     </div>
-                    <div id="search-res-list" class="list-group mt-2" style="max-height:100px; overflow-y:auto;"></div>
+                    <div id="search-res-list" class="list-group mt-2 shadow-sm" style="max-height:110px; overflow-y:auto;"></div>
                 </div>
 
-                <div class="editor-section bg-light p-2 rounded border shadow-sm">
+                <div class="editor-section bg-light p-2 rounded border">
                     <div class="row g-2">
-                        <div class="col-5"><small class="text-muted">案號</small><div id="info-id" class="fw-bold">--</div></div>
+                        <div class="col-5"><small class="text-muted">案號</small><div id="info-id" class="fw-bold text-primary">--</div></div>
                         <div class="col-7"><small class="text-muted">案件簡稱</small><div id="info-name" class="fw-bold">--</div></div>
                     </div>
                     <div class="mt-2">
-                        <label class="small text-muted">WKT 座標欄位 (自動更新)</label>
-                        <textarea id="val-wkt" class="form-control form-control-sm" rows="2" style="font-size:10px;" readonly></textarea>
+                        <label class="small text-muted">WKT 座標數據 (繪圖後自動更新)</label>
+                        <textarea id="val-wkt" class="form-control form-control-sm font-monospace" rows="2" style="font-size:10px; background:#f1f3f5;" readonly></textarea>
                     </div>
                 </div>
 
                 <div class="editor-section">
                     <div class="row g-2">
                         <div class="col-6">
-                            <label class="small fw-bold">類別</label>
-                            <div class="category-scroll-box" id="cat-class-box">${generateCheckboxes(dataService.categoryData.class, 'class')}</div>
+                            <label class="small fw-bold">類別 (複選)</label>
+                            <div class="category-scroll-box" id="cat-class-box">${renderCheckboxes(dataService.categoryData.class, 'class')}</div>
                         </div>
                         <div class="col-6">
-                            <label class="small fw-bold">狀態</label>
-                            <div class="category-scroll-box" id="cat-status-box">${generateCheckboxes(dataService.categoryData.status, 'status')}</div>
+                            <label class="small fw-bold">案件狀態</label>
+                            <div class="category-scroll-box" id="cat-status-box">${renderCheckboxes(dataService.categoryData.status, 'status')}</div>
                         </div>
                     </div>
                 </div>
 
-                <div class="d-grid">
-                    <button class="btn btn-success btn-sm" id="btn-copy-wkt">複製 WKT 資料至剪貼簿</button>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" id="btn-copy-wkt"><i class="bi bi-clipboard"></i> 複製座標資料</button>
                 </div>
             `;
             editorPanel.setContent(html);
 
-            // 綁定搜尋按鈕
-            document.getElementById('btn-search-trigger').onclick = () => {
-                const kw = document.getElementById('ipt-search').value;
-                const results = dataService.search(kw);
-                const list = document.getElementById('search-res-list');
-                list.innerHTML = results.map(r => `
-                    <div class="list-group-item search-result-item p-1 small" onclick="window.lockAndFly('${r.id}')">
-                        [${r.id}] ${r.name}
-                    </div>
-                `).join('');
-            };
+            // 綁定搜尋按鈕事件
+            document.getElementById('btn-search-trigger').onclick = executeSearch;
         }
 
-        function generateCheckboxes(items, type) {
-            return items.map(it => `
+        function renderCheckboxes(list, type) {
+            if (list.length === 0) return '<small class="text-muted">無分類資料</small>';
+            return list.map(item => `
                 <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="${it}" id="chk-${type}-${it}">
-                    <label class="form-check-label small" style="font-size:11px;" for="chk-${type}-${it}">${it}</label>
+                    <input class="form-check-input chk-filter" type="checkbox" value="${item}" data-type="${type}" id="chk-${type}-${item}">
+                    <label class="form-check-label small" style="font-size:11px;" for="chk-${type}-${item}">${item}</label>
                 </div>
             `).join('');
         }
 
-        /**
-         * 綁定地圖控制項 (需求 5, 6, 7)
-         */
-        function bindMapActions() {
-            const map = mapEngine.map;
-
-            // 切換底圖 (需求 5)
-            document.getElementById('btn-switch-base').onclick = () => {
-                const current = map.getStyle().name;
-                // 這裡調用 MapEngine 的切換邏輯
-                logDebug("切換底圖模式");
-            };
-
-            // 2D/3D 轉換 (需求 6)
-            document.getElementById('btn-toggle-3d').onclick = () => {
-                const p = map.getPitch();
-                map.easeTo({ pitch: p > 0 ? 0 : 45, duration: 800 });
-                logDebug(`切換至 ${p > 0 ? '2D' : '3D'} 模式`);
-            };
-
-            document.getElementById('btn-reset-pitch').onclick = () => map.easeTo({ pitch: 0 });
-            document.getElementById('btn-reset-north').onclick = () => map.easeTo({ bearing: 0 });
-
-            // 監聽繪圖 (需求 1: 自動填入座標欄位)
-            map.on('draw.create', syncDrawToUI);
-            map.on('draw.update', syncDrawToUI);
-            map.on('draw.delete', syncDrawToUI);
-
-            // 狀態列更新 (需求 7)
-            map.on('rotate', () => {
-                document.getElementById('txt-north').innerText = `N: ${Math.round(map.getBearing())}°`;
+        // [分組四：搜尋與過濾邏輯]
+        function executeSearch() {
+            const query = document.getElementById('ipt-search').value;
+            
+            // 獲取分類勾選狀態
+            const filters = { class: [], status: [] };
+            document.querySelectorAll('.chk-filter:checked').forEach(el => {
+                filters[el.dataset.type].push(el.value);
             });
-            map.on('mousemove', (e) => {
-                document.getElementById('txt-coords').innerText = `${e.lngLat.lng.toFixed(5)}, ${e.lngLat.lat.toFixed(5)}`;
-            });
+
+            const results = dataService.search(query, filters);
+            const listEl = document.getElementById('search-res-list');
+            
+            listEl.innerHTML = results.map(r => `
+                <div class="list-group-item search-result-item p-2" onclick="window.lockCase('${r.id}')">
+                    <span class="badge bg-secondary me-1">${r.id}</span> ${r.name}
+                </div>
+            `).join('');
+            
+            if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查無相符案件</div>';
         }
 
-        /**
-         * 鎖定案件並跳轉 (核心功能)
-         */
-        window.lockAndFly = (id) => {
-            const target = dataService.lockCase(id);
+        // [分組五：案件鎖定與 WKT 定位]
+        window.lockCase = (id) => {
+            const target = dataService.rawRecords.find(r => r.id === id);
             if (!target) return;
 
             document.getElementById('info-id').innerText = target.id;
             document.getElementById('info-name').innerText = target.name;
             document.getElementById('val-wkt').value = target.wkt;
 
-            // 若有座標則載入並飛往該處
-            if (target.wkt) {
-                try {
-                    const geojson = wellknown.parse(target.wkt);
+            // 定位地圖並載入現有 WKT
+            if (target.wkt && target.wkt.trim() !== "") {
+                const feature = engine.parseWKT(target.wkt);
+                if (feature) {
                     draw.deleteAll();
-                    draw.add(geojson);
-                    mapEngine.flyToWKT(target.wkt);
-                } catch (e) {
-                    logDebug("WKT 載入錯誤");
+                    draw.add(feature);
+                    engine.flyToWKT(target.wkt);
                 }
             }
+            logDebug(`鎖定案件: ${id}`);
         };
 
-        function syncDrawToUI() {
+        // [分組六：繪圖連動 (需求 1)]
+        function syncMapToField() {
             const data = draw.getAll();
             if (data.features.length > 0) {
-                // 將畫布上所有圖形轉為 WKT
-                const wkt = wellknown.stringify(data.features[0].geometry); 
-                document.getElementById('val-wkt').value = wkt;
-                logDebug("座標欄位已自動更新");
+                const wktArr = engine.featuresToWKT(data.features);
+                document.getElementById('val-wkt').value = wktArr.join('; ');
+                logDebug("座標欄位已隨繪圖自動更新");
             }
+        }
+
+        // [分組七：地圖控制按鈕 (需求 5, 6, 7)]
+        function bindMapEvents() {
+            const map = engine.map;
+
+            document.getElementById('btn-switch-base').onclick = () => {
+                const isSat = engine.switchBaseMap();
+                document.getElementById('btn-switch-base').classList.toggle('btn-active', isSat);
+            };
+
+            document.getElementById('btn-toggle-3d').onclick = () => {
+                const is3D = engine.toggle3D();
+                document.getElementById('btn-toggle-3d').classList.toggle('btn-active', is3D);
+                map.easeTo({ pitch: is3D ? 45 : 0 });
+            };
+
+            document.getElementById('btn-reset-pitch').onclick = () => engine.resetView();
+            document.getElementById('btn-reset-north').onclick = () => map.easeTo({ bearing: 0 });
+
+            // 狀態列更新
+            map.on('rotate', () => document.getElementById('txt-north').innerText = `N: ${Math.round(map.getBearing())}°`);
+            map.on('zoom', () => document.getElementById('txt-scale').innerText = `Zoom: ${map.getZoom().toFixed(1)}`);
+            map.on('mousemove', (e) => {
+                document.getElementById('txt-coords').innerText = `${e.lngLat.lng.toFixed(5)}, ${e.lngLat.lat.toFixed(5)}`;
+            });
+
+            // 繪圖事件監聽
+            map.on('draw.create', syncMapToField);
+            map.on('draw.update', syncMapToField);
+            map.on('draw.delete', syncMapToField);
         }
 
         function logDebug(msg) {
             // 需求 3: 確保 Debug 視窗能讀取動作
-            if (window.parent) {
-                window.parent.postMessage({ type: 'debug', module: 'MapEditor', msg: msg }, '*');
-            }
+            engine.log(msg, "EDITOR");
         }
 
         window.onload = init;

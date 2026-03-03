@@ -1,7 +1,14 @@
 /**
- * MapEngine.js v2.0 - 惇陽 AI 實驗室 通用空間分析引擎
+ * @fileoverview MapEngine.js v2.2 - 惇陽 AI 實驗室 通用空間分析引擎
+ * [分組模塊邏輯：依賴檢查與守衛邏輯]
  * 支援模組：實績地圖 (map.html)、圖資編輯器 (map_editor.html)、氣象動態分析 (Weather.html)
  */
+
+// --- 模組防禦性檢查 ---
+if (typeof maplibregl === 'undefined') {
+    console.error('[MapEngine] 嚴重錯誤：偵測不到 Maplibre GL 庫，請檢查 HTML 引用。');
+}
+
 class MapEngine {
     constructor(containerId, options = {}) {
         this.containerId = containerId;
@@ -10,7 +17,7 @@ class MapEngine {
         this.isSatellite = false;
         this.terrainActive = options.terrainDefault !== undefined ? options.terrainDefault : true;
         
-        // 預設樣式定義 (全面展開，不依賴外部隱藏邏輯)
+        // 預設樣式與地形定義
         this.terrainSource = {
             "type": "raster-dem",
             "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
@@ -42,7 +49,7 @@ class MapEngine {
     }
 
     /**
-     * 1. 核心地圖初始化邏輯
+     * [分組一：核心地圖初始化邏輯]
      */
     init(options) {
         this.map = new maplibregl.Map({
@@ -62,14 +69,12 @@ class MapEngine {
     }
 
     /**
-     * 2. 視角與底圖控制邏輯
+     * [分組二：視角與底圖控制邏輯]
      */
     switchBaseMap() {
         this.isSatellite = !this.isSatellite;
-        // 保留當前的地形狀態進行樣式切換
         const currentStyle = this.isSatellite ? this.esriStyle : this.osmStyle;
         currentStyle.terrain = this.terrainActive ? { "source": "t-rgb", "exaggeration": 1.5 } : null;
-        
         this.map.setStyle(currentStyle);
         this.log(`底圖切換完畢: ${this.isSatellite ? '衛星航照' : '道路地圖'}`, "INFO");
         return this.isSatellite;
@@ -93,10 +98,8 @@ class MapEngine {
     }
 
     /**
-     * 3. WKT 雙向演算邏輯 (完全展開公式，無依賴)
+     * [分組三：WKT 雙向演算邏輯]
      */
-    
-    // GeoJSON 轉 WKT (負責 map_editor.html 畫圖匯出)
     featuresToWKT(features) {
         let wktArray = [];
         for (let i = 0; i < features.length; i++) {
@@ -108,90 +111,59 @@ class MapEngine {
                 wktArray.push(`POINT(${coords[0].toFixed(6)} ${coords[1].toFixed(6)})`);
             } 
             else if (type === 'LineString') {
-                let pts = [];
-                for (let j = 0; j < coords.length; j++) {
-                    pts.push(`${coords[j][0].toFixed(6)} ${coords[j][1].toFixed(6)}`);
-                }
+                let pts = coords.map(p => `${p[0].toFixed(6)} ${p[1].toFixed(6)}`);
                 wktArray.push(`LINESTRING(${pts.join(', ')})`);
             } 
             else if (type === 'Polygon') {
-                let rings = [];
-                for (let j = 0; j < coords.length; j++) {
-                    let ringPts = [];
-                    for (let k = 0; k < coords[j].length; k++) {
-                        ringPts.push(`${coords[j][k][0].toFixed(6)} ${coords[j][k][1].toFixed(6)}`);
-                    }
-                    rings.push(`(${ringPts.join(', ')})`);
-                }
+                let rings = coords.map(ring => {
+                    let pts = ring.map(p => `${p[0].toFixed(6)} ${p[1].toFixed(6)}`);
+                    return `(${pts.join(', ')})`;
+                });
                 wktArray.push(`POLYGON(${rings.join(', ')})`);
             }
         }
         return wktArray;
     }
 
-    // WKT 轉 GeoJSON (負責讀取資料庫舊案，重新渲染回地圖)
     parseWKT(wktString) {
+        if (!wktString) return null;
         wktString = wktString.trim().toUpperCase();
         
-        if (wktString.indexOf('POINT') === 0) {
-            const content = wktString.replace('POINT', '').replace(/\(/g, '').replace(/\)/g, '').trim();
-            const parts = content.split(/\s+/);
-            return {
-                type: 'Feature',
-                geometry: { type: 'Point', coordinates: [parseFloat(parts[0]), parseFloat(parts[1])] },
-                properties: {}
-            };
-        } 
-        else if (wktString.indexOf('LINESTRING') === 0) {
-            const content = wktString.replace('LINESTRING', '').replace(/\(/g, '').replace(/\)/g, '').trim();
-            const pairs = content.split(',');
-            const coordinates = [];
-            for (let i = 0; i < pairs.length; i++) {
-                const parts = pairs[i].trim().split(/\s+/);
-                coordinates.push([parseFloat(parts[0]), parseFloat(parts[1])]);
+        try {
+            if (wktString.indexOf('POINT') === 0) {
+                const content = wktString.replace('POINT', '').replace(/\(/g, '').replace(/\)/g, '').trim();
+                const parts = content.split(/\s+/);
+                return { type: 'Feature', geometry: { type: 'Point', coordinates: [parseFloat(parts[0]), parseFloat(parts[1])] }, properties: {} };
+            } 
+            else if (wktString.indexOf('LINESTRING') === 0) {
+                const content = wktString.replace('LINESTRING', '').replace(/\(/g, '').replace(/\)/g, '').trim();
+                const coordinates = content.split(',').map(p => p.trim().split(/\s+/).map(Number));
+                return { type: 'Feature', geometry: { type: 'LineString', coordinates: coordinates }, properties: {} };
+            } 
+            else if (wktString.indexOf('POLYGON') === 0) {
+                const rawContent = wktString.substring(wktString.indexOf('(') + 1, wktString.lastIndexOf(')'));
+                const ringStrings = rawContent.match(/\([^)]+\)/g);
+                const coordinates = ringStrings.map(ring => {
+                    const ringContent = ring.replace(/\(/g, '').replace(/\)/g, '').trim();
+                    return ringContent.split(',').map(p => p.trim().split(/\s+/).map(Number));
+                });
+                return { type: 'Feature', geometry: { type: 'Polygon', coordinates: coordinates }, properties: {} };
             }
-            return {
-                type: 'Feature',
-                geometry: { type: 'LineString', coordinates: coordinates },
-                properties: {}
-            };
-        } 
-        else if (wktString.indexOf('POLYGON') === 0) {
-            // 處理 Polygon 的括號剝離
-            const rawContent = wktString.substring(wktString.indexOf('(') + 1, wktString.lastIndexOf(')'));
-            const ringStrings = rawContent.match(/\([^)]+\)/g);
-            const coordinates = [];
-            
-            if (ringStrings) {
-                for (let i = 0; i < ringStrings.length; i++) {
-                    const ringContent = ringStrings[i].replace(/\(/g, '').replace(/\)/g, '').trim();
-                    const pairs = ringContent.split(',');
-                    const ringCoords = [];
-                    for (let j = 0; j < pairs.length; j++) {
-                        const parts = pairs[j].trim().split(/\s+/);
-                        ringCoords.push([parseFloat(parts[0]), parseFloat(parts[1])]);
-                    }
-                    coordinates.push(ringCoords);
-                }
-            }
-            return {
-                type: 'Feature',
-                geometry: { type: 'Polygon', coordinates: coordinates },
-                properties: {}
-            };
+        } catch (e) {
+            this.log(`WKT 解析失敗: ${wktString.substring(0, 20)}...`, "ERROR");
+            return null;
         }
-        return null; // 不支援的格式
+        return null;
     }
 
     /**
-     * 4. 繪製引擎掛載 (MapboxDraw 整合)
+     * [分組四：繪製引擎掛載] (MapboxDraw 整合)
      */
     initDrawingTools() {
         if (typeof MapboxDraw === 'undefined') {
             this.log("未載入 MapboxDraw 庫，跳過繪製工具初始化", "ERROR");
             return null;
         }
-        
         this.draw = new MapboxDraw({
             displayControlsDefault: false,
             styles: [
@@ -206,32 +178,50 @@ class MapEngine {
     }
 
     /**
-     * 5. 圖層動態管理 (提供給 Weather.html 覆蓋運算使用)
+     * [分組五：自動定位與縮放功能] (新增需求)
+     * 讀取案件資料後，自動鎖定並飛往該處
+     */
+    flyToWKT(wkt) {
+        const feature = this.parseWKT(wkt);
+        if (!feature) return;
+
+        let center;
+        const geom = feature.geometry;
+        if (geom.type === 'Point') {
+            center = geom.coordinates;
+        } else if (geom.type === 'Polygon') {
+            center = geom.coordinates[0][0]; // 取多邊形第一個點
+        } else if (geom.type === 'LineString') {
+            center = geom.coordinates[0];
+        }
+
+        this.map.flyTo({
+            center: center,
+            zoom: 16,
+            pitch: 45,
+            essential: true,
+            duration: 2000
+        });
+        this.log(`地圖定位至案件座標: ${center}`, "INFO");
+    }
+
+    /**
+     * [分組六：圖層動態管理]
      */
     addGeoJSONLayer(layerId, geojsonData, paintOptions) {
         if (this.map.getSource(layerId)) {
             this.map.getSource(layerId).setData(geojsonData);
         } else {
             this.map.addSource(layerId, { type: 'geojson', data: geojsonData });
-            
-            // 根據 GeoJSON 的類型決定渲染方式
             const geomType = geojsonData.features[0]?.geometry?.type || 'Point';
-            let layerType = 'circle';
-            if (geomType.includes('Polygon')) layerType = 'fill';
-            if (geomType.includes('Line')) layerType = 'line';
-
-            this.map.addLayer({
-                id: layerId,
-                type: layerType,
-                source: layerId,
-                paint: paintOptions || {}
-            });
+            const layerType = geomType.includes('Polygon') ? 'fill' : (geomType.includes('Line') ? 'line' : 'circle');
+            this.map.addLayer({ id: layerId, type: layerType, source: layerId, paint: paintOptions || {} });
         }
         this.log(`已更新或寫入圖層: ${layerId}`, "INFO");
     }
 
     /**
-     * 6. 系統除錯連動 (與 DebugSystem.js 整合)
+     * [分組七：系統除錯與連動] (與 DebugSystem.js 整合)
      */
     log(message, level = "INFO") {
         console.log(`[MapEngine][${level}] ${message}`);
@@ -240,3 +230,6 @@ class MapEngine {
         }
     }
 }
+
+// 模組導出，供 map_editor.html 使用
+export default MapEngine;
