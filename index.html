@@ -88,103 +88,91 @@
         <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
     </div>
 
-    <script>
-        // 核心 Log 轉導：所有日誌都進到 DebugSystem 面板
-        window.sysLog = function(msg, type = '') {
-            if (window.DebugSystemInstance) {
-                window.DebugSystemInstance.log(msg, type.toUpperCase() || "INFO");
+<script>
+    // --- 1. 基礎日誌工具 (優化對接) ---
+    window.sysLog = function(msg, type = '') {
+        // 優先輸出到 Console 備份
+        console.log(`[${type.toUpperCase()}] ${msg}`);
+
+        // 如果浮動視窗的實例已經建立，直接使用它的 log 方法
+        if (window.DebugInstance && typeof window.DebugInstance.log === 'function') {
+            window.DebugInstance.log(msg, type || "INFO");
+        } else {
+            // 實例化前的過渡處理
+            const logBox = document.getElementById('debug-log');
+            if (logBox) {
+                const div = document.createElement('div');
+                div.style.color = (type === 'err' ? '#ff4b4b' : (type === 'success' ? '#00f2ff' : '#0f0'));
+                div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logBox.appendChild(div);
+                logBox.scrollTop = logBox.scrollHeight;
+            }
+        }
+    };
+
+    // --- 2. 安全解碼邏輯 (保持不變) ---
+    function base64UrlDecode(str) {
+        let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) { base64 += '='; }
+        return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }
+
+    // --- 3. Google 登入回調 (保持不變) ---
+    window.handleCredentialResponse = async (response) => {
+        window.sysLog("收到憑證，開始驗證...", "success");
+        try {
+            const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
+            const userEmail = payload.email.toLowerCase();
+            window.sysLog("使用者：" + userEmail);
+
+            if (!window.appConfig) {
+                const res = await fetch('./manifest.json?v=' + Date.now());
+                window.appConfig = await res.json();
+            }
+
+            const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+            if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
+                window.sysLog("驗證通過！解鎖系統介面。", "success");
+                sessionStorage.setItem('ai_lab_auth', 'true');
+                sessionStorage.setItem('user_email', userEmail);
+                if (window.startSystem) window.startSystem();
             } else {
-                console.log(`[INIT] ${msg}`);
+                window.sysLog("權限拒絕：" + userEmail, "err");
+                alert("您不在授權名單中: " + userEmail);
             }
-        };
+        } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
+    };
 
-        function base64UrlDecode(str) {
-            let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-            while (base64.length % 4) { base64 += '='; }
-            return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-        }
+    window.toggleDebugWindow = () => {
+        const win = document.getElementById('debug-log-window');
+        if (!win) return;
+        win.style.display = (win.style.display === 'none' || win.style.display === '') ? 'flex' : 'none';
+    };
 
-        window.handleCredentialResponse = async (response) => {
-            try {
-                const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
-                const userEmail = payload.email.toLowerCase();
-                window.sysLog("解析成功: " + userEmail, "success");
+    // --- 4. 視窗拖移邏輯 (修正移動靈敏度) ---
+    const dragWin = document.getElementById("debug-log-window");
+    const dragHeader = document.getElementById("debug-header");
+    let isDragging = false, startX, startY, transX = 0, transY = 0;
 
-                if (!window.appConfig) {
-                    const res = await fetch('./manifest.json?v=' + Date.now());
-                    window.appConfig = await res.json();
-                }
+    dragHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX - transX;
+        startY = e.clientY - transY;
+        dragHeader.style.cursor = 'grabbing';
+    });
 
-                const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
-                if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                    sessionStorage.setItem('ai_lab_auth', 'true');
-                    sessionStorage.setItem('user_email', userEmail);
-                    window.startSystem ? window.startSystem() : location.reload();
-                } else {
-                    alert("無權限存取此系統: " + userEmail);
-                }
-            } catch (e) { window.sysLog("登入解析錯誤: " + e.message, "err"); }
-        };
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        transX = e.clientX - startX;
+        transY = e.clientY - startY;
+        dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
+    });
 
-        window.toggleDebugWindow = () => {
-            const win = document.getElementById('debug-log-window');
-            win.style.display = (win.style.display === 'none' || win.style.display === '') ? 'flex' : 'none';
-        };
-
-        // 視窗拖移邏輯
-        const dragWin = document.getElementById("debug-log-window");
-        const dragHeader = document.getElementById("debug-header");
-        let active = false, currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
-
-        dragHeader.onmousedown = (e) => {
-            initialX = e.clientX - xOffset; initialY = e.clientY - yOffset;
-            if (e.target === dragHeader || e.target.parentNode === dragHeader) active = true;
-        };
-        document.onmousemove = (e) => {
-            if (active) {
-                e.preventDefault();
-                currentX = e.clientX - initialX; currentY = e.clientY - initialY;
-                xOffset = currentX; yOffset = currentY;
-                dragWin.style.transform = `translate(${currentX}px, ${currentY}px)`;
-            }
-        };
-        document.onmouseup = () => active = false;
-    </script>
-
-    <script type="module">
-        import * as AM from './core/AppLoader.js';
-        import * as DS from './core/DebugSystem.js';
-
-        const AppLoader = AM.default || AM.AppLoader;
-        const DebugSystem = DS.default || DS.DebugSystem;
-
-        window.startSystem = function() {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('main-layout').style.display = 'flex';
-            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-            
-            // 初始化浮動 Debug 系統
-            if (DebugSystem) {
-                window.DebugSystemInstance = new DebugSystem();
-                window.DebugSystemInstance.log("AI STUDIO 核心已啟動", "SUCCESS");
-            }
-            
-            if (AppLoader && window.appConfig) {
-                const loader = new AppLoader(window.appConfig);
-                loader.renderMenu('menu-container');
-            }
-        };
-
-        async function init() {
-            try {
-                const response = await fetch('./manifest.json?v=' + Date.now());
-                window.appConfig = await response.json();
-                document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
-                if (sessionStorage.getItem('ai_lab_auth') === 'true') window.startSystem();
-            } catch (e) { console.error("Init Error", e); }
-        }
-        init();
-        window.logout = () => { sessionStorage.clear(); location.reload(); };
-    </script>
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        if(dragHeader) dragHeader.style.cursor = 'move';
+    });
+</script>
 </body>
 </html>
