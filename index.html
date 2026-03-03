@@ -14,12 +14,15 @@
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
         body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
         
+        /* 頂部導航 */
         .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; }
         
+        /* 登入遮罩 */
         #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; }
         
+        /* 主佈局 */
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
@@ -39,10 +42,11 @@
             padding: 10px; overflow-y: auto; word-break: break-all; user-select: text;
         }
 
+        /* 內容區 */
         .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; overflow: hidden; }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
-        /* 分類收放 CSS (由 AppLoader 控制) */
+        /* 分類收放 CSS */
         .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
         .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
         .module-group.collapsed { max-height: 0; }
@@ -89,7 +93,7 @@
     </div>
 
 <script>
-    // --- 1. 基礎日誌工具 (對接安全版) ---
+    // 1. 基礎日誌工具：對接浮動視窗
     window.sysLog = function(msg, type = '') {
         console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
         if (window.DebugInstance && typeof window.DebugInstance.log === 'function') {
@@ -106,14 +110,16 @@
         }
     };
 
+    // 2. Base64URL 解碼
     function base64UrlDecode(str) {
         let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) { base64 += '='; }
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
+    // 3. 登入回調
     window.handleCredentialResponse = async (response) => {
-        window.sysLog("解析憑證中...", "success");
+        window.sysLog("收到憑證，開始驗證...", "success");
         try {
             const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
             const userEmail = payload.email.toLowerCase();
@@ -126,24 +132,24 @@
 
             const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
             if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                window.sysLog("驗證通過！啟動系統核心。", "success");
+                window.sysLog("驗證通過！解鎖系統介面。", "success");
                 sessionStorage.setItem('ai_lab_auth', 'true');
                 sessionStorage.setItem('user_email', userEmail);
                 if (window.startSystem) window.startSystem();
             } else {
-                window.sysLog("存取拒絕: " + userEmail, "err");
-                alert("未經授權的帳號");
+                window.sysLog("權限拒絕：" + userEmail, "err");
+                alert("您不在授權名單中: " + userEmail);
             }
-        } catch (e) { window.sysLog("登入錯誤: " + e.message, "err"); }
+        } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
     };
 
+    // 4. 視窗控制與拖移
     window.toggleDebugWindow = () => {
         const win = document.getElementById('debug-log-window');
-        if(!win) return;
+        if (!win) return;
         win.style.display = (win.style.display === 'none' || win.style.display === '') ? 'flex' : 'none';
     };
 
-    // --- 視窗拖移邏輯 (優化版) ---
     const dragWin = document.getElementById("debug-log-window");
     const dragHeader = document.getElementById("debug-header");
     let isDragging = false, startX, startY, transX = 0, transY = 0;
@@ -181,10 +187,9 @@
         document.getElementById('main-layout').style.display = 'flex';
         document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
         
-        // 先建立偵錯實例，攔截後續錯誤
         if (DebugSystem) {
-            window.DebugInstance = new DebugSystem();
-            window.sysLog("系統介面已成功解鎖", "success");
+            window.DebugInstance = new DebugSystem(); 
+            window.sysLog("系統核心解鎖成功", "success");
         }
         
         if (AppLoader && window.appConfig) {
