@@ -193,20 +193,21 @@
      * [核心啟動程序]
      * 對接全域 startSystem 供 Auth 回調使用
      */
-    window.startSystem = function() {
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('main-layout').style.display = 'flex';
-        document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-        
-        // 將模組實例掛載至全域
-        window.DebugInstance = debugSystem;
-        window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
-        
-        if (AppLoader && window.appConfig) {
-            const loader = new AppLoader(window.appConfig);
-            loader.renderMenu('menu-container');
-        }
-    };
+// 確保 DebugInstance 為單例模式，並能接收來自 iframe 的訊息
+window.startSystem = function() {
+    document.getElementById('auth-overlay').style.display = 'none';
+    document.getElementById('main-layout').style.display = 'flex';
+    document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+    
+    // 將 core/DebugSystem.js 的實例掛載至全域
+    window.DebugInstance = debugSystem; 
+    window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
+    
+    if (AppLoader && window.appConfig) {
+        const loader = new AppLoader(window.appConfig);
+        loader.renderMenu('menu-container');
+    }
+};
 
     // 初始化檢測
     async function init() {
