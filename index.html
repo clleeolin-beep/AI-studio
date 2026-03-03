@@ -7,7 +7,9 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="icon" href="data:image/x-icon;base64,="> <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link rel="icon" href="data:image/x-icon;base64,="> 
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
@@ -34,7 +36,7 @@
             <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
             
             <div id="g_id_onload"
-                 data-client_id="992099032000-u34bqjlpetm2qma995nksbu2ot0rhk6f.apps.googleusercontent.com"
+                 data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
                  data-context="signin"
                  data-ux_mode="popup"
                  data-callback="handleCredentialResponse"
@@ -65,24 +67,15 @@
         import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
-        // 定義全域變數，確保 handleCredentialResponse 能正確存取
         window.appManifest = null;
 
-        /**
-         * 初始化函式：載入 manifest.json
-         */
         async function bootstrap() {
             try {
                 const response = await fetch('./manifest.json');
-                if (!response.ok) throw new Error("Manifest 載入失敗");
                 const data = await response.json();
-                
-                // 儲存至全域 window
                 window.appManifest = data;
-                
                 document.getElementById('sys-version').innerText = data.ai_lab_config.version;
 
-                // 檢查 Session
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
                     unlockSystem();
                 }
@@ -91,24 +84,15 @@
             }
         }
 
-        /**
-         * Google 登入回調 (掛載到 window 以供全域呼叫)
-         */
         window.handleCredentialResponse = async (response) => {
-            console.log("收到 Google 回傳憑證...");
-
-            // 再次檢查配置是否已載入 (防禦性編碼)
             if (!window.appManifest) {
                 const res = await fetch('./manifest.json');
                 window.appManifest = await res.json();
             }
 
             try {
-                // 解析 JWT
                 const payload = JSON.parse(atob(response.credential.split('.')[1]));
                 const userEmail = payload.email.toLowerCase();
-                
-                // 從 JSON 結構中讀取名單
                 const allowedUsers = (window.appManifest.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
 
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
@@ -122,32 +106,14 @@
                     errEl.style.display = 'block';
                 }
             } catch (err) {
-                console.error("[Auth] 驗證過程發生錯誤:", err);
+                console.error("[Auth] 驗證錯誤:", err);
             }
         };
 
         function unlockSystem() {
             if (!window.appManifest) return;
-
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('main-layout').style.display = 'flex';
             document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-            
-            // 初始化全域 Debug 系統
             window.DebugSystem = new DebugSystem();
-            
-            // 呼叫 AppLoader
-            const loader = new AppLoader(window.appManifest);
-            loader.renderMenu('menu-container');
-        }
-
-        window.logout = () => {
-            sessionStorage.clear();
-            location.reload();
-        };
-
-        // 啟動系統
-        bootstrap();
-    </script>
-</body>
-</html>
+            const loader = new AppLoader(
