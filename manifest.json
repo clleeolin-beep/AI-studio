@@ -20,12 +20,19 @@
     ],
     "modules": [
       {
-        "id": "MapEditor",
-        "name": "空間實績地圖",
-        "icon": "🌐",
-        "path": "views/spatial/map.html",
-        "category": "空間資訊"
-      },
+  "id": "MapViewer",
+  "name": "空間實績地圖",
+  "icon": "🌐",
+  "path": "views/spatial/map.html",
+  "category": "空間資訊"
+},
+{
+  "id": "MapEditor",
+  "name": "圖資編輯工具",
+  "icon": "🛠️",
+  "path": "views/spatial/map_editor.html",
+  "category": "空間資訊"
+},
       {
         "id": "WeatherMonitor",
         "name": "氣象監測系統",
