@@ -13,31 +13,24 @@
         :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
         body { background: var(--lab-bg); color: white; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; margin: 0; overflow: hidden; }
         
-        /* 頂部導航列 */
+        /* 導航列 */
         .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; z-index: 1001; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; letter-spacing: 1px; }
         
-        /* 登入遮罩層 (全螢幕鎖定) */
+        /* 登入遮罩 */
         #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--lab-bg); z-index: 2000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .login-box { background: #1e293b; padding: 40px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }
         
-        /* 主佈局介面 */
+        /* 主佈局 */
         #main-layout { display: none; height: calc(100vh - 56px); }
         .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
         .content-area { flex-grow: 1; background: #000; position: relative; }
         
-        /* 側邊選單樣式 */
         .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; border-left: 4px solid transparent; cursor: pointer; }
         .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
         .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
-        .category-label { font-size: 11px; color: #64748b; padding: 20px 20px 8px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
-
-        iframe { width: 100%; height: 100%; border: none; }
         
-        /* 捲軸美化 */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
@@ -49,20 +42,13 @@
             <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
             
             <div id="g_id_onload"
-                 data-client_id="YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
+                 data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
                  data-context="signin"
                  data-ux_mode="popup"
                  data-callback="handleCredentialResponse"
                  data-auto_prompt="false">
             </div>
-            <div class="g_id_signin d-flex justify-content-center" 
-                 data-type="standard" 
-                 data-shape="rectangular" 
-                 data-theme="filled_black" 
-                 data-text="signin_with" 
-                 data-size="large" 
-                 data-logo_alignment="left">
-            </div>
+            <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
             
             <div id="auth-error" class="text-danger mt-3 small" style="display:none;">
                 <i class="bi bi-exclamation-triangle-fill me-1"></i> 您未在授權名單中，存取已拒絕。
@@ -72,25 +58,17 @@
 
     <nav class="navbar navbar-dark px-4 d-flex justify-content-between">
         <a class="navbar-brand m-0" href="#">
-            <i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">v2.2</span>
+            <i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span>
         </a>
         <div class="d-flex align-items-center">
             <span id="user-display" class="me-3 small text-muted font-monospace"></span>
-            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出">
-                <i class="bi bi-box-arrow-right"></i>
-            </button>
+            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出"><i class="bi bi-box-arrow-right"></i></button>
         </div>
     </nav>
 
     <div id="main-layout" class="d-flex">
-        <aside class="sidebar">
-            <div id="menu-container">
-                </div>
-        </aside>
-
-        <main class="content-area">
-            <iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe>
-        </main>
+        <aside class="sidebar"><div id="menu-container"></div></aside>
+        <main class="content-area"><iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe></main>
     </div>
 
     <script type="module">
@@ -100,84 +78,77 @@
         let manifest = null;
 
         /**
-         * 系統啟動引導 (Bootstrap)
+         * 系統初始化
          */
         async function bootstrap() {
             try {
-                // 1. 優先獲取 manifest 配置
                 const response = await fetch('./manifest.json');
                 if (!response.ok) throw new Error("Manifest Load Failed");
                 manifest = await response.json();
                 
-                // 更新版本標籤
+                // 顯示版本
                 document.getElementById('sys-version').innerText = manifest.ai_lab_config.version;
 
-                // 2. 檢核 Session 狀態
+                // 驗證狀態檢查
                 const sessionAuth = sessionStorage.getItem('ai_lab_auth');
-                if (sessionAuth === 'true') {
-                    unlockSystem();
-                } else if (!manifest.ai_lab_config.env.ENABLE_GOOGLE_AUTH) {
-                    // 若配置關閉登入功能，則直接解鎖
+                const authEnabled = manifest.ai_lab_config.env.ENABLE_GOOGLE_AUTH;
+
+                if (sessionAuth === 'true' || authEnabled === false) {
                     unlockSystem();
                 }
-            } catch (e) {
-                console.error("[System] 啟動失敗:", e);
+            } catch (e) { 
+                console.error("[System] Bootstrap Error:", e); 
             }
         }
 
         /**
-         * Google 登入回調處理
+         * Google 登入回調
          */
         window.handleCredentialResponse = (response) => {
-            // 解析 JWT Payload (Base64)
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            const userEmail = payload.email;
-            
-            // 讀取 manifest 中的安全名單 (ALLOWED_USERS)
             const allowedUsers = manifest.ai_lab_config.env.ALLOWED_USERS || [];
 
-            if (allowedUsers.includes(userEmail)) {
-                console.log(`[Auth] 歡迎回來, ${payload.name}`);
-                
-                // 存入 Session
+            if (allowedUsers.includes(payload.email)) {
                 sessionStorage.setItem('ai_lab_auth', 'true');
-                sessionStorage.setItem('user_email', userEmail);
+                sessionStorage.setItem('user_email', payload.email);
                 sessionStorage.setItem('user_name', payload.name);
-                
                 unlockSystem();
             } else {
                 document.getElementById('auth-error').style.display = 'block';
-                console.error("[Auth] 存取拒絕:", userEmail);
+                console.warn("[Auth] 存取被拒:", payload.email);
             }
         };
 
         /**
-         * 解鎖主介面並加載模組
+         * 解鎖系統並掛載服務
          */
         function unlockSystem() {
+            // UI 切換
             document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('main-layout').style.display = 'flex';
-            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
             
-            // 初始化 Debug 系統並掛載至全域
+            const savedEmail = sessionStorage.getItem('user_email') || "Guest";
+            document.getElementById('user-display').innerText = savedEmail;
+
+            // 1. 初始化 Debug 系統並掛載到 window (讓 iframe 可以 parent.DebugSystem 調用)
             window.DebugSystem = new DebugSystem();
-            
-            // 初始化 AppLoader 並渲染選單
+
+            // 2. 初始化選單渲染器
             const loader = new AppLoader(manifest);
-            loader.renderMenu('menu-container');
+            if (manifest.ai_lab_config && manifest.ai_lab_config.modules) {
+                loader.renderMenu('menu-container');
+            } else {
+                console.error("[System] Manifest 結構錯誤，缺少 modules 陣列。");
+            }
             
-            window.DebugSystem.log("System", `使用者 ${sessionStorage.getItem('user_name')} 已登入`, "SUCCESS");
+            window.DebugSystem.log("System", "應用程式環境解鎖成功", "SUCCESS");
         }
 
-        /**
-         * 登出邏輯
-         */
-        window.logout = () => {
-            sessionStorage.clear();
-            location.reload();
+        window.logout = () => { 
+            sessionStorage.clear(); 
+            location.reload(); 
         };
 
-        // 啟動流程
         window.onload = bootstrap;
     </script>
 </body>
