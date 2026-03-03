@@ -2,122 +2,242 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>惇陽 AI 實驗室 - 工具平台</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <style>
-        :root { --p-blue: #0f172a; --accent: #2563eb; --nav-bg: #ffffff; }
-        body { font-family: 'Microsoft JhengHei', sans-serif; margin: 0; background: #f8fafc; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
-        /* 驗證遮罩層 */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--p-blue); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; text-align: center; transition: opacity 0.5s; }
-        
-        /* 頂部標籤列 */
-        nav { background: var(--nav-bg); display: flex; overflow-x: auto; border-bottom: 1px solid #e2e8f0; padding: 8px 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        nav::-webkit-scrollbar { display: none; } 
-        
-        .tab { padding: 10px 18px; cursor: pointer; border-radius: 20px; white-space: nowrap; color: #64748b; font-size: 14px; font-weight: bold; margin: 0 4px; transition: 0.2s; border: 1px solid transparent; }
-        .tab.active { background: #eff6ff; color: var(--accent); border: 1px solid #dbeafe; }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>惇陽 AI 實驗室 | 模組化導覽中心</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1A5276">
 
-        /* 工具顯示區 */
-        #content-area { flex-grow: 1; position: relative; width: 100%; background: #fff; }
-        iframe { width: 100%; height: 100%; border: none; }
-        
-        .error-msg { color: #ef4444; margin-top: 10px; font-size: 14px; display: none; }
+    <style>
+        :root {
+            --bg-dark: #0b0e14;
+            --sidebar-bg: rgba(20, 30, 48, 0.95);
+            --primary-blue: #1A5276;
+            --accent-cyan: #00f2ff;
+            --text-main: #e0e0e0;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        #app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* 側邊導覽列 */
+        #sidebar {
+            width: 260px;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--primary-blue);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid rgba(26, 82, 118, 0.5);
+            text-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        #menu-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .menu-group-title {
+            font-size: 11px;
+            color: #666;
+            margin: 15px 0 5px 5px;
+            text-transform: uppercase;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .menu-item:hover {
+            background: rgba(0, 242, 255, 0.1);
+            border-color: var(--accent-cyan);
+            transform: translateX(5px);
+        }
+
+        .menu-item.active {
+            background: var(--primary-blue);
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        }
+
+        /* 主視窗區 */
+        #main-content {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        #tool-viewport {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+        }
+
+        /* 全域偵錯視窗 (底層) */
+        #global-debug {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            height: 220px;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #ff4444;
+            border-radius: 8px;
+            display: none; /* 預設隱藏 */
+            flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .debug-header {
+            padding: 8px 12px;
+            background: #ff4444;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            cursor: move;
+        }
+
+        #debug-log {
+            flex: 1;
+            padding: 10px;
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            overflow-y: auto;
+            color: #00ff00;
+            line-height: 1.4;
+        }
+
+        /* 響應式：手機版自動收合側邊欄 */
+        @media (max-width: 768px) {
+            #sidebar { width: 60px; }
+            .sidebar-header, .menu-item span { display: none; }
+        }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <h2 style="letter-spacing: 2px;">惇陽 AI 實驗室</h2>
-        <p style="opacity: 0.7; font-size: 14px; margin-bottom: 30px;">設計A組內部平台 (需授權登入)</p>
+<div id="app-container">
+    <aside id="sidebar">
+        <div class="sidebar-header">AI STUDIO</div>
+        <div id="menu-list">
+            <div class="menu-group-title">核心工具</div>
+            <div class="menu-item active" onclick="switchTool('map.html', this)">
+                <span>🌐 空間實績地圖</span>
+            </div>
+            <div class="menu-item" onclick="switchTool('inspection_tool.html', this)">
+                <span>📸 現場會勘記錄</span>
+            </div>
+            <div class="menu-item" onclick="switchTool('calc.html', this)">
+                <span>📐 工程計算引擎</span>
+            </div>
+            <div class="menu-group-title">專案管理</div>
+            <div class="menu-item" onclick="switchTool('Gantt.html', this)">
+                <span>📊 專案甘特圖表</span>
+            </div>
+            <div id="dynamic-modules"></div> </div>
         
-        <div id="g_id_onload"
-             data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
-             data-callback="handleAuth">
+        <div style="padding: 15px;">
+            <button onclick="toggleDebug()" style="width:100%; background:transparent; color:#666; border:1px solid #444; padding:5px; cursor:pointer; font-size:10px;">系統監控</button>
         </div>
-        <div class="g_id_signin" data-type="standard" data-shape="pill"></div>
-        <div id="err-log" class="error-msg">帳號不在授權名單內，請聯繫管理員。</div>
+    </aside>
+
+    <main id="main-content">
+        <iframe id="tool-viewport" src="map.html"></iframe>
+    </main>
+</div>
+
+<div id="global-debug">
+    <div class="debug-header">
+        <span>SYSTEM CONSOLE</span>
+        <span onclick="toggleDebug()" style="cursor:pointer;">✖</span>
     </div>
+    <div id="debug-log"></div>
+</div>
 
-    <nav id="nav-tabs">
-        <div class="tab active" onclick="switchTool(this, 'map.html')">🗺️ 3D地圖</div>
-        <div class="tab" onclick="switchTool(this, 'doc.html')">📄 公文助手</div>
-        <div class="tab" onclick="switchTool(this, 'Gantt.html')">📊 甘特圖</div>
-        <div class="tab" onclick="switchTool(this, 'calc.html')">🧮 換算器</div>
-        <div class="tab" onclick="switchTool(this, 'tree.html')">🌳 修樹工單</div>
-        <div class="tab" onclick="switchTool(this, 'green.html')">🌿 綠化工單</div>
-        <div class="tab" onclick="switchTool(this, 'inspection_tool.html')">📋 施工抽查</div>
-        <div class="tab" onclick="switchTool(this, 'Weather.html')">📊 氣象分析</div>
-        <div class="tab" onclick="switchTool(this, 'WeatherData.html')">🌦️ 氣象彙整</div>
-        <div class="tab" onclick="switchTool(this, 'BusinessCard_Vision.html')">📇 名片彙整</div>
-        <div class="tab" onclick="switchTool(this, 'tutorial.html')">📖 操作教程</div>
-        <div class="tab" style="border-left: 2px solid #e2e8f0; margin-left: 10px; color: #6366f1;" onclick="switchTool(this, 'AI實驗室-Github串聯NAS.html')">🚀 架構計畫</div>
-    </nav>
+<script>
+    const logEl = document.getElementById('debug-log');
 
-    <div id="content-area">
-        <iframe id="tool-frame" name="tool-frame" src=""></iframe>
-    </div>
+    // 1. 切換工具邏輯 (兼容模式)
+    function switchTool(url, element) {
+        document.getElementById('tool-viewport').src = url;
+        
+        // 更新 UI 狀態
+        document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+        element.classList.add('active');
+        
+        sysLog(`切換至模組: ${url}`);
+    }
 
-    <script>
-        // --- 權限名單設定 ---
-        // 請在此處加入所有允許登入的 Email（包含公司帳號）
-        const allowedEmails = [
-            "cl.lee.olin@gmail.com",
-            "0757troph@gmail.com", "Roserain0516@gmail.com", "cccrj0929@gmail.com",
-            "hank881016@gmail.com", "twjackal@gmail.com", "lucis.willow@gmail.com",
-            "daphnetang111@gmail.com", "jangpp7@gmail.com", "kenwu880316@gmail.com",
-            "g520g7@gmail.com", "adad154154@gmail.com", "wu.yingu@gmail.com",
-            "maoyuanweng19901210@gmail.com", "juby90884@gmail.com", "paida19595@gmail.com",
-            "tsaisujing@gmail.com", "b0287751@gmail.com", "awencoacc012@gmail.com",
-            "a75121723@gmail.com", "copic.wang@gmail.com", "swallowa81@gmail.com"
-        ];
+    // 2. 系統日誌
+    function sysLog(msg) {
+        const time = new Date().toLocaleTimeString();
+        logEl.innerHTML += `<div><span style="color:#888;">[${time}]</span> ${msg}</div>`;
+        logEl.scrollTop = logEl.scrollHeight;
+        console.log(`[AI Lab] ${msg}`);
+    }
 
-        // --- 登入回傳處理 ---
-        function handleAuth(response) {
-            try {
-                const base64Url = response.credential.split('.')[1];
-                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                const payload = JSON.parse(window.atob(base64));
-                
-                const userEmail = payload.email.toLowerCase();
-                console.log("嘗試登入者:", userEmail);
-
-                // --- 修正點：移除網域自動授權，僅比對名單 ---
-                const isAuthorized = allowedEmails.map(e => e.toLowerCase()).includes(userEmail);
-
-                if (isAuthorized) {
-                    console.log("驗證成功");
-                    const authScreen = document.getElementById('auth-screen');
-                    authScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        authScreen.style.display = 'none';
-                        switchTool(document.querySelector('.tab'), 'map.html');
-                    }, 500);
-                } else {
-                    console.error("授權失敗");
-                    const errLog = document.getElementById('err-log');
-                    errLog.style.display = 'block';
-                    errLog.innerText = "未授權帳號: " + userEmail;
-                }
-            } catch (error) {
-                console.error("登入程序發生錯誤:", error);
-                alert("驗證程序出錯，請刷新頁面重試。");
-            }
+    // 3. 自動偵測 Manifest 並動態擴充選單
+    async function loadManifest() {
+        try {
+            const response = await fetch('manifest.json');
+            if (!response.ok) throw new Error("Manifest 尚未建置");
+            
+            const data = await response.json();
+            sysLog(`成功讀取系統清冊: ${data.name}`);
+            
+            // 可以在這裡寫邏輯，比對 manifest 裡的模組，如果選單沒出現就補上去
+            // 這是您未來「自動化」的關鍵
+        } catch (err) {
+            sysLog(`提示: ${err.message}。目前運行於手動兼容模式。`);
         }
+    }
 
-        // --- 分頁切換功能 ---
-        function switchTool(el, fileName) {
-            if (!el || !fileName) return;
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            const frame = document.getElementById('tool-frame');
-            frame.src = "./" + fileName;
-        }
+    // 4. 偵錯視窗切換
+    function toggleDebug() {
+        const panel = document.getElementById('global-debug');
+        panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+    }
 
-        window.onload = function() {
-            console.log("系統已就緒，等待 Google 驗證...");
-        };
-    </script>
+    // 啟動
+    window.onload = () => {
+        sysLog("AI 實驗室核心啟動中...");
+        loadManifest();
+    };
+</script>
+
 </body>
 </html>
