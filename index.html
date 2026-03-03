@@ -23,12 +23,12 @@
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
-        /* 浮動式 Debug 視窗樣式 */
+        /* 浮動式 Debug 視窗 */
         #debug-log-window { 
             position: fixed; bottom: 20px; right: 20px; width: 500px; height: 350px;
             background: rgba(0, 0, 0, 0.9); border: 2px solid var(--lab-cyan); border-radius: 12px;
             z-index: 10000; display: none; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px); user-select: none;
         }
         #debug-header { 
             padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid #334155;
@@ -36,13 +36,13 @@
         }
         #debug-log { 
             flex-grow: 1; font-family: 'Consolas', monospace; font-size: 11px; color: #00ff00; 
-            padding: 10px; overflow-y: auto; word-break: break-all;
+            padding: 10px; overflow-y: auto; word-break: break-all; user-select: text;
         }
 
         .content-area { flex-grow: 1; background: #000; position: relative; height: 100%; overflow: hidden; }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
-        /* 分類收放 CSS */
+        /* 分類收放 CSS (由 AppLoader 控制) */
         .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
         .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
         .module-group.collapsed { max-height: 0; }
@@ -60,7 +60,7 @@
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">安全性管制中 (v2.2.2)</p>
+            <p class="text-muted mb-4 small">安全性管制中 (v2.2.3)</p>
             <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
         </div>
@@ -89,16 +89,12 @@
     </div>
 
 <script>
-    // --- 1. 基礎日誌工具 (優化對接) ---
+    // --- 1. 基礎日誌工具 (對接安全版) ---
     window.sysLog = function(msg, type = '') {
-        // 優先輸出到 Console 備份
-        console.log(`[${type.toUpperCase()}] ${msg}`);
-
-        // 如果浮動視窗的實例已經建立，直接使用它的 log 方法
+        console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
         if (window.DebugInstance && typeof window.DebugInstance.log === 'function') {
             window.DebugInstance.log(msg, type || "INFO");
         } else {
-            // 實例化前的過渡處理
             const logBox = document.getElementById('debug-log');
             if (logBox) {
                 const div = document.createElement('div');
@@ -110,16 +106,14 @@
         }
     };
 
-    // --- 2. 安全解碼邏輯 (保持不變) ---
     function base64UrlDecode(str) {
         let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) { base64 += '='; }
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
-    // --- 3. Google 登入回調 (保持不變) ---
     window.handleCredentialResponse = async (response) => {
-        window.sysLog("收到憑證，開始驗證...", "success");
+        window.sysLog("解析憑證中...", "success");
         try {
             const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
             const userEmail = payload.email.toLowerCase();
@@ -132,24 +126,24 @@
 
             const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
             if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                window.sysLog("驗證通過！解鎖系統介面。", "success");
+                window.sysLog("驗證通過！啟動系統核心。", "success");
                 sessionStorage.setItem('ai_lab_auth', 'true');
                 sessionStorage.setItem('user_email', userEmail);
                 if (window.startSystem) window.startSystem();
             } else {
-                window.sysLog("權限拒絕：" + userEmail, "err");
-                alert("您不在授權名單中: " + userEmail);
+                window.sysLog("存取拒絕: " + userEmail, "err");
+                alert("未經授權的帳號");
             }
-        } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
+        } catch (e) { window.sysLog("登入錯誤: " + e.message, "err"); }
     };
 
     window.toggleDebugWindow = () => {
         const win = document.getElementById('debug-log-window');
-        if (!win) return;
+        if(!win) return;
         win.style.display = (win.style.display === 'none' || win.style.display === '') ? 'flex' : 'none';
     };
 
-    // --- 4. 視窗拖移邏輯 (修正移動靈敏度) ---
+    // --- 視窗拖移邏輯 (優化版) ---
     const dragWin = document.getElementById("debug-log-window");
     const dragHeader = document.getElementById("debug-header");
     let isDragging = false, startX, startY, transX = 0, transY = 0;
@@ -173,6 +167,42 @@
         isDragging = false;
         if(dragHeader) dragHeader.style.cursor = 'move';
     });
+</script>
+
+<script type="module">
+    import * as AM from './core/AppLoader.js';
+    import * as DS from './core/DebugSystem.js';
+
+    const AppLoader = AM.default || AM.AppLoader;
+    const DebugSystem = DS.default || DS.DebugSystem;
+
+    window.startSystem = function() {
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('main-layout').style.display = 'flex';
+        document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+        
+        // 先建立偵錯實例，攔截後續錯誤
+        if (DebugSystem) {
+            window.DebugInstance = new DebugSystem();
+            window.sysLog("系統介面已成功解鎖", "success");
+        }
+        
+        if (AppLoader && window.appConfig) {
+            const loader = new AppLoader(window.appConfig);
+            loader.renderMenu('menu-container');
+        }
+    };
+
+    async function init() {
+        try {
+            const response = await fetch('./manifest.json?v=' + Date.now());
+            window.appConfig = await response.json();
+            document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
+            if (sessionStorage.getItem('ai_lab_auth') === 'true') window.startSystem();
+        } catch (e) { console.error("Init Error", e); }
+    }
+    init();
+    window.logout = () => { sessionStorage.clear(); location.reload(); };
 </script>
 </body>
 </html>
