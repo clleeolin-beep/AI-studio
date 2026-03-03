@@ -78,74 +78,87 @@
             }
             console.log(`[DEBUG] ${msg}`);
         };
-        window.sysLog("核心腳本加載中...");
+        window.sysLog("系統啟動中...");
     </script>
 
     <script>
         window.handleCredentialResponse = async function(response) {
-            window.sysLog("Google 驗證完成，開始解析憑證...", "success");
+            window.sysLog("Google 驗證完成，解析憑證...", "success");
             try {
                 const base64Url = response.credential.split('.')[1];
                 const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
                 const payload = JSON.parse(atob(base64));
                 const userEmail = payload.email.toLowerCase();
-                window.sysLog("登入者：" + userEmail);
+                window.sysLog("登入帳號：" + userEmail);
 
-                // 等待 Module 腳本把 appConfig 準備好
                 if (!window.appConfig) {
-                    window.sysLog("正在讀取設定檔，請稍候...");
+                    window.sysLog("正在讀取設定檔...");
                     const res = await fetch('./manifest.json?v=' + Date.now());
                     window.appConfig = await res.json();
                 }
 
                 const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
-                window.sysLog("正在比對授權名單...");
-
+                
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                    window.sysLog("驗證通過！解鎖系統介面。", "success");
+                    window.sysLog("驗證成功！正在啟動系統介面...", "success");
                     sessionStorage.setItem('ai_lab_auth', 'true');
                     sessionStorage.setItem('user_email', userEmail);
-                    sessionStorage.setItem('user_name', payload.name);
                     
-                    // 呼叫 Module 內的啟動函式
-                    if (window.startSystem) window.startSystem();
+                    if (typeof window.startSystem === 'function') {
+                        window.startSystem();
+                    } else {
+                        window.sysLog("錯誤：系統核心模組尚未就緒，請重整頁面。", "err");
+                    }
                 } else {
                     window.sysLog("存取拒絕：此帳號不在白名單內。", "err");
                 }
             } catch (e) {
-                window.sysLog("驗證邏輯出錯：" + e.message, "err");
+                window.sysLog("登入執行出錯：" + e.message, "err");
             }
         };
     </script>
 
     <script type="module">
-        import AppLoader from './core/AppLoader.js';
+        import * as AppModules from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
+        // 偵測匯出名稱 (相容 export default 或 export class AppLoader)
+        const AppLoader = AppModules.default || AppModules.AppLoader;
+
         window.startSystem = function() {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('main-layout').style.display = 'flex';
-            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-            
-            window.DebugSystem = new DebugSystem();
-            const loader = new AppLoader(window.appConfig);
-            loader.renderMenu('menu-container');
+            try {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('main-layout').style.display = 'flex';
+                document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+                
+                window.DebugSystem = new DebugSystem();
+                
+                if (AppLoader) {
+                    const loader = new AppLoader(window.appConfig);
+                    loader.renderMenu('menu-container');
+                    window.sysLog("介面加載完成。", "success");
+                } else {
+                    throw new Error("找不到 AppLoader 類別。");
+                }
+            } catch (e) {
+                window.sysLog("渲染失敗: " + e.message, "err");
+            }
         };
 
         async function init() {
             try {
-                window.sysLog("讀取 manifest.json...");
+                window.sysLog("獲取設定檔 manifest.json...");
                 const response = await fetch('./manifest.json?v=' + Date.now());
                 window.appConfig = await response.json();
                 document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
                 window.sysLog("設定檔加載成功。", "success");
 
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
-                    window.sysLog("偵測到有效工作階段，自動解鎖...");
+                    window.sysLog("自動登入中...");
                     window.startSystem();
                 }
             } catch (e) {
-                window.sysLog("配置加載失敗：" + e.message, "err");
+                window.sysLog("初始化失敗：" + e.message, "err");
             }
         }
 
