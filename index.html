@@ -38,7 +38,7 @@
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">安全性管制中 (測試模式)</p>
+            <p class="text-muted mb-4 small">權限驗證中 (Base64URL 協議版)</p>
             
             <div id="g_id_onload"
                  data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com"
@@ -76,20 +76,51 @@
                 debugEl.appendChild(div);
                 debugEl.scrollTop = debugEl.scrollHeight;
             }
-            console.log(`[DEBUG] ${msg}`);
         };
-        window.sysLog("系統核心準備中...");
+        window.sysLog("Base64URL 協議初始化...");
     </script>
 
     <script>
-        window.handleCredentialResponse = async function(response) {
-            window.sysLog("Google 驗證完成，解析中...", "success");
-            try {
-                const payload = JSON.parse(atob(response.credential.split('.')[1]));
-                const userEmail = payload.email.toLowerCase();
-                window.sysLog("登入者：" + userEmail);
+        /**
+         * Base64URL 解碼器 (解決 atob 報錯)
+         */
+        function base64UrlDecode(str) {
+            // 1. 替換網址安全字元
+            let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+            
+            // 2. 補足長度使之成為 4 的倍數 (Padding)
+            const pad = base64.length % 4;
+            if (pad) {
+                if (pad === 1) throw new Error("無效的 Base64URL 字串");
+                base64 += new Array(5 - pad).join('=');
+            }
 
+            // 3. 使用 atob 轉換並處理 Unicode 亂碼問題
+            try {
+                return decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+            } catch (err) {
+                throw new Error("atob 解析失敗: " + err.message);
+            }
+        }
+
+        window.handleCredentialResponse = async function(response) {
+            window.sysLog("收到憑證，啟動安全解析...", "success");
+            try {
+                // 取得 JWT Payload 段落
+                const parts = response.credential.split('.');
+                if (parts.length < 2) throw new Error("JWT 格式不完整");
+
+                // 使用 Base64URL 協議解析
+                const jsonPayload = base64UrlDecode(parts[1]);
+                const payload = JSON.parse(jsonPayload);
+                const userEmail = payload.email.toLowerCase();
+                window.sysLog("解碼成功: " + userEmail, "success");
+
+                // 確保配置已準備好
                 if (!window.appConfig) {
+                    window.sysLog("正在手動重新抓取設定檔...");
                     const res = await fetch('./manifest.json?v=' + Date.now());
                     window.appConfig = await res.json();
                 }
@@ -97,19 +128,21 @@
                 const allowedUsers = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
                 
                 if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                    window.sysLog("驗證成功！正在啟動系統...", "success");
+                    window.sysLog("授權通過，正在加載系統...", "success");
                     sessionStorage.setItem('ai_lab_auth', 'true');
                     sessionStorage.setItem('user_email', userEmail);
                     if (typeof window.startSystem === 'function') {
                         window.startSystem();
                     } else {
-                        window.sysLog("錯誤：系統啟動函式未就緒，請重整頁面。", "err");
+                        window.sysLog("系統模組載入中，請稍候 1.5 秒...");
+                        setTimeout(window.startSystem, 1500);
                     }
                 } else {
-                    window.sysLog("拒絕存取：此帳號不在名單內。", "err");
+                    window.sysLog("存取遭拒：您不在授權清單內。", "err");
                 }
             } catch (e) {
-                window.sysLog("驗證執行出錯：" + e.message, "err");
+                window.sysLog("協議解析錯誤: " + e.message, "err");
+                console.error(e);
             }
         };
     </script>
@@ -123,43 +156,42 @@
 
         window.startSystem = function() {
             try {
-                document.getElementById('auth-overlay').style.display = 'none';
-                document.getElementById('main-layout').style.display = 'flex';
+                const overlay = document.getElementById('auth-overlay');
+                const layout = document.getElementById('main-layout');
+                if (!overlay || !layout) return;
+
+                overlay.style.display = 'none';
+                layout.style.display = 'flex';
                 document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
                 
-                // 安全初始化 DebugSystem
-                if (DebugSystem) {
-                    window.DebugSystem = new DebugSystem();
-                } else {
-                    window.sysLog("警告：DebugSystem 模組失效，跳過初始化。", "warn");
-                }
+                if (DebugSystem) window.DebugSystem = new DebugSystem();
                 
-                // 安全初始化 AppLoader
                 if (AppLoader && window.appConfig) {
                     const loader = new AppLoader(window.appConfig);
                     loader.renderMenu('menu-container');
-                    window.sysLog("系統解鎖成功，介面加載完成。", "success");
+                    window.sysLog("介面初始化完成。", "success");
                 } else {
-                    throw new Error("AppLoader 模組載入失敗");
+                    throw new Error("AppLoader 模組未就緒");
                 }
             } catch (e) {
-                window.sysLog("進入系統失敗: " + e.message, "err");
+                window.sysLog("系統啟動失敗: " + e.message, "err");
             }
         };
 
         async function init() {
             try {
-                window.sysLog("獲取設定檔 manifest.json...");
+                window.sysLog("加載設定檔...");
                 const response = await fetch('./manifest.json?v=' + Date.now());
                 window.appConfig = await response.json();
                 document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
-                window.sysLog("設定檔加載成功。", "success");
+                window.sysLog("設定檔加載完成。", "success");
 
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
+                    window.sysLog("偵測到已有工作階段，自動進入...");
                     window.startSystem();
                 }
             } catch (e) {
-                window.sysLog("初始化失敗：" + e.message, "err");
+                window.sysLog("初始化失敗: " + e.message, "err");
             }
         }
         init();
