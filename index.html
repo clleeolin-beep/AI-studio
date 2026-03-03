@@ -11,302 +11,221 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <style>
-        :root { 
-            --lab-cyan: #00f2ff; 
-            --lab-bg: #0f172a; 
-            --lab-sidebar: #1e293b; 
-            --lab-border: #334155;
-        }
+        :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
+        body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
+        
+        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; }
+        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; text-decoration: none; }
+        
+        #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        
+        #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
+        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
-        body, html { 
-            background: var(--lab-bg); 
-            color: white; 
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
-            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; 
-        }
-
-        /* 頂部導航欄 */
-        .navbar { 
-            background: #000 !important; 
-            border-bottom: 1px solid var(--lab-border); 
-            height: 56px; padding: 0 20px; 
-            flex-shrink: 0; 
-            display: flex; 
-            align-items: center; 
-            z-index: 1000;
-        }
-        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; text-decoration: none; font-size: 1.25rem; }
-
-        /* 登入遮罩層 */
-        #auth-overlay { 
-            position: fixed; inset: 0; 
-            background: var(--lab-bg); 
-            z-index: 9999; 
-            display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        }
-        .login-box { 
-            background: #1e293b; padding: 40px; border-radius: 24px; 
-            border: 1px solid var(--lab-border); text-align: center; width: 420px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
-
-        /* 主佈局結構 */
-        #main-layout { 
-            display: none; 
-            height: calc(100vh - 56px); 
-            width: 100%; 
-            overflow: hidden; 
-        }
-        .sidebar { 
-            width: 280px; min-width: 280px; 
-            background: var(--lab-sidebar); 
-            border-right: 1px solid var(--lab-border); 
-            display: flex; flex-direction: column; height: 100%; 
-            overflow-y: auto; 
-        }
-        .content-area { flex-grow: 1; background: #000; position: relative; overflow: hidden; }
-        iframe { width: 100%; height: 100%; border: none; display: block; }
-
-        /* 偵錯終端視窗 */
+        /* 偵錯視窗樣式 */
         #debug-log-window { 
-            position: fixed; bottom: 20px; right: 20px; 
-            width: 550px; height: 380px; 
-            background: rgba(10, 15, 30, 0.95); 
-            border: 1px solid var(--lab-cyan); 
-            border-radius: 12px; z-index: 10001; 
-            display: none; flex-direction: column; 
-            box-shadow: 0 15px 40px rgba(0,0,0,0.7);
-            backdrop-filter: blur(12px);
+            position: fixed; bottom: 20px; right: 20px; width: 500px; height: 350px;
+            background: rgba(0, 0, 0, 0.9); border: 2px solid var(--lab-cyan); border-radius: 12px;
+            z-index: 10000; display: none; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
         }
         #debug-header { 
-            padding: 10px 15px; background: rgba(30, 41, 59, 0.8); 
-            border-bottom: 1px solid var(--lab-border); 
-            display: flex; justify-content: space-between; align-items: center; 
-            cursor: move; border-radius: 12px 12px 0 0;
-            user-select: none;
+            padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid #334155;
+            display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 10px 10px 0 0;
         }
         #debug-log { 
-            flex-grow: 1; font-family: 'Cascadia Code', 'Consolas', monospace; 
-            font-size: 11px; color: #adbac7; 
-            padding: 12px; overflow-y: auto; word-break: break-all; 
+            flex-grow: 1; font-family: 'Consolas', monospace; font-size: 11px; color: #00ff00; 
+            padding: 10px; overflow-y: auto; word-break: break-all;
         }
 
-        /* 選單樣式 */
-        .category-item { 
-            cursor: pointer; padding: 12px 20px; 
-            background: rgba(255, 255, 255, 0.02); 
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; font-weight: 600; color: #94a3b8;
-        }
-        .category-item:hover { background: rgba(255, 255, 255, 0.05); }
-        .nav-link { 
-            color: #64748b; padding: 10px 20px 10px 45px; 
-            display: block; text-decoration: none; font-size: 14px; 
-            border-left: 4px solid transparent; transition: 0.2s;
-        }
-        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.03); }
-        .nav-link.active { 
-            color: var(--lab-cyan); 
-            background: rgba(0,242,255,0.08); 
-            border-left: 4px solid var(--lab-cyan); 
-        }
-        .module-group.collapsed { display: none; }
+        .content-area { flex-grow: 1; background: #000; position: relative; }
+        iframe { width: 100%; height: 100%; border: none; display: block; }
+
+        /* 選單與收合樣式 */
+        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
+        .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
+        .module-group.collapsed { max-height: 0; }
+        .bi-chevron-down { transition: transform 0.3s; font-size: 10px; }
+        .collapsed .bi-chevron-down { transform: rotate(-90deg); }
+
+        .nav-link { color: #94a3b8; padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="login-box">
-            <div class="mb-3" style="font-size: 3rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
-            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan); letter-spacing: 1px;">AI Studio Lab</h2>
-            <p class="text-muted small mb-4">Security Access Control System</p>
-            <div id="g_id_onload" 
-                 data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" 
-                 data-callback="handleCredentialResponse" 
-                 data-auto_prompt="false"></div>
+            <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
+            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
+            <p class="text-muted mb-4 small">安全性管制中 (v2.2.3)</p>
+            <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
         </div>
     </div>
 
     <nav class="navbar navbar-dark">
-        <a class="navbar-brand me-auto" href="#">
-            <i class="bi bi-intersect me-2"></i>AI STUDIO 
-            <span class="badge bg-dark border border-info ms-2" id="sys-version" style="color:var(--lab-cyan); font-size: 10px;">--</span>
-        </a>
+        <a class="navbar-brand me-auto" href="#"><i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span></a>
         <div class="d-flex align-items-center">
-            <button class="btn btn-sm btn-outline-info me-3" onclick="toggleDebugWindow()">
-                <i class="bi bi-terminal me-1"></i>偵錯中樞
-            </button>
-            <span id="user-display" class="me-3 small text-muted font-monospace" style="font-size: 12px;"></span>
-            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()">
-                <i class="bi bi-box-arrow-right"></i>
-            </button>
+            <button class="btn btn-sm btn-outline-info me-3" onclick="toggleDebugWindow()"><i class="bi bi-terminal me-1"></i>偵錯</button>
+            <span id="user-display" class="me-3 small text-muted font-monospace"></span>
+            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
         </div>
     </nav>
 
     <div id="debug-log-window">
         <div id="debug-header">
-            <span style="font-size: 11px; font-weight: bold; color: var(--lab-cyan);">🛠️ SYSTEM KERNEL DEBUG</span>
-            <i class="bi bi-x-lg" style="cursor:pointer; font-size: 12px;" onclick="toggleDebugWindow()"></i>
+            <span style="font-size: 12px; font-weight: bold; color: var(--lab-cyan);">🛠️ SYSTEM DEBUG TERMINAL</span>
+            <i class="bi bi-x-lg" style="cursor:pointer;" onclick="toggleDebugWindow()"></i>
         </div>
         <div id="debug-log"></div>
     </div>
 
     <div id="main-layout" class="d-flex">
-        <aside class="sidebar">
-            <div id="menu-container"></div>
-        </aside>
-        <main class="content-area">
-            <iframe id="main-frame" name="main-frame" src="about:blank"></iframe>
-        </main>
+        <aside class="sidebar"><div id="menu-container"></div></aside>
+        <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
     </div>
 
 <script>
     /**
-     * [AI Lab Global Logic]
-     * 負責全域通訊、登入驗證與視窗物理行為
+     * [手動偵錯程序加回]
+     * 支援全域 sysLog 呼叫，並自動對接 DebugSystem 實例
      */
+    window.sysLog = function(msg, type = '') {
+        console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
+        
+        // 1. 如果 DebugSystem 實例存在，使用其實例方法 (維持核心一致性)
+        if (window.DebugInstance && typeof window.DebugInstance.addLog === 'function') {
+            window.DebugInstance.addLog(type || 'info', msg);
+            return;
+        }
 
-    // 1. 全域日誌系統 (Singleton Pattern Proxy)
-    window.sysLog = function(msg, type = 'info') {
+        // 2. 備用機制：直接更新 DOM (確保初始化期間訊息不遺失)
         const logBox = document.getElementById('debug-log');
-        if (!logBox) return;
-
-        const entry = document.createElement('div');
-        entry.style.marginBottom = '4px';
-        const colors = { 
-            err: '#ff6b6b', 
-            error: '#ff6b6b', 
-            success: '#00f2ff', 
-            warn: '#ffd93d',
-            info: '#adbac7'
-        };
-        
-        const timestamp = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-        const color = colors[type.toLowerCase()] || colors.info;
-        
-        entry.innerHTML = `<span style="color: #54637d;">[${timestamp}]</span> <span style="color: ${color};">[${type.toUpperCase()}]</span> ${msg}`;
-        
-        logBox.appendChild(entry);
-        logBox.scrollTop = logBox.scrollHeight;
+        if (logBox) {
+            const div = document.createElement('div');
+            const colors = { err: '#ff4b4b', error: '#ff4b4b', success: '#00f2ff', warn: '#ffbb33', info: '#00ff00' };
+            div.style.color = colors[type.toLowerCase()] || '#0f0';
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            div.style.padding = '2px 0';
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
     };
 
-    // 2. 跨域訊息交換橋接 (Iframe Bridge)
+    // 接收來自 Iframe (MapEditor) 的偵錯訊息橋接
     window.addEventListener('message', (event) => {
         if (event.data && event.data.source === 'AI_STUDIO_APP') {
-            window.sysLog(event.data.content, event.data.type || 'remote');
+            const { type, content } = event.data;
+            window.sysLog(content, type);
         }
     });
 
-    // 3. Google Auth 與 權限驗證
     function base64UrlDecode(str) {
         let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) { base64 += '='; }
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
+    // Google Auth 回調：修正 Scope 隔離導致的啟動失敗
     window.handleCredentialResponse = async (response) => {
-        window.sysLog("身份憑證已接收，開始驗證程序...", "info");
+        window.sysLog("收到憑證，開始驗證...", "success");
         try {
             const payload = JSON.parse(base64UrlDecode(response.credential.split('.')[1]));
             const userEmail = payload.email.toLowerCase();
-            
-            // 動態加載 Manifest
+
             const res = await fetch('./manifest.json?v=' + Date.now());
             window.appConfig = await res.json();
 
             const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
             if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
+                window.sysLog("驗證通過！解鎖系統。", "success");
                 sessionStorage.setItem('ai_lab_auth', 'true');
                 sessionStorage.setItem('user_email', userEmail);
-                window.sysLog("權限驗證通過，解鎖系統核心。", "success");
                 
-                // 發送自定義事件通知模組腳本
-                window.dispatchEvent(new CustomEvent('system-auth-success'));
+                // 觸發模組內的啟動程序
+                if (window.startSystem) {
+                    window.startSystem();
+                } else {
+                    window.dispatchEvent(new CustomEvent('manual-start'));
+                }
             } else {
-                window.sysLog(`存取拒絕: ${userEmail}`, "error");
-                alert("未經授權的帳號: " + userEmail);
+                alert("未經授權: " + userEmail);
             }
-        } catch (e) { 
-            window.sysLog("驗證系統異常: " + e.message, "err"); 
-        }
+        } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
     };
 
-    // 4. 視窗物理交互實作 (Draggable Logic)
-    let isDragging = false;
-    let currentX, currentY, initialX, initialY, xOffset = 0, yOffset = 0;
-    const dragTarget = document.getElementById("debug-log-window");
-    const dragHandle = document.getElementById("debug-header");
+    // 偵錯視窗拖移邏輯 (完全補回)
+    const dragWin = document.getElementById("debug-log-window");
+    const dragHeader = document.getElementById("debug-header");
+    let isDragging = false, startX, startY, transX = 0, transY = 0;
 
     window.toggleDebugWindow = () => {
-        dragTarget.style.display = (dragTarget.style.display === 'none' || dragTarget.style.display === '') ? 'flex' : 'none';
+        dragWin.style.display = (dragWin.style.display === 'none' || dragWin.style.display === '') ? 'flex' : 'none';
     };
 
-    dragHandle.addEventListener("mousedown", (e) => {
-        initialX = e.clientX - xOffset;
-        initialY = e.clientY - yOffset;
-        if (e.target === dragHandle || dragHandle.contains(e.target)) {
-            isDragging = true;
-        }
+    dragHeader.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX - transX;
+        startY = e.clientY - transY;
+        dragHeader.style.cursor = 'grabbing';
     });
-
-    document.addEventListener("mousemove", (e) => {
-        if (isDragging) {
-            e.preventDefault();
-            currentX = e.clientX - initialX;
-            currentY = e.clientY - initialY;
-            xOffset = currentX;
-            yOffset = currentY;
-            dragTarget.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
-        }
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        transX = e.clientX - startX;
+        transY = e.clientY - startY;
+        dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
     });
-
-    document.addEventListener("mouseup", () => {
+    document.addEventListener('mouseup', () => {
         isDragging = false;
+        dragHeader.style.cursor = 'move';
     });
-
-    window.logout = () => { sessionStorage.clear(); location.reload(); };
 </script>
 
 <script type="module">
-    /**
-     * [AI Lab Module Controller]
-     * 負責模組化組件之初始化與生命週期管理
-     */
     import AppLoader from './core/AppLoader.js';
-    import { DebugSystem } from './core/DebugSystem.js';
+    import { debugSystem } from './core/DebugSystem.js';
 
-    async function startSystem() {
-        if (!window.appConfig) {
-            const res = await fetch('./manifest.json');
-            window.appConfig = await res.json();
-        }
-
-        // UI 切換
+    /**
+     * [核心啟動程序]
+     * 對接全域 startSystem 供 Auth 回調使用
+     */
+    window.startSystem = function() {
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('main-layout').style.display = 'flex';
         document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-        document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
-
-        // 初始化核心類別
-        try {
-            window.DebugInstance = new DebugSystem();
+        
+        // 將模組實例掛載至全域
+        window.DebugInstance = debugSystem;
+        window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
+        
+        if (AppLoader && window.appConfig) {
             const loader = new AppLoader(window.appConfig);
             loader.renderMenu('menu-container');
-            window.sysLog("系統組件與選單加載完成。", "success");
-        } catch (err) {
-            window.sysLog("模組初始化失敗: " + err.message, "err");
         }
+    };
+
+    // 初始化檢測
+    async function init() {
+        try {
+            const response = await fetch('./manifest.json?v=' + Date.now());
+            window.appConfig = await response.json();
+            document.getElementById('sys-version').innerText = window.appConfig.ai_lab_config.version;
+            
+            if (sessionStorage.getItem('ai_lab_auth') === 'true') {
+                window.startSystem();
+            }
+        } catch (e) { console.error("Init Error", e); }
     }
 
-    // 監聽驗證成功訊號
-    window.addEventListener('system-auth-success', startSystem);
-
-    // 處理自動登入邏輯
-    if (sessionStorage.getItem('ai_lab_auth') === 'true') {
-        startSystem();
-    }
+    // 監聽手動啟動事件 (預防 Race Condition)
+    window.addEventListener('manual-start', window.startSystem);
+    
+    init();
+    window.logout = () => { sessionStorage.clear(); location.reload(); };
 </script>
 </body>
 </html>
