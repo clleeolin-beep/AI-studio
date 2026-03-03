@@ -1,8 +1,7 @@
 /**
  * @Core: AppLoader
- * @Version: 2.2.0
- * @Description: 管理 Manifest 載入、分類選單生成與 Iframe 模組切換
- * 支援 manifest.json 中的 Emoji 圖示與分類導航
+ * @Version: 2.2.1
+ * @Description: 管理 Manifest 分類選單生成、摺疊收合與模組切換
  */
 
 export default class AppLoader {
@@ -20,7 +19,7 @@ export default class AppLoader {
     }
 
     /**
-     * 渲染側邊欄選單
+     * 渲染側邊欄選單 (支援分類收合)
      * @param {string} containerId - 側邊欄容器的 DOM ID
      */
     renderMenu(containerId) {
@@ -30,49 +29,66 @@ export default class AppLoader {
             return;
         }
 
-        // 清空現有選單內容
         menuContainer.innerHTML = '';
-        
         const modules = this.manifest.ai_lab_config.modules;
-        let lastCategory = "";
 
+        // 1. 將模組按分類分組
+        const groups = {};
         modules.forEach(mod => {
-            // 處理分類標題 (如果該模組有分類且與前一個不同)
-            if (mod.category && mod.category !== lastCategory) {
-                const head = document.createElement('div');
-                head.className = 'px-3 py-2 mt-3 small text-uppercase text-muted fw-bold';
-                head.style.letterSpacing = '1px';
-                head.style.fontSize = '11px';
-                head.innerText = mod.category;
-                menuContainer.appendChild(head);
-                lastCategory = mod.category;
-            }
-
-            // 建立選單項目 (a 標籤)
-            const item = document.createElement('a');
-            item.className = 'nav-link d-flex align-items-center';
-            item.href = '#'; // 防止頁面跳轉
-            
-            // 處理 Emoji 與 名稱
-            // 使用 span 包裹 Emoji 確保間距正確
-            item.innerHTML = `
-                <span class="me-3" style="font-style: normal; width: 20px; text-align: center;">${mod.icon}</span>
-                <span>${mod.name}</span>
-            `;
-            
-            // 綁定點擊事件
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.switchModule(mod, item);
-            });
-
-            menuContainer.appendChild(item);
+            const cat = mod.category || "未分類";
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push(mod);
         });
 
-        // 預設載入第一個模組（空間實績地圖）
-        if (modules.length > 0) {
-            const firstItem = menuContainer.querySelector('.nav-link');
-            this.switchModule(modules[0], firstItem);
+        // 2. 遍歷分組並生成 HTML
+        Object.keys(groups).forEach(catName => {
+            // 建立分類標題 (category-item)
+            const catHeader = document.createElement('div');
+            catHeader.className = 'category-item';
+            catHeader.innerHTML = `
+                <span>${catName}</span>
+                <i class="bi bi-chevron-down"></i>
+            `;
+
+            // 建立模組群組容器 (module-group)
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'module-group';
+
+            // 綁定收合事件
+            catHeader.addEventListener('click', () => {
+                groupDiv.classList.toggle('collapsed');
+                catHeader.classList.toggle('collapsed');
+            });
+
+            // 填充該分類下的模組
+            groups[catName].forEach(mod => {
+                const item = document.createElement('a');
+                item.className = 'nav-link d-flex align-items-center';
+                item.href = '#';
+                
+                // 處理 Emoji 圖示與名稱
+                item.innerHTML = `
+                    <span class="me-3" style="font-style: normal; width: 20px; text-align: center;">${mod.icon}</span>
+                    <span>${mod.name}</span>
+                `;
+                
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation(); // 防止觸發分類收合
+                    this.switchModule(mod, item);
+                });
+
+                groupDiv.appendChild(item);
+            });
+
+            menuContainer.appendChild(catHeader);
+            menuContainer.appendChild(groupDiv);
+        });
+
+        // 3. 預設啟動：載入第一個分類的第一個項目
+        const firstLink = menuContainer.querySelector('.nav-link');
+        if (firstLink && modules.length > 0) {
+            this.switchModule(modules[0], firstLink);
         }
     }
 
@@ -93,15 +109,15 @@ export default class AppLoader {
             frame.src = mod.path;
         }
 
-        // 更新選單的 Active 樣式狀態
+        // 更新選單的 Active 狀態
         document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
         if (el) {
             el.classList.add('active');
         }
 
-        // 同步顯示除錯日誌 (如果全域函式存在)
+        // 同步顯示除錯日誌
         if (window.sysLog) {
-            window.sysLog(`切換至模組: ${mod.name}`, "ok");
+            window.sysLog(`載入模組: ${mod.name}`, "success");
         }
 
         console.log(`[System] 切換模組: ${mod.name} -> ${mod.path}`);
