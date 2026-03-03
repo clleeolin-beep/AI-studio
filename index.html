@@ -45,7 +45,6 @@
             position: relative;
         }
 
-        /* 收折狀態樣式 */
         #sidebar.collapsed {
             width: var(--sidebar-collapsed-width);
         }
@@ -61,10 +60,6 @@
             overflow: hidden;
         }
 
-        #sidebar.collapsed .sidebar-header {
-            font-size: 0.8rem;
-        }
-
         #menu-list {
             flex: 1;
             overflow-y: auto;
@@ -72,7 +67,7 @@
             scrollbar-width: thin;
         }
 
-        /* 分類標題樣式 */
+        /* 分類標題 */
         .category-header {
             font-size: 11px;
             color: #566573;
@@ -87,9 +82,11 @@
         #sidebar.collapsed .category-header {
             opacity: 0;
             margin: 10px 0;
+            height: 0;
+            overflow: hidden;
         }
 
-        /* 選單項目樣式 */
+        /* 選單項目 */
         .menu-item {
             display: flex;
             align-items: center;
@@ -122,7 +119,6 @@
         .menu-item span {
             margin-left: 12px;
             white-space: nowrap;
-            transition: opacity 0.2s;
         }
 
         #sidebar.collapsed .menu-item span {
@@ -145,12 +141,7 @@
             background: rgba(0,0,0,0.3);
             border-top: 1px solid rgba(26, 82, 118, 0.5);
             color: var(--accent-cyan);
-            font-size: 1.2rem;
-            transition: background 0.2s;
-        }
-
-        .collapse-btn:hover {
-            background: rgba(0, 242, 255, 0.1);
+            font-size: 1rem;
         }
 
         /* 主視窗區 */
@@ -160,37 +151,22 @@
             background: #000;
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
+        iframe { width: 100%; height: 100%; border: none; }
 
-        /* 系統狀態列 */
-        #status-bar {
-            height: 30px;
-            background: #141e30;
-            border-top: 1px solid var(--primary-blue);
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            color: #566573;
-            justify-content: space-between;
-        }
-
+        /* 偵錯視窗 */
         #global-debug {
             position: absolute;
             bottom: 50px;
             left: 280px;
-            width: 450px;
-            height: 280px;
-            background: rgba(0, 0, 0, 0.9);
+            width: 500px;
+            height: 300px;
+            background: rgba(0, 0, 0, 0.95);
             border: 1px solid #ff4444;
             border-radius: 8px;
             display: none;
             flex-direction: column;
             z-index: 9999;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
 
         .debug-header {
@@ -207,11 +183,10 @@
         #debug-log {
             flex: 1;
             padding: 10px;
-            font-family: monospace;
+            font-family: 'Consolas', monospace;
             font-size: 11px;
             overflow-y: auto;
             color: #00ff00;
-            background: #000;
         }
     </style>
 </head>
@@ -220,26 +195,23 @@
 <div id="app-container">
     <aside id="sidebar">
         <div class="sidebar-header">AI STUDIO</div>
-        <div id="menu-list">
-            <div style="padding: 20px; color: #444; font-size: 12px;">系統載入中...</div>
-        </div>
+        <div id="menu-list"></div>
+        <div class="collapse-btn" onclick="toggleSidebar()">◀ 收起選單</div>
         
-        <div class="collapse-btn" onclick="toggleSidebar()" title="切換選單寬度">◀</div>
-
-        <div id="status-bar">
-            <span id="system-msg">核心啟動中...</span>
+        <div id="status-bar" style="height:30px; background:#141e30; font-size:11px; display:flex; align-items:center; padding:0 15px; color:#566573; justify-content:space-between; border-top:1px solid var(--primary-blue);">
+            <span id="system-msg">系統就緒</span>
             <button style="background:none; border:1px solid #444; color:#888; font-size:10px; cursor:pointer;" onclick="toggleDebug()">DEBUG</button>
         </div>
     </aside>
 
     <main id="main-viewport">
-        <iframe id="content-frame" name="tool-frame" src="about:blank"></iframe>
+        <iframe id="content-frame" src="about:blank"></iframe>
     </main>
 </div>
 
 <div id="global-debug">
     <div class="debug-header" id="debug-drag">
-        <span>SYSTEM MONITOR</span>
+        <span>CORE MONITOR</span>
         <span onclick="toggleDebug()" style="cursor:pointer;">✖</span>
     </div>
     <div id="debug-log"></div>
@@ -250,7 +222,7 @@
         const sidebar = document.getElementById('sidebar');
         const btn = document.querySelector('.collapse-btn');
         sidebar.classList.toggle('collapsed');
-        btn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        btn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀ 收起選單';
     }
 
     function toggleDebug() {
@@ -258,15 +230,13 @@
         panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
     }
 
-    // 拖移邏輯
-    (function() {
-        const win = document.getElementById("global-debug");
-        const hdr = document.getElementById("debug-drag");
-        let isDrag = false, offset = [0, 0];
-        hdr.onmousedown = (e) => { isDrag = true; offset = [win.offsetLeft - e.clientX, win.offsetTop - e.clientY]; };
-        document.onmousemove = (e) => { if (isDrag) { win.style.left = (e.clientX + offset[0]) + "px"; win.style.top = (e.clientY + offset[1]) + "px"; }};
-        document.onmouseup = () => isDrag = false;
-    })();
+    // 簡單拖移
+    const win = document.getElementById("global-debug");
+    const hdr = document.getElementById("debug-drag");
+    let isDrag = false, offset = [0, 0];
+    hdr.onmousedown = (e) => { isDrag = true; offset = [win.offsetLeft - e.clientX, win.offsetTop - e.clientY]; };
+    document.onmousemove = (e) => { if (isDrag) { win.style.left = (e.clientX + offset[0]) + "px"; win.style.top = (e.clientY + offset[1]) + "px"; }};
+    document.onmouseup = () => isDrag = false;
 </script>
 
 <script src="core/DebugSystem.js"></script>
