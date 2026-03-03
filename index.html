@@ -1,166 +1,145 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Studio | 惇陽 AI 實驗室</title>
     
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="icon" href="data:image/x-icon;base64,="> <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <style>
-        :root { 
-            --p-blue: #0f172a; 
-            --accent: #00f2ff; /* 換回您喜歡的 Cyberpunk 青色 */
-            --nav-bg: #1e293b; 
-        }
-        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; margin: 0; background: #000; display: flex; flex-direction: column; height: 100vh; overflow: hidden; color: white; }
-        
-        /* 驗證遮罩層 */
-        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--p-blue); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        
-        /* 頂部導航標籤列 */
-        nav { background: var(--nav-bg); display: flex; overflow-x: auto; border-bottom: 1px solid #334155; padding: 10px 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        nav::-webkit-scrollbar { height: 4px; } 
-        nav::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-        
-        .tab { padding: 10px 20px; cursor: pointer; border-radius: 8px; white-space: nowrap; color: #94a3b8; font-size: 14px; font-weight: bold; margin: 0 4px; transition: 0.3s; border: 1px solid transparent; }
-        .tab:hover { color: var(--accent); background: rgba(0, 242, 255, 0.1); }
-        .tab.active { background: rgba(0, 242, 255, 0.15); color: var(--accent); border: 1px solid var(--accent); }
-
-        /* 工具內容區 */
-        #content-area { flex-grow: 1; position: relative; width: 100%; background: #000; }
+        :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
+        body { background: var(--lab-bg); color: white; font-family: 'Segoe UI', Microsoft JhengHei, sans-serif; margin: 0; overflow: hidden; }
+        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; z-index: 1001; }
+        .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; letter-spacing: 1px; }
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--lab-bg); z-index: 2000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: #1e293b; padding: 40px; border-radius: 20px; border: 1px solid #334155; box-shadow: 0 25px 50px rgba(0,0,0,0.5); text-align: center; max-width: 400px; width: 90%; }
+        #main-layout { display: none; height: calc(100vh - 56px); }
+        .sidebar { width: 260px; background: var(--lab-sidebar); border-right: 1px solid #334155; overflow-y: auto; }
+        .content-area { flex-grow: 1; background: #000; position: relative; }
+        .nav-link { color: #94a3b8; padding: 12px 20px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; border-left: 4px solid transparent; cursor: pointer; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
         iframe { width: 100%; height: 100%; border: none; }
-        
-        .error-msg { color: #ff4b4b; margin-top: 15px; font-size: 14px; display: none; font-weight: bold; }
-        .user-info { margin-left: auto; padding: 0 15px; display: flex; align-items: center; font-size: 12px; color: #64748b; border-left: 1px solid #334155; }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <h2 style="letter-spacing: 2px; color: var(--accent);">AI Studio Lab</h2>
-        <p style="opacity: 0.7; font-size: 14px; margin-bottom: 30px;">惇陽設計A組內部平台 (需授權登入)</p>
-        
-        <div id="g_id_onload"
-             data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
-             data-callback="handleAuth"
-             data-auto_prompt="false">
+    <div id="auth-overlay">
+        <div class="login-box">
+            <div class="mb-3" style="font-size: 3rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
+            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
+            <p class="text-muted mb-4 small">安全性管制中，請使用授權帳號登入</p>
+            
+            <div id="g_id_onload"
+                 data-client_id="615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleCredentialResponse"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-shape="rectangular" data-theme="filled_black" data-text="signin_with" data-size="large" data-logo_alignment="left"></div>
+            
+            <div id="auth-error" class="text-danger mt-3 small" style="display:none;">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> 帳號未授權，請聯繫管理員。
+            </div>
         </div>
-        <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_black"></div>
-        <div id="err-log" class="error-msg">帳號不在授權名單內，請聯繫管理員。</div>
     </div>
 
-    <nav id="nav-tabs">
-        </nav>
+    <nav class="navbar navbar-dark px-4 d-flex justify-content-between">
+        <a class="navbar-brand m-0" href="#">
+            <i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark text-cyan border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span>
+        </a>
+        <div class="d-flex align-items-center">
+            <span id="user-display" class="me-3 small text-muted font-monospace"></span>
+            <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()" title="安全登出"><i class="bi bi-box-arrow-right"></i></button>
+        </div>
+    </nav>
 
-    <div id="content-area">
-        <iframe id="tool-frame" name="tool-frame" src=""></iframe>
+    <div id="main-layout" class="d-flex">
+        <aside class="sidebar"><div id="menu-container"></div></aside>
+        <main class="content-area"><iframe id="main-frame" name="main-frame" src="views/knowledge/tutorial.html"></iframe></main>
     </div>
 
     <script type="module">
+        import AppLoader from './core/AppLoader.js';
         import DebugSystem from './core/DebugSystem.js';
 
         let manifest = null;
 
-        /**
-         * 系統初始化：讀取 Manifest
-         */
-        async function init() {
+        // 初始化：預先載入配置
+        async function bootstrap() {
             try {
                 const response = await fetch('./manifest.json');
-                const data = await response.json();
-                manifest = data.ai_lab_config;
-                console.log("[System] 配置加載成功");
+                if (!response.ok) throw new Error("無法載入 manifest.json");
+                manifest = await response.json();
+                
+                document.getElementById('sys-version').innerText = manifest.ai_lab_config.version;
 
-                // 檢查是否已有 Session (自動登入)
+                // 檢查 Session 自動解鎖
                 if (sessionStorage.getItem('ai_lab_auth') === 'true') {
                     unlockSystem();
                 }
-            } catch (error) {
-                console.error("[System] 初始化失敗:", error);
+            } catch (e) {
+                console.error("[System] 啟動失敗:", e);
             }
         }
 
-        /**
-         * Google 登入回傳處理
-         */
-        window.handleAuth = (response) => {
-            const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            const userEmail = payload.email.toLowerCase();
+        // Google 登入回調 (掛載到 window 以供 SDK 調用)
+        window.handleCredentialResponse = async (response) => {
+            console.log("[Auth] 收到憑證，驗證中...");
             
-            // 從 manifest 獲取授權名單
-            const allowedUsers = manifest.env.ALLOWED_USERS.map(u => u.toLowerCase());
+            // 安全機制：確保 manifest 已就緒
+            if (!manifest) {
+                const res = await fetch('./manifest.json');
+                manifest = await res.json();
+            }
 
-            if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
-                sessionStorage.setItem('ai_lab_auth', 'true');
-                sessionStorage.setItem('user_email', userEmail);
-                sessionStorage.setItem('user_name', payload.name);
-                unlockSystem();
-            } else {
-                const errBox = document.getElementById('err-log');
-                errBox.style.display = 'block';
-                errBox.innerText = "未授權帳號: " + userEmail;
+            try {
+                // 解析 JWT
+                const payload = JSON.parse(atob(response.credential.split('.')[1]));
+                const userEmail = payload.email.toLowerCase();
+                
+                // 取得授權名單並轉小寫
+                const allowedUsers = (manifest.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+
+                if (allowedUsers.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
+                    sessionStorage.setItem('ai_lab_auth', 'true');
+                    sessionStorage.setItem('user_email', userEmail);
+                    sessionStorage.setItem('user_name', payload.name);
+                    unlockSystem();
+                } else {
+                    document.getElementById('auth-error').style.display = 'block';
+                    document.getElementById('auth-error').innerText = "未授權帳號: " + userEmail;
+                }
+            } catch (err) {
+                console.error("[Auth] 解析錯誤:", err);
             }
         };
 
-        /**
-         * 解鎖系統並渲染介面
-         */
         function unlockSystem() {
-            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('main-layout').style.display = 'flex';
+            document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
             
-            // 初始化選單
-            renderTabs();
-            
-            // 初始化偵錯系統
+            // 全域 Debug 系統
             window.DebugSystem = new DebugSystem();
-
-            // 預設切換到第一個工具
-            if (manifest.modules.length > 0) {
-                const firstModule = manifest.modules[0];
-                switchTool(firstModule.path, firstModule.id);
-            }
+            
+            // 渲染選單
+            const loader = new AppLoader(manifest);
+            loader.renderMenu('menu-container');
+            
+            window.DebugSystem.log("System", "歡迎進入 惇陽 AI 實驗室", "SUCCESS");
         }
 
-        /**
-         * 動態渲染標籤頁
-         */
-        function renderTabs() {
-            const nav = document.getElementById('nav-tabs');
-            nav.innerHTML = ''; // 清空
-
-            manifest.modules.forEach(mod => {
-                const tab = document.createElement('div');
-                tab.className = 'tab';
-                tab.id = `tab-${mod.id}`;
-                tab.innerHTML = `${mod.icon} ${mod.name}`;
-                tab.onclick = () => switchTool(mod.path, mod.id);
-                nav.appendChild(tab);
-            });
-
-            // 加入登出與使用者資訊
-            const info = document.createElement('div');
-            info.className = 'user-info';
-            info.innerHTML = `${sessionStorage.getItem('user_name')} | <span style="cursor:pointer; margin-left:10px; color:#ef4444;" onclick="location.reload(); sessionStorage.clear();">登出</span>`;
-            nav.appendChild(info);
-        }
-
-        /**
-         * 切換工具邏輯
-         */
-        window.switchTool = (path, id) => {
-            // 更新標籤狀態
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            const activeTab = document.getElementById(`tab-${id}`);
-            if (activeTab) activeTab.classList.add('active');
-
-            // 更新 iframe 網址
-            const frame = document.getElementById('tool-frame');
-            frame.src = path;
-            console.log(`[Navigation] 切換至: ${id} (${path})`);
+        window.logout = () => {
+            sessionStorage.clear();
+            location.reload();
         };
 
-        window.onload = init;
+        window.onload = bootstrap;
     </script>
 </body>
 </html>
