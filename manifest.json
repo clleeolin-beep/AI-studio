@@ -7,14 +7,10 @@
   "ai_lab_config": {
     "version": "2.0.0",
     "description": "模組化空間資訊編輯平台",
-    
-    "//核心配置": "定義系統啟動必備的腳本",
     "core": {
       "loader": "core/AppLoader.js",
       "debug": "core/DebugSystem.js"
     },
-
-    "//共享組件": "定義可被多個工具重複呼叫的 JS 零件",
     "components": [
       {
         "id": "MapEngine",
@@ -22,8 +18,6 @@
         "description": "3D 地圖與 WKT 解析核心"
       }
     ],
-
-    "//工具模組": "定義側邊選單載入的工具",
     "modules": [
       {
         "id": "MapEditor",
@@ -40,11 +34,60 @@
         "category": "工程工具"
       },
       {
+        "id": "NasSync",
+        "name": "NAS 自動化連動",
+        "icon": "🔗",
+        "path": "modules/AI實驗室-Github串聯NAS.html",
+        "category": "核心工具"
+      },
+      {
+        "id": "CalcEngine",
+        "name": "工程換算引擎",
+        "icon": "📐",
+        "path": "modules/calc.html",
+        "category": "工程工具"
+      },
+      {
+        "id": "GreenTool",
+        "name": "植栽選取工具",
+        "icon": "🌿",
+        "path": "modules/green.html",
+        "category": "工程工具"
+      },
+      {
+        "id": "DocAssistant",
+        "name": "公文智能助手",
+        "icon": "📝",
+        "path": "modules/doc.html",
+        "category": "工程工具"
+      },
+      {
         "id": "WeatherMonitor",
         "name": "氣象監測系統",
         "icon": "☁️",
         "path": "modules/Weather.html",
         "category": "環境數據"
+      },
+      {
+        "id": "WeatherData",
+        "name": "氣候資料工具",
+        "icon": "📅",
+        "path": "modules/WeatherData.html",
+        "category": "環境數據"
+      },
+      {
+        "id": "BusinessCardVision",
+        "name": "數位名片管理",
+        "icon": "🪪",
+        "path": "modules/BusinessCard_Vision.html",
+        "category": "環境數據"
+      },
+      {
+        "id": "Tutorial",
+        "name": "操作教學指南",
+        "icon": "📖",
+        "path": "modules/tutorial.html",
+        "category": "其他"
       }
     ]
   }
