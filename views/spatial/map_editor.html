@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="utf-8">
-    <title>圖資編輯工具 | AI Studio (Monolithic Version)</title>
+    <title>圖資編輯工具 | AI Studio (Draggable UI)</title>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.js"></script>
@@ -12,120 +12,239 @@
 
     <style>
         :root { --primary: #1A5276; --success: #27AE60; --danger: #E74C3C; --bg: #f8f9fa; }
-        html, body { width: 100%; height: 100%; margin: 0; padding: 0; display: flex; font-family: 'Microsoft JhengHei', sans-serif; overflow: hidden; background: var(--bg); }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: 'Microsoft JhengHei', sans-serif; overflow: hidden; background: #333; }
         
-        #map { flex-grow: 1; height: 100%; position: relative; }
+        /* 地圖全螢幕 */
+        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        #sidebar { width: 400px; height: 100%; background: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); z-index: 10; transition: 0.3s; }
-        
-        .header { background: var(--primary); color: white; padding: 15px; text-align: center; }
-        .header h3 { margin: 0; font-size: 18px; letter-spacing: 1px; }
-        
+        /* 繪圖控制項圖層修正 */
+        .maplibregl-ctrl-top-right { z-index: 50 !important; pointer-events: auto; }
+
+        /* 浮動面板通用樣式 */
+        .floating-panel { position: absolute; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.25); z-index: 100; display: flex; flex-direction: column; overflow: hidden; pointer-events: auto; max-height: 90vh; }
+        .panel-header { background: var(--primary); color: white; padding: 12px 15px; cursor: move; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+        .panel-header h3 { margin: 0; font-size: 15px; letter-spacing: 1px; }
+        .panel-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; }
+        .panel-body { padding: 15px; overflow-y: auto; flex-grow: 1; background: var(--bg); }
+
+        /* 面板具體設定 */
+        #list-panel { top: 20px; left: 20px; width: 360px; height: 600px; }
+        #editor-panel { top: 20px; left: 400px; width: 480px; height: 80vh; display: none; }
+        #debug-panel { bottom: 20px; right: 60px; width: 400px; height: 300px; display: none; background: #1e1e1e; color: #0f0; font-family: monospace; font-size: 12px; z-index: 9999; }
+        #debug-panel .panel-header { background: #333; }
+        #debug-panel .panel-body { background: #1e1e1e; }
+
+        /* 授權 Banner */
         #auth-banner { background: #fff3cd; color: #856404; padding: 10px; font-size: 13px; text-align: center; font-weight: bold; border-bottom: 1px solid #ffeeba; cursor: pointer; transition: 0.2s; }
-        #auth-banner:hover { background: #ffe8a1; }
         #auth-banner.authorized { background: #d4edda; color: #155724; border-bottom-color: #c3e6cb; cursor: default; }
-        
-        .search-box { padding: 15px; background: #fff; border-bottom: 1px solid #eee; }
-        .search-box input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 14px; }
-        
-        #list-view { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .list-item { background: white; margin: 8px 15px; padding: 12px; border-radius: 8px; border-left: 5px solid var(--primary); cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s; }
-        .list-item:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+
+        /* 搜尋與列表 */
+        .search-box { padding: 10px; background: #fff; border-bottom: 1px solid #eee; }
+        .search-box input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; box-sizing: border-box; font-size: 13px; }
+        .list-item { background: white; margin: 8px 0; padding: 12px; border-radius: 8px; border-left: 5px solid var(--primary); cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .list-item:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .list-title { font-size: 14px; font-weight: bold; color: #333; }
-        .list-meta { font-size: 12px; color: #777; margin-top: 5px; }
 
-        #edit-view { display: none; flex-direction: column; height: 100%; background: white; }
-        .edit-toolbar { padding: 10px 15px; background: #eee; display: flex; align-items: center; border-bottom: 1px solid #ddd; }
-        .btn-back { background: #888; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        /* 表單樣式 */
+        .form-section { background: #fff; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ddd; }
+        .form-section-title { font-size: 13px; font-weight: bold; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
+        .form-group .sub-label { font-size: 10px; color: #888; font-weight: normal; margin-left: 5px; }
+        .form-control { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 13px; }
+        .form-control[readonly] { background: #eee; }
+        textarea.form-control { min-height: 80px; font-family: monospace; font-size: 11px; resize: vertical; }
+
+        /* 核取方塊群組 */
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+        .checkbox-item { display: flex; align-items: center; font-size: 12px; }
+        .checkbox-item input { margin-right: 4px; }
         
-        .form-content { padding: 20px; flex-grow: 1; overflow-y: auto; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 12px; font-weight: bold; color: var(--primary); margin-bottom: 5px; }
-        .form-control { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 13px; background: #f9f9f9; }
-        textarea.form-control { min-height: 120px; font-family: monospace; font-size: 11px; line-height: 1.4; resize: vertical; }
-        
-        .btn-save { background: var(--success); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.2s; }
+        /* 階層分類 */
+        .cat-parent { font-weight: bold; margin-top: 8px; color: #333; font-size: 13px; border-bottom: 1px dashed #ccc; padding-bottom: 3px; }
+        .cat-children { margin-left: 15px; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+
+        /* 按鈕 */
+        .btn-save { background: var(--success); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px; }
         .btn-save:disabled { background: #ccc; cursor: not-allowed; }
-        .btn-save:hover:not(:disabled) { filter: brightness(1.1); }
 
-        .map-style-ctrl { position: absolute; top: 10px; right: 50px; z-index: 100; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
-        .map-style-ctrl select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; }
-
-        /* 地圖控制按鈕樣式 */
+        /* 地圖控制按鈕 */
+        .map-style-ctrl { position: absolute; top: 10px; right: 50px; z-index: 50; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
         .maplibregl-ctrl-pitch { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E"); background-size: 20px; background-repeat: no-repeat; background-position: center; }
+        
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); }
+        
+        /* Debug 小蟲按鈕 */
+        #debug-toggle { position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 20px; border: 2px solid #555; }
     </style>
 </head>
 <body>
 
 <div id="loading-overlay">資料處理中，請稍候...</div>
 
-<div id="sidebar">
-    <div class="header">
-        <h3>🛠️ 圖資編輯工具</h3>
+<div id="map"></div>
+
+<div class="map-style-ctrl">
+    <select id="style-selector" onchange="switchMapStyle(this.value)" style="padding:4px; font-weight:bold; border-radius:4px;">
+        <option value="osm">🗺️ 標準道路地圖</option>
+        <option value="esri">🛰️ 高解析衛星圖</option>
+    </select>
+</div>
+
+<div id="list-panel" class="floating-panel">
+    <div class="panel-header" id="list-header">
+        <h3>📂 案件搜尋與列表</h3>
     </div>
-    
     <div id="auth-banner" onclick="triggerAuth()">
-        🔒 唯讀模式：點擊此處登入 Google 授權以啟用寫入功能
+        🔒 唯讀模式：點擊登入授權以啟用編輯寫入
     </div>
-
-    <div id="list-container" style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="🔍 搜尋案號或案件簡稱..." oninput="renderList()">
-        </div>
-        <div id="list-view"></div>
+    <div class="search-box">
+        <input type="text" id="search-input" placeholder="🔍 搜尋案號、名稱、鄉鎮..." oninput="renderList()">
     </div>
+    <div class="panel-body" id="list-view"></div>
+</div>
 
-    <div id="edit-view">
-        <div class="edit-toolbar">
-            <button class="btn-back" onclick="closeEditor()">◀ 返回列表</button>
-            <span style="margin-left: 15px; font-weight: bold; font-size: 14px; color: #333;">案件編輯</span>
+<div id="editor-panel" class="floating-panel">
+    <div class="panel-header" id="editor-header">
+        <h3 id="editor-title">📝 案件編輯</h3>
+        <button class="panel-close" onclick="closeEditor()">✖</button>
+    </div>
+    <div class="panel-body">
+        
+        <div class="form-section">
+            <div class="form-section-title">基本資訊</div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;"><label>案號</label><input type="text" id="f-id" class="form-control" readonly></div>
+                <div class="form-group" style="flex: 2;"><label>案件簡稱</label><input type="text" id="f-short-name" class="form-control"></div>
+            </div>
+            <div class="form-group"><label>契約案名</label><input type="text" id="f-contract-name" class="form-control"></div>
+            <div class="form-group"><label>工程名稱</label><input type="text" id="f-eng-name" class="form-control"></div>
+            <div class="form-group"><label>業主</label><input type="text" id="f-owner" class="form-control"></div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;"><label>所在縣市</label><input type="text" id="f-city" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>所在鄉鎮市區</label><input type="text" id="f-town" class="form-control"></div>
+            </div>
+            <div class="form-group"><label>案件面積/規模</label><input type="text" id="f-scale" class="form-control"></div>
         </div>
-        <div class="form-content">
-            <div class="form-group">
-                <label>案件標識 (唯讀)</label>
-                <input type="text" id="edit-id" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label>案件簡稱 (唯讀)</label>
-                <input type="text" id="edit-name" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label>案件狀態</label>
-                <input type="text" id="edit-status" class="form-control" readonly>
-            </div>
-            <div class="form-group" style="background: #eef2f5; padding: 10px; border-radius: 6px; border: 1px solid #d1d8dd;">
-                <label style="color: #d35400;">📍 空間資料 (WKT)</label>
-                <div style="font-size:11px; color:#555; margin-bottom:8px;">請在地圖上使用右上方工具列繪製點、線、面。系統會自動彙整成標準 WKT 格式。</div>
-                <textarea id="edit-wkt" class="form-control" placeholder="WKT 座標資料..."></textarea>
-            </div>
-            <button id="btn-save" class="btn-save" disabled onclick="saveToGoogleSheet()">💾 儲存至雲端</button>
+
+        <div class="form-section" style="background: #eef2f5; border-color: #d1d8dd;">
+            <div class="form-section-title" style="color: #d35400;">📍 空間資料 (WKT)</div>
+            <div style="font-size:11px; color:#555; margin-bottom:8px;">支援多點、多線、多區塊。請使用地圖右上角工具繪製，系統將自動打包。</div>
+            <textarea id="f-wkt" class="form-control"></textarea>
         </div>
+
+        <div class="form-section">
+            <div class="form-section-title">經費與人員</div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;"><label>服務經費</label><input type="number" id="f-fee-srv" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>工程經費</label><input type="number" id="f-fee-eng" class="form-control"></div>
+            </div>
+            <div class="form-group"><label>執行組別</label><input type="text" id="f-team" class="form-control"></div>
+            <div class="form-group"><label>計畫主持人/共同主持人</label><input type="text" id="f-host" class="form-control"></div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;"><label>協同主持人</label><input type="text" id="f-co-host" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>專案經理</label><input type="text" id="f-pm" class="form-control"></div>
+            </div>
+            <div class="form-group"><label>工程會金質獎</label><input type="text" id="f-award-gold" class="form-control"></div>
+            <div class="form-group"><label>其他獲獎</label><input type="text" id="f-award-other" class="form-control"></div>
+            <div class="form-group"><label>實績照片(URL)</label><input type="text" id="f-photo" class="form-control"></div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title">時程與狀態</div>
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex: 1;"><label>案件起始日期 <span class="sub-label">(議價日起算)</span></label><input type="date" id="f-date-start" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>案件結束日期 <span class="sub-label">(勞務驗收證明書日期)</span></label><input type="date" id="f-date-end" class="form-control"></div>
+            </div>
+            <div class="form-group">
+                <label>案件狀態 (單選)</label>
+                <div class="checkbox-group" id="f-status-group">
+                    <label class="checkbox-item"><input type="radio" name="r-status" value="進行中">進行中</label>
+                    <label class="checkbox-item"><input type="radio" name="r-status" value="已結案">已結案</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>案件屬性 (複選)</label>
+                <div class="checkbox-group" id="f-attr-group">
+                    </div>
+            </div>
+            <div class="form-group">
+                <label>申請核准 (複選)</label>
+                <div class="checkbox-group" id="f-approve-group">
+                    </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-section-title">類別與類型 (階層式複選)</div>
+            <div id="f-category-tree">
+                </div>
+        </div>
+
+        <div class="form-section">
+            <div class="form-group"><label>備註</label><textarea id="f-memo" class="form-control" style="min-height: 50px;"></textarea></div>
+        </div>
+
+        <button id="btn-save" class="btn-save" disabled onclick="saveToGoogleSheet()">💾 儲存寫入雲端</button>
     </div>
 </div>
 
-<div id="map">
-    <div class="map-style-ctrl">
-        <select id="style-selector" onchange="switchMapStyle(this.value)">
-            <option value="osm">🗺️ 標準道路地圖</option>
-            <option value="esri">🛰️ 高解析衛星圖</option>
-        </select>
+<div id="debug-toggle" onclick="toggleDebug()">🐛</div>
+<div id="debug-panel" class="floating-panel">
+    <div class="panel-header" id="debug-header">
+        <h3>系統偵錯終端</h3>
+        <button class="panel-close" onclick="toggleDebug()">✖</button>
     </div>
+    <div class="panel-body" id="debug-log"></div>
 </div>
 
 <script>
+    // --- 攔截 Console 輸出至 Debug 面板 ---
+    const debugLogEl = document.getElementById('debug-log');
+    ['log', 'warn', 'error'].forEach(method => {
+        const orig = console[method];
+        console[method] = function(...args) {
+            orig.apply(console, args);
+            const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+            const color = method === 'error' ? '#ff4d4d' : method === 'warn' ? '#f39c12' : '#00ff00';
+            const time = new Date().toLocaleTimeString();
+            debugLogEl.innerHTML += `<div style="color:${color}; margin-bottom:4px; border-bottom:1px dashed #444;">[${time}] ${msg}</div>`;
+            debugLogEl.scrollTop = debugLogEl.scrollHeight;
+        };
+    });
+
     // --- 全域變數 ---
     const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
     let sheetId = "";
-    let sheetNameStr = ""; // 自動抓取第一個工作表名稱
+    let sheetNameStr = "";
     let tokenClient, accessToken = null;
     let projectData = [];
     let map, draw;
     let terrainEnabled = true;
     let currentLockedId = null;
-    let colMap = {}; // 動態欄位索引表
+    let colMap = {}; 
+    let headerRow = [];
 
-    // 地圖樣式定義
+    // --- 靜態選單定義 ---
+    const attrOptions = ['設計', '監造', '專案管理', '履約管理', '規劃', '營運'];
+    const approveOptions = ['簡易水保', '水保', '環評', '建照', '簽證', '出流', '室裝', '水權', '地質安全評估', '用水計畫', '交通影響評估'];
+    const categoryTree = {
+        "01 產業園區開發": ["01-1 產業園區開發", "01-2 產業園區更新", "01-3 產業園區擴展", "01-4 特定工廠登記", "01-5 工業區立體化申請"],
+        "02 都市計畫及都市更新": ["02-1 都市計畫通盤檢討", "02-2 都市計畫個案變更", "02-3 都市更新", "02-4 容積移轉", "02-5 合建開發評估"],
+        "03 國土計畫及非都市土地開發": ["03-1 全國縣市國土計畫", "03-2 鄉村地區整體規劃", "03-3 非都市開發變更", "03-4 非都市土地變更"],
+        "04 再生能源基地設計": ["04-1 基地設計", "04-2 競標與設計", "04-3 生態與環社檢核"],
+        "05 促參招商": ["05-1 前置作業", "05-2 營運招商", "05-3 履約管理", "05-4 經營模式評估"],
+        "06 遊憩規劃": ["06-1 風景區評鑑申請", "06-2 休閒農場", "06-3 整體規劃", "06-4 區域整合", "06-5 空間再造", "06-6 土地變更"],
+        "07 建築及土木設計": ["07-1 建築設計", "07-2 室內裝修", "07-3 選址評估", "07-4 文化建設", "07-5 土地資產活化", "07-6 交通建設", "07-7 水保水利設施"],
+        "08 景觀設計": ["08-1 公園設計", "08-2 水岸再造", "08-3 城鄉空間再造", "08-4 農村再生及生態復育", "08-5 濕地及海岸復育", "08-6 人工濕地", "08-7 登山步道"],
+        "09 主題活動場域設計": ["09-1 寵物及療癒公園", "09-2 自然形式遊戲場", "09-3 共融遊戲場", "09-4 特色主题遊戲場設計", "09-5 多功能遊戲場設計", "09-6 鄰里小型公園", "09-7 遊戲場相關計畫", "09-8 運動場及極限場域", "09-9 探索教育及合理冒險場"],
+        "10 VSCAPE越南景觀設計": ["10-1 住宅及中庭", "10-2 園區及渡假村", "10-3 越南都市開發"],
+        "11 都市設計": ["11-1 TOD人本空間", "11-2 重劃工程", "11-3 商業空間再造"],
+        "12 專案管理及全域整合": ["12-1 PCM+監造", "12-2 生命園區", "12-3 總顧問", "12-4 社區營造", "12-5 綱要計畫"],
+        "13 軍方案件": ["13-1 保密A", "13-2 保密B", "13-3 保密C", "13-4 保密D"]
+    };
+
+    // --- 地圖樣式 ---
     const terrainRGB = { "type": "raster-dem", "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], "encoding": "terrarium", "tileSize": 256 };
     const osmStyle = { 
         "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "t-rgb": terrainRGB },
@@ -136,26 +255,90 @@
         "layers": [{ "id": "esri-layer", "type": "raster", "source": "esri" }], "terrain": { "source": "t-rgb", "exaggeration": 1.5 }
     };
 
-    // --- 初始化啟動區 ---
+    // --- 系統啟動 ---
     window.onload = async () => {
-        showLoading("正在初始化系統...");
+        console.log("🚀 系統啟動...");
+        showLoading("初始化中...");
+        
+        makeDraggable(document.getElementById('list-panel'), document.getElementById('list-header'));
+        makeDraggable(document.getElementById('editor-panel'), document.getElementById('editor-header'));
+        makeDraggable(document.getElementById('debug-panel'), document.getElementById('debug-header'));
+        
+        buildCheckboxes();
         initMap();
         initGoogleAuth();
         await fetchManifestAndLoadData();
     };
 
-    function showLoading(msg) { 
-        const el = document.getElementById('loading-overlay');
-        el.innerText = msg; el.style.display = 'flex'; 
-    }
+    function showLoading(msg) { document.getElementById('loading-overlay').innerText = msg; document.getElementById('loading-overlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
+    function toggleDebug() { const p = document.getElementById('debug-panel'); p.style.display = p.style.display === 'none' ? 'flex' : 'none'; }
+
+    // --- 拖曳面板共用函數 ---
+    function makeDraggable(element, handle) {
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        handle.onmousedown = (e) => {
+            if(e.target.tagName === 'BUTTON') return;
+            e.preventDefault();
+            pos3 = e.clientX; pos4 = e.clientY;
+            document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
+            document.onmousemove = (e) => {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY;
+                pos3 = e.clientX; pos4 = e.clientY;
+                element.style.top = (element.offsetTop - pos2) + "px";
+                element.style.left = (element.offsetLeft - pos1) + "px";
+            };
+            document.querySelectorAll('.floating-panel').forEach(p => p.style.zIndex = 100);
+            element.style.zIndex = 101;
+        };
+    }
+
+    // --- 構建動態 Checkbox UI ---
+    function buildCheckboxes() {
+        // 屬性與核准
+        const attrHtml = attrOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-attr" value="${o}">${o}</label>`).join('');
+        document.getElementById('f-attr-group').innerHTML = attrHtml;
+        const appHtml = approveOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-approve" value="${o}">${o}</label>`).join('');
+        document.getElementById('f-approve-group').innerHTML = appHtml;
+
+        // 階層式類別
+        const treeEl = document.getElementById('f-category-tree');
+        let treeHtml = '';
+        Object.keys(categoryTree).forEach(parent => {
+            treeHtml += `
+                <div class="cat-parent">
+                    <label class="checkbox-item"><input type="checkbox" name="chk-cat-parent" value="${parent}">${parent}</label>
+                </div>
+                <div class="cat-children">
+                    ${categoryTree[parent].map(child => `<label class="checkbox-item"><input type="checkbox" name="chk-cat-child" value="${child}">${child}</label>`).join('')}
+                </div>
+            `;
+        });
+        treeEl.innerHTML = treeHtml;
+
+        // 綁定父子連動
+        document.querySelectorAll('input[name="chk-cat-parent"]').forEach(p => {
+            p.addEventListener('change', function() {
+                const children = this.parentElement.parentElement.nextElementSibling.querySelectorAll('input');
+                children.forEach(c => c.checked = this.checked);
+            });
+        });
+        document.querySelectorAll('input[name="chk-cat-child"]').forEach(c => {
+            c.addEventListener('change', function() {
+                if(this.checked) {
+                    const parent = this.parentElement.parentElement.previousElementSibling.querySelector('input');
+                    parent.checked = true;
+                }
+            });
+        });
+    }
 
     // --- 1. 地圖與繪圖核心 ---
     function initMap() {
         map = new maplibregl.Map({ container: 'map', style: osmStyle, center: [121.0, 23.8], zoom: 7, pitch: 45 });
         map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-        // 注入自定義控制按鈕 (2D 投影 / 3D 地形)
         setTimeout(() => {
             const navGroup = document.querySelector('.maplibregl-ctrl-group');
             if (navGroup) {
@@ -167,25 +350,18 @@
 
                 const terrainBtn = document.createElement('button');
                 terrainBtn.className = 'maplibregl-ctrl-icon';
-                terrainBtn.title = '開啟/關閉立體地形';
+                terrainBtn.title = '切換 3D 地形';
                 terrainBtn.innerHTML = '⛰️';
                 terrainBtn.style.fontSize = '16px';
-                terrainBtn.style.background = '#eee';
                 terrainBtn.onclick = () => {
                     terrainEnabled = !terrainEnabled;
-                    if (terrainEnabled) {
-                        map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
-                        terrainBtn.style.background = '#eee';
-                    } else {
-                        map.setTerrain(null);
-                        terrainBtn.style.background = '#fff';
-                    }
+                    if (terrainEnabled) map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
+                    else map.setTerrain(null);
                 };
                 navGroup.appendChild(terrainBtn);
             }
         }, 500);
 
-        // 初始化 MapboxDraw
         draw = new MapboxDraw({
             displayControlsDefault: false,
             controls: { polygon: true, line_string: true, point: true, trash: true },
@@ -197,24 +373,19 @@
         });
         map.addControl(draw, 'top-right');
 
-        // 綁定繪圖事件以同步 WKT
         map.on('draw.create', syncDrawToWKT);
         map.on('draw.update', syncDrawToWKT);
         map.on('draw.delete', syncDrawToWKT);
 
-        // 監聽手動編輯 WKT 欄位
-        document.getElementById('edit-wkt').addEventListener('input', function() {
+        document.getElementById('f-wkt').addEventListener('input', function() {
             try {
                 const geo = wellknown.parse(this.value.trim());
                 if(geo) {
                     draw.deleteAll();
-                    if(geo.type === "GeometryCollection") {
-                        geo.geometries.forEach(g => draw.add(g));
-                    } else {
-                        draw.add(geo);
-                    }
+                    if(geo.type === "GeometryCollection") geo.geometries.forEach(g => draw.add(g));
+                    else draw.add(geo);
                 }
-            } catch(e) { /* 解析失敗時忽略，直到輸入完整 */ }
+            } catch(e) {}
         });
     }
 
@@ -226,42 +397,34 @@
         });
     }
 
-    // --- 2. Google API 與權限機制 ---
+    // --- 2. Google 授權與讀取 ---
     function initGoogleAuth() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: 'https://www.googleapis.com/auth/spreadsheets',
             callback: (resp) => { 
                 accessToken = resp.access_token; 
-                enableEditMode();
+                const banner = document.getElementById('auth-banner');
+                banner.className = 'authorized';
+                banner.innerHTML = '🟢 授權成功：您已具備儲存寫入權限';
+                document.getElementById('btn-save').disabled = false;
+                console.log("授權成功 Token 已取得");
             }
         });
     }
+    function triggerAuth() { if (!accessToken) tokenClient.requestAccessToken(); }
 
-    function triggerAuth() {
-        if (!accessToken) tokenClient.requestAccessToken();
-    }
-
-    function enableEditMode() {
-        const banner = document.getElementById('auth-banner');
-        banner.className = 'authorized';
-        banner.innerHTML = '🟢 已連線至雲端 (具備編輯與寫入權限)';
-        document.getElementById('btn-save').disabled = false;
-        alert("授權成功！您現在可以儲存修改至雲端。");
-    }
-
-    // --- 3. 資料讀取與動態欄位解析 ---
     async function fetchManifestAndLoadData() {
         try {
             const resp = await fetch('../../manifest.json');
             const manifest = await resp.json();
             sheetId = manifest.ai_lab_config.env.SHEET_CASES;
-            if(!sheetId) throw new Error("Manifest 缺少 SHEET_CASES 配置");
+            if(!sheetId) throw new Error("Manifest 缺少 SHEET_CASES");
             
             await loadSheetDataGviz();
         } catch (error) {
             console.error(error);
-            alert("讀取配置失敗，請確認網路連線或 manifest.json。");
+            alert("讀取配置失敗！");
             hideLoading();
         }
     }
@@ -270,91 +433,131 @@
         return new Promise((resolve) => {
             window.gvizCallback = (json) => {
                 if (json && json.table) {
-                    const rows = json.table.rows;
-                    const cols = json.table.cols;
+                    headerRow = json.table.cols.map(c => c.label || "");
                     
-                    // 動態建立欄位索引對照表
-                    cols.forEach((c, idx) => {
-                        if(!c || !c.label) return;
-                        const label = c.label.toLowerCase();
-                        if (label.includes("案號")) colMap.id = idx;
-                        else if (label.includes("簡稱") || label.includes("契約")) colMap.name = idx;
-                        else if (label.includes("座標")) colMap.wkt = idx;
-                        else if (label.includes("狀態")) colMap.status = idx;
-                    });
+                    // 動態欄位綁定 (模糊比對)
+                    const getIdx = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
+                    colMap = {
+                        id: getIdx(['案號']), wkt: getIdx(['座標']), name: getIdx(['案件簡稱']),
+                        contract: getIdx(['契約案名']), eng: getIdx(['工程名稱']), owner: getIdx(['業主']),
+                        city: getIdx(['縣市']), town: getIdx(['鄉鎮市區']), scale: getIdx(['面積','規模']),
+                        feeSrv: getIdx(['服務經費']), feeEng: getIdx(['工程經費']), photo: getIdx(['實績照片']),
+                        cat: getIdx(['類別']), type: getIdx(['類型']), attr: getIdx(['案件屬性']),
+                        gold: getIdx(['金質獎']), otherAward: getIdx(['其他獲獎']), team: getIdx(['執行組別']),
+                        host: getIdx(['計畫主持','共同主持']), coHost: getIdx(['協同主持']), pm: getIdx(['專案經理']),
+                        approve: getIdx(['申請核准']), dateStart: getIdx(['起始日期']), dateEnd: getIdx(['結束日期']),
+                        status: getIdx(['案件狀態']), memo: getIdx(['備註'])
+                    };
 
-                    // 容錯：若沒抓到表頭，給予預設值
-                    if(colMap.id === undefined) colMap.id = 0;
-                    if(colMap.wkt === undefined) colMap.wkt = 1;
-                    if(colMap.name === undefined) colMap.name = 2;
+                    projectData = json.table.rows.map(r => {
+                        const vals = headerRow.map((_, i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "");
+                        return { id: String(vals[colMap.id] || "").trim(), _raw: vals };
+                    }).filter(p => p.id);
 
-                    projectData = [];
-                    rows.forEach(r => {
-                        const getV = (i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "";
-                        const pId = String(getV(colMap.id)).trim();
-                        if (!pId) return;
-
-                        projectData.push({
-                            id: pId,
-                            name: getV(colMap.name),
-                            wkt: getV(colMap.wkt),
-                            status: getV(colMap.status) || "未定義"
-                        });
-                    });
                     renderList();
+                    console.log(`成功載入 ${projectData.length} 筆案件`);
                 }
                 hideLoading();
                 resolve();
             };
-
             const s = document.createElement('script');
-            // gviz 會自動回傳第一個有資料的 Sheet
             s.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=responseHandler:gvizCallback`;
             document.body.appendChild(s);
         });
     }
 
-    // --- 4. 列表與編輯介面互動 ---
+    // --- 3. UI 互動與表單填寫 ---
     function renderList() {
         const kw = document.getElementById('search-input').value.toLowerCase();
         const list = document.getElementById('list-view');
         list.innerHTML = "";
 
-        const filtered = projectData.filter(p => !kw || p.id.toLowerCase().includes(kw) || p.name.toLowerCase().includes(kw));
+        const filtered = projectData.filter(p => {
+            const name = p._raw[colMap.name] || "";
+            const town = p._raw[colMap.town] || "";
+            return !kw || p.id.toLowerCase().includes(kw) || name.toLowerCase().includes(kw) || town.toLowerCase().includes(kw);
+        });
         
         filtered.forEach(p => {
+            const name = p._raw[colMap.name] || "--";
+            const wkt = p._raw[colMap.wkt] || "";
             const div = document.createElement('div');
             div.className = 'list-item';
-            div.innerHTML = `
-                <div class="list-title">${p.id}</div>
-                <div class="list-meta">${p.name} | ${p.status}</div>
-                ${p.wkt && p.wkt !== '--' && p.wkt.includes('(') ? '<div style="font-size:10px; color:#27AE60; margin-top:4px;">📍 具備空間資料</div>' : '<div style="font-size:10px; color:#E74C3C; margin-top:4px;">⚪ 尚未定位</div>'}
-            `;
+            div.innerHTML = `<div class="list-title">${p.id}</div><div style="font-size:12px; color:#666; margin-top:4px;">${name}</div>
+                             ${wkt.includes('(') ? '<div style="font-size:10px; color:#27AE60; margin-top:4px;">📍 已定位</div>' : '<div style="font-size:10px; color:#E74C3C; margin-top:4px;">⚪ 未定位</div>'}`;
             div.onclick = () => openEditor(p);
             list.appendChild(div);
         });
     }
 
+    // 解析 Google YYYY/MM/DD 等日期為 YYYY-MM-DD 給 <input type="date">
+    function parseDateForInput(dStr) {
+        if(!dStr) return "";
+        const parts = dStr.split(/[\/\-]/);
+        if(parts.length === 3) {
+            return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
+        }
+        return "";
+    }
+
+    // 解析帶有 # 的自訂勾選字串
+    function checkOptions(selector, valStr) {
+        document.querySelectorAll(selector).forEach(c => c.checked = false);
+        if(!valStr) return;
+        document.querySelectorAll(selector).forEach(c => {
+            if(valStr.includes(c.value)) c.checked = true;
+        });
+    }
+
     function openEditor(p) {
         currentLockedId = p.id;
-        document.getElementById('list-container').style.display = 'none';
-        document.getElementById('edit-view').style.display = 'flex';
+        document.getElementById('editor-panel').style.display = 'flex';
+        document.getElementById('editor-title').innerText = `📝 案件編輯 - ${p.id}`;
         
-        document.getElementById('edit-id').value = p.id;
-        document.getElementById('edit-name').value = p.name;
-        document.getElementById('edit-status').value = p.status;
-        document.getElementById('edit-wkt').value = p.wkt;
+        const r = p._raw;
+        document.getElementById('f-id').value = p.id;
+        document.getElementById('f-wkt').value = r[colMap.wkt] || "";
+        document.getElementById('f-short-name').value = r[colMap.name] || "";
+        document.getElementById('f-contract-name').value = r[colMap.contract] || "";
+        document.getElementById('f-eng-name').value = r[colMap.eng] || "";
+        document.getElementById('f-owner').value = r[colMap.owner] || "";
+        document.getElementById('f-city').value = r[colMap.city] || "";
+        document.getElementById('f-town').value = r[colMap.town] || "";
+        document.getElementById('f-scale').value = r[colMap.scale] || "";
+        document.getElementById('f-fee-srv').value = r[colMap.feeSrv] ? r[colMap.feeSrv].replace(/,/g, '') : "";
+        document.getElementById('f-fee-eng').value = r[colMap.feeEng] ? r[colMap.feeEng].replace(/,/g, '') : "";
+        document.getElementById('f-team').value = r[colMap.team] || "";
+        document.getElementById('f-host').value = r[colMap.host] || "";
+        document.getElementById('f-co-host').value = r[colMap.coHost] || "";
+        document.getElementById('f-pm').value = r[colMap.pm] || "";
+        document.getElementById('f-award-gold').value = r[colMap.gold] || "";
+        document.getElementById('f-award-other').value = r[colMap.otherAward] || "";
+        document.getElementById('f-photo').value = r[colMap.photo] || "";
+        document.getElementById('f-memo').value = r[colMap.memo] || "";
+        
+        document.getElementById('f-date-start').value = parseDateForInput(r[colMap.dateStart]);
+        document.getElementById('f-date-end').value = parseDateForInput(r[colMap.dateEnd]);
+
+        // 狀態單選
+        const status = r[colMap.status] || "";
+        document.querySelectorAll('input[name="r-status"]').forEach(r => r.checked = (r.value === status));
+
+        // 複選填入
+        checkOptions('input[name="chk-attr"]', r[colMap.attr]);
+        checkOptions('input[name="chk-approve"]', r[colMap.approve]);
+        checkOptions('input[name="chk-cat-parent"]', r[colMap.cat]);
+        checkOptions('input[name="chk-cat-child"]', r[colMap.type]);
 
         // 地圖處理
         draw.deleteAll();
-        if (p.wkt && p.wkt.includes('(')) {
+        const wktStr = r[colMap.wkt] || "";
+        if (wktStr.includes('(')) {
             try {
-                const geo = wellknown.parse(p.wkt.trim());
+                const geo = wellknown.parse(wktStr.trim());
                 if (geo) {
                     if (geo.type === "GeometryCollection") geo.geometries.forEach(g => draw.add(g));
                     else draw.add(geo);
                     
-                    // 自動飛梭至幾何中心
                     let center = null;
                     if(geo.type==="Point") center = geo.coordinates;
                     else if(geo.type==="LineString") center = geo.coordinates[0];
@@ -372,90 +575,100 @@
     function closeEditor() {
         currentLockedId = null;
         draw.deleteAll();
-        document.getElementById('edit-view').style.display = 'none';
-        document.getElementById('list-container').style.display = 'flex';
+        document.getElementById('editor-panel').style.display = 'none';
     }
 
-    // --- 5. 多維幾何轉換與寫入機制 ---
     function syncDrawToWKT() {
         const data = draw.getAll();
-        const textarea = document.getElementById('edit-wkt');
-        if (data.features.length === 0) {
-            textarea.value = "";
-            return;
-        }
-        
-        let wkt = "";
-        if (data.features.length === 1) {
-            wkt = wellknown.stringify(data.features[0].geometry);
-        } else {
-            // 打包成 GEOMETRYCOLLECTION 以支援多點/線/面共存
-            const gc = { type: 'GeometryCollection', geometries: data.features.map(f => f.geometry) };
-            wkt = wellknown.stringify(gc);
-        }
+        const textarea = document.getElementById('f-wkt');
+        if (data.features.length === 0) { textarea.value = ""; return; }
+        let wkt = data.features.length === 1 ? 
+            wellknown.stringify(data.features[0].geometry) : 
+            wellknown.stringify({ type: 'GeometryCollection', geometries: data.features.map(f => f.geometry) });
         textarea.value = wkt;
     }
 
-    // 將純數字索引轉為 Excel 欄位字母 (ex: 0->A, 1->B)
-    function getColumnLetter(idx) {
-        let temp, letter = '';
-        while (idx >= 0) {
-            temp = idx % 26;
-            letter = String.fromCharCode(temp + 65) + letter;
-            idx = (idx - temp - 1) / 26;
-        }
-        return letter;
+    // --- 4. 儲存機制 (全列寫入) ---
+    function getCheckedVals(selector, prefix = '') {
+        const checked = Array.from(document.querySelectorAll(selector + ':checked')).map(el => prefix + el.value);
+        return checked.join(', ');
+    }
+
+    function formatDateForSheet(dStr) {
+        if(!dStr) return "";
+        return dStr.replace(/-/g, '/'); // 將 YYYY-MM-DD 轉為 YYYY/MM/DD
     }
 
     async function saveToGoogleSheet() {
         if (!accessToken) { triggerAuth(); return; }
-        const newWkt = document.getElementById('edit-wkt').value.trim();
         if (!currentLockedId) return;
 
-        showLoading("正在精確定位並更新雲端資料...");
+        showLoading("正在整列更新雲端資料...");
         
         try {
-            // 1. 透過 Sheets API 抓取完整資料，以取得絕對的 Row 與 Column
-            // 由於不知道具體 Sheet Name，先呼叫 API 取得第一個 Sheet 的名稱
-            const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            // 抓取 Sheet Name
+            const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const metaData = await metaRes.json();
             sheetNameStr = metaData.sheets[0].properties.title;
 
-            const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetNameStr}!A1:ZZ`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-            });
+            // 尋找目標 Row Index
+            const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetNameStr}!A1:Z`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const data = await res.json();
             const rows = data.values;
-            if(!rows || rows.length < 1) throw new Error("雲端資料表為空");
-
-            const headers = rows[0];
-            const colWktIdx = headers.findIndex(h => /座標/i.test(h));
-            const colIdIdx = headers.findIndex(h => /案號/i.test(h));
-            
-            if(colWktIdx === -1 || colIdIdx === -1) throw new Error("表頭找不到『座標』或『案號』欄位");
-            
-            // 尋找目標 Row (Row Index = 陣列索引 + 1)
-            const rowIdx = rows.findIndex(r => String(r[colIdIdx]).trim() === currentLockedId);
+            const rowIdx = rows.findIndex(r => String(r[colMap.id]).trim() === currentLockedId);
             if(rowIdx === -1) throw new Error(`雲端找不到案號: ${currentLockedId}`);
 
-            const colLetter = getColumnLetter(colWktIdx);
-            const targetRange = `${sheetNameStr}!${colLetter}${rowIdx + 1}`;
+            // 組合新陣列 (補齊長度)
+            let newRowData = [...rows[rowIdx]];
+            while(newRowData.length < headerRow.length) newRowData.push("");
 
-            // 2. PUT 單一儲存格更新
+            const setV = (key, val) => { if(colMap[key] !== -1 && colMap[key] !== undefined) newRowData[colMap[key]] = val; };
+
+            setV('wkt', document.getElementById('f-wkt').value.trim());
+            setV('name', document.getElementById('f-short-name').value);
+            setV('contract', document.getElementById('f-contract-name').value);
+            setV('eng', document.getElementById('f-eng-name').value);
+            setV('owner', document.getElementById('f-owner').value);
+            setV('city', document.getElementById('f-city').value);
+            setV('town', document.getElementById('f-town').value);
+            setV('scale', document.getElementById('f-scale').value);
+            setV('feeSrv', document.getElementById('f-fee-srv').value);
+            setV('feeEng', document.getElementById('f-fee-eng').value);
+            setV('team', document.getElementById('f-team').value);
+            setV('host', document.getElementById('f-host').value);
+            setV('coHost', document.getElementById('f-co-host').value);
+            setV('pm', document.getElementById('f-pm').value);
+            setV('gold', document.getElementById('f-award-gold').value);
+            setV('otherAward', document.getElementById('f-award-other').value);
+            setV('photo', document.getElementById('f-photo').value);
+            setV('memo', document.getElementById('f-memo').value);
+            setV('dateStart', formatDateForSheet(document.getElementById('f-date-start').value));
+            setV('dateEnd', formatDateForSheet(document.getElementById('f-date-end').value));
+            
+            const checkedStatus = document.querySelector('input[name="r-status"]:checked');
+            setV('status', checkedStatus ? checkedStatus.value : "");
+            
+            setV('attr', getCheckedVals('input[name="chk-attr"]'));
+            setV('approve', getCheckedVals('input[name="chk-approve"]'));
+            setV('cat', getCheckedVals('input[name="chk-cat-parent"]', '#'));
+            setV('type', getCheckedVals('input[name="chk-cat-child"]', '#'));
+
+            // 執行 API 更新 (整列)
+            const targetRange = `${sheetNameStr}!A${rowIdx + 1}`;
             const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${targetRange}?valueInputOption=USER_ENTERED`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ values: [[newWkt]] })
+                body: JSON.stringify({ values: [newRowData] })
             });
 
             if(updateRes.ok) {
-                alert("✅ 座標已成功寫入雲端 Google Sheet！");
-                // 更新本地記憶體
+                console.log("✅ 案件更新成功:", currentLockedId);
+                alert("✅ 儲存成功！");
+                
+                // 更新本地記憶體，避免重整
                 const proj = projectData.find(p => p.id === currentLockedId);
-                if(proj) proj.wkt = newWkt;
-                renderList(); 
+                if(proj) proj._raw = newRowData;
+                renderList();
             } else {
                 const errJson = await updateRes.json();
                 throw new Error(errJson.error.message);
