@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="utf-8">
-    <title>圖資編輯工具 | AI Studio (Draggable UI)</title>
+    <title>圖資編輯工具 | AI Studio (Ultimate Draggable Version)</title>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.js"></script>
@@ -16,9 +16,6 @@
         
         /* 地圖全螢幕 */
         #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        
-        /* 繪圖控制項圖層修正 */
-        .maplibregl-ctrl-top-right { z-index: 50 !important; pointer-events: auto; }
 
         /* 浮動面板通用樣式 */
         .floating-panel { position: absolute; background: #fff; border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.25); z-index: 100; display: flex; flex-direction: column; overflow: hidden; pointer-events: auto; max-height: 90vh; }
@@ -27,12 +24,18 @@
         .panel-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; }
         .panel-body { padding: 15px; overflow-y: auto; flex-grow: 1; background: var(--bg); }
 
-        /* 面板具體設定 */
+        /* 各別面板設定 */
         #list-panel { top: 20px; left: 20px; width: 360px; height: 600px; }
-        #editor-panel { top: 20px; left: 400px; width: 480px; height: 80vh; display: none; }
-        #debug-panel { bottom: 20px; right: 60px; width: 400px; height: 300px; display: none; background: #1e1e1e; color: #0f0; font-family: monospace; font-size: 12px; z-index: 9999; }
+        #editor-panel { top: 20px; left: 400px; width: 480px; height: 85vh; display: none; }
+        #draw-panel { top: 20px; right: 20px; width: 140px; display: none; }
+        
+        #debug-panel { bottom: 20px; left: 20px; width: 400px; height: 300px; display: none; background: #1e1e1e; color: #0f0; font-family: monospace; font-size: 12px; z-index: 9999; }
         #debug-panel .panel-header { background: #333; }
         #debug-panel .panel-body { background: #1e1e1e; }
+
+        /* 繪圖工具按鈕 */
+        .btn-draw { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 6px; background: #fff; cursor: pointer; font-weight: bold; transition: 0.2s; text-align: left; }
+        .btn-draw:hover { background: #eee; transform: translateY(-1px); }
 
         /* 授權 Banner */
         #auth-banner { background: #fff3cd; color: #856404; padding: 10px; font-size: 13px; text-align: center; font-weight: bold; border-bottom: 1px solid #ffeeba; cursor: pointer; transition: 0.2s; }
@@ -69,18 +72,20 @@
         .btn-save:disabled { background: #ccc; cursor: not-allowed; }
 
         /* 地圖控制按鈕 */
-        .map-style-ctrl { position: absolute; top: 10px; right: 50px; z-index: 50; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
+        .map-style-ctrl { position: absolute; bottom: 20px; right: 20px; z-index: 50; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
         .maplibregl-ctrl-pitch { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E"); background-size: 20px; background-repeat: no-repeat; background-position: center; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
         
         /* Debug 小蟲按鈕 */
-        #debug-toggle { position: absolute; bottom: 20px; right: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 20px; border: 2px solid #555; }
+        #debug-toggle { position: absolute; bottom: 80px; right: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 20px; border: 2px solid #555; }
     </style>
 </head>
 <body>
 
-<div id="loading-overlay">資料處理中，請稍候...</div>
+<div id="loading-overlay">
+    <div id="loading-text">資料處理中，請稍候...</div>
+</div>
 
 <div id="map"></div>
 
@@ -96,12 +101,12 @@
         <h3>📂 案件搜尋與列表</h3>
     </div>
     <div id="auth-banner" onclick="triggerAuth()">
-        🔒 唯讀模式：點擊登入授權以啟用編輯寫入
+        🔒 唯讀模式：點擊登入授權以啟用編輯、上傳與寫入
     </div>
     <div class="search-box">
         <input type="text" id="search-input" placeholder="🔍 搜尋案號、名稱、鄉鎮..." oninput="renderList()">
     </div>
-    <div class="panel-body" id="list-view"></div>
+    <div class="panel-body" id="list-view" style="padding: 10px;"></div>
 </div>
 
 <div id="editor-panel" class="floating-panel">
@@ -129,7 +134,7 @@
 
         <div class="form-section" style="background: #eef2f5; border-color: #d1d8dd;">
             <div class="form-section-title" style="color: #d35400;">📍 空間資料 (WKT)</div>
-            <div style="font-size:11px; color:#555; margin-bottom:8px;">支援多點、多線、多區塊。請使用地圖右上角工具繪製，系統將自動打包。</div>
+            <div style="font-size:11px; color:#555; margin-bottom:8px;">支援多點、多線、多區塊。請使用「繪圖工具面板」繪製，系統將自動打包為集合。</div>
             <textarea id="f-wkt" class="form-control"></textarea>
         </div>
 
@@ -147,7 +152,17 @@
             </div>
             <div class="form-group"><label>工程會金質獎</label><input type="text" id="f-award-gold" class="form-control"></div>
             <div class="form-group"><label>其他獲獎</label><input type="text" id="f-award-other" class="form-control"></div>
-            <div class="form-group"><label>實績照片(URL)</label><input type="text" id="f-photo" class="form-control"></div>
+            
+            <div class="form-group" style="background: #fdf2e9; padding: 10px; border-radius: 6px; border: 1px solid #fae5d3;">
+                <label style="color: #d35400;">📸 實績照片 (雲端上傳)</label>
+                <div style="font-size:11px; color:#666; margin-bottom:5px;">單案限制最多 6 張。系統將自動命名並上傳至指定 Drive 資料夾。</div>
+                <input type="text" id="f-photo" class="form-control" placeholder='["url1", "url2"]' readonly style="background:#fff; margin-bottom: 5px;">
+                <div style="display: flex; gap: 5px;">
+                    <input type="file" id="photo-upload" multiple accept="image/*" class="form-control" style="flex: 1; padding: 5px;">
+                    <button class="btn-save" style="width: auto; padding: 5px 10px; font-size:13px;" onclick="handlePhotoUpload()">⇧ 上傳</button>
+                    <button class="btn-save" style="width: auto; padding: 5px 10px; font-size:13px; background:#e74c3c;" onclick="clearPhotos()">清除</button>
+                </div>
+            </div>
         </div>
 
         <div class="form-section">
@@ -165,20 +180,17 @@
             </div>
             <div class="form-group">
                 <label>案件屬性 (複選)</label>
-                <div class="checkbox-group" id="f-attr-group">
-                    </div>
+                <div class="checkbox-group" id="f-attr-group"></div>
             </div>
             <div class="form-group">
                 <label>申請核准 (複選)</label>
-                <div class="checkbox-group" id="f-approve-group">
-                    </div>
+                <div class="checkbox-group" id="f-approve-group"></div>
             </div>
         </div>
 
         <div class="form-section">
             <div class="form-section-title">類別與類型 (階層式複選)</div>
-            <div id="f-category-tree">
-                </div>
+            <div id="f-category-tree"></div>
         </div>
 
         <div class="form-section">
@@ -189,7 +201,19 @@
     </div>
 </div>
 
-<div id="debug-toggle" onclick="toggleDebug()">🐛</div>
+<div id="draw-panel" class="floating-panel">
+    <div class="panel-header" id="draw-header">
+        <h3 style="font-size:13px;">🖍️ 繪圖工具</h3>
+    </div>
+    <div class="panel-body" style="padding: 10px;">
+        <button class="btn-draw" onclick="draw.changeMode('draw_point')">📍 畫點 (Point)</button>
+        <button class="btn-draw" onclick="draw.changeMode('draw_line_string')">〰️ 畫線 (Line)</button>
+        <button class="btn-draw" onclick="draw.changeMode('draw_polygon')">🛑 畫區塊 (Polygon)</button>
+        <button class="btn-draw" style="background:#ffecec; color:#c0392b; border-color:#e74c3c; margin-top:10px;" onclick="draw.trash()">🗑️ 刪除選取圖形</button>
+    </div>
+</div>
+
+<div id="debug-toggle" onclick="toggleDebug()" title="開啟偵錯終端">🐛</div>
 <div id="debug-panel" class="floating-panel">
     <div class="panel-header" id="debug-header">
         <h3>系統偵錯終端</h3>
@@ -215,6 +239,7 @@
 
     // --- 全域變數 ---
     const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
+    const DRIVE_FOLDER_ID = '1KyolmR0PGxRTbMzo8eicyMrO2jNOVYU5'; // 指定上傳的資料夾
     let sheetId = "";
     let sheetNameStr = "";
     let tokenClient, accessToken = null;
@@ -260,8 +285,10 @@
         console.log("🚀 系統啟動...");
         showLoading("初始化中...");
         
+        // 綁定所有浮動面板
         makeDraggable(document.getElementById('list-panel'), document.getElementById('list-header'));
         makeDraggable(document.getElementById('editor-panel'), document.getElementById('editor-header'));
+        makeDraggable(document.getElementById('draw-panel'), document.getElementById('draw-header'));
         makeDraggable(document.getElementById('debug-panel'), document.getElementById('debug-header'));
         
         buildCheckboxes();
@@ -270,7 +297,7 @@
         await fetchManifestAndLoadData();
     };
 
-    function showLoading(msg) { document.getElementById('loading-overlay').innerText = msg; document.getElementById('loading-overlay').style.display = 'flex'; }
+    function showLoading(msg) { document.getElementById('loading-text').innerText = msg; document.getElementById('loading-overlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loading-overlay').style.display = 'none'; }
     function toggleDebug() { const p = document.getElementById('debug-panel'); p.style.display = p.style.display === 'none' ? 'flex' : 'none'; }
 
@@ -289,6 +316,7 @@
                 element.style.top = (element.offsetTop - pos2) + "px";
                 element.style.left = (element.offsetLeft - pos1) + "px";
             };
+            // 點擊置頂
             document.querySelectorAll('.floating-panel').forEach(p => p.style.zIndex = 100);
             element.style.zIndex = 101;
         };
@@ -296,14 +324,9 @@
 
     // --- 構建動態 Checkbox UI ---
     function buildCheckboxes() {
-        // 屬性與核准
-        const attrHtml = attrOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-attr" value="${o}">${o}</label>`).join('');
-        document.getElementById('f-attr-group').innerHTML = attrHtml;
-        const appHtml = approveOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-approve" value="${o}">${o}</label>`).join('');
-        document.getElementById('f-approve-group').innerHTML = appHtml;
+        document.getElementById('f-attr-group').innerHTML = attrOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-attr" value="${o}">${o}</label>`).join('');
+        document.getElementById('f-approve-group').innerHTML = approveOptions.map(o => `<label class="checkbox-item"><input type="checkbox" name="chk-approve" value="${o}">${o}</label>`).join('');
 
-        // 階層式類別
-        const treeEl = document.getElementById('f-category-tree');
         let treeHtml = '';
         Object.keys(categoryTree).forEach(parent => {
             treeHtml += `
@@ -315,7 +338,7 @@
                 </div>
             `;
         });
-        treeEl.innerHTML = treeHtml;
+        document.getElementById('f-category-tree').innerHTML = treeHtml;
 
         // 綁定父子連動
         document.querySelectorAll('input[name="chk-cat-parent"]').forEach(p => {
@@ -337,7 +360,7 @@
     // --- 1. 地圖與繪圖核心 ---
     function initMap() {
         map = new maplibregl.Map({ container: 'map', style: osmStyle, center: [121.0, 23.8], zoom: 7, pitch: 45 });
-        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+        map.addControl(new maplibregl.NavigationControl(), 'top-left'); // 移到左邊避免跟視窗衝突
 
         setTimeout(() => {
             const navGroup = document.querySelector('.maplibregl-ctrl-group');
@@ -362,16 +385,16 @@
             }
         }, 500);
 
+        // 初始化但不顯示原生按鈕
         draw = new MapboxDraw({
             displayControlsDefault: false,
-            controls: { polygon: true, line_string: true, point: true, trash: true },
             styles: [
                 { "id": "gl-draw-polygon-fill", "type": "fill", "filter": ["==", "$type", "Polygon"], "paint": { "fill-color": "#27AE60", "fill-opacity": 0.4 }},
                 { "id": "gl-draw-line", "type": "line", "filter": ["==", "$type", "LineString"], "paint": { "line-color": "#F1C40F", "line-width": 4 }},
                 { "id": "gl-draw-point", "type": "circle", "filter": ["==", "$type", "Point"], "paint": { "circle-radius": 7, "circle-color": "#E74C3C", "circle-stroke-width": 2, "circle-stroke-color": "#fff" }}
             ]
         });
-        map.addControl(draw, 'top-right');
+        map.addControl(draw);
 
         map.on('draw.create', syncDrawToWKT);
         map.on('draw.update', syncDrawToWKT);
@@ -397,18 +420,18 @@
         });
     }
 
-    // --- 2. Google 授權與讀取 ---
+    // --- 2. Google OAuth (Sheets + Drive) ---
     function initGoogleAuth() {
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/spreadsheets',
+            scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
             callback: (resp) => { 
                 accessToken = resp.access_token; 
                 const banner = document.getElementById('auth-banner');
                 banner.className = 'authorized';
-                banner.innerHTML = '🟢 授權成功：您已具備儲存寫入權限';
+                banner.innerHTML = '🟢 授權成功：已解鎖資料寫入與圖片上傳';
                 document.getElementById('btn-save').disabled = false;
-                console.log("授權成功 Token 已取得");
+                console.log("雙重權限(Sheets+Drive) 授權成功");
             }
         });
     }
@@ -435,7 +458,6 @@
                 if (json && json.table) {
                     headerRow = json.table.cols.map(c => c.label || "");
                     
-                    // 動態欄位綁定 (模糊比對)
                     const getIdx = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
                     colMap = {
                         id: getIdx(['案號']), wkt: getIdx(['座標']), name: getIdx(['案件簡稱']),
@@ -490,17 +512,13 @@
         });
     }
 
-    // 解析 Google YYYY/MM/DD 等日期為 YYYY-MM-DD 給 <input type="date">
     function parseDateForInput(dStr) {
         if(!dStr) return "";
         const parts = dStr.split(/[\/\-]/);
-        if(parts.length === 3) {
-            return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
-        }
+        if(parts.length === 3) return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
         return "";
     }
 
-    // 解析帶有 # 的自訂勾選字串
     function checkOptions(selector, valStr) {
         document.querySelectorAll(selector).forEach(c => c.checked = false);
         if(!valStr) return;
@@ -512,6 +530,7 @@
     function openEditor(p) {
         currentLockedId = p.id;
         document.getElementById('editor-panel').style.display = 'flex';
+        document.getElementById('draw-panel').style.display = 'flex'; // 同步開啟繪圖工具列
         document.getElementById('editor-title').innerText = `📝 案件編輯 - ${p.id}`;
         
         const r = p._raw;
@@ -524,8 +543,8 @@
         document.getElementById('f-city').value = r[colMap.city] || "";
         document.getElementById('f-town').value = r[colMap.town] || "";
         document.getElementById('f-scale').value = r[colMap.scale] || "";
-        document.getElementById('f-fee-srv').value = r[colMap.feeSrv] ? r[colMap.feeSrv].replace(/,/g, '') : "";
-        document.getElementById('f-fee-eng').value = r[colMap.feeEng] ? r[colMap.feeEng].replace(/,/g, '') : "";
+        document.getElementById('f-fee-srv').value = r[colMap.feeSrv] ? String(r[colMap.feeSrv]).replace(/,/g, '') : "";
+        document.getElementById('f-fee-eng').value = r[colMap.feeEng] ? String(r[colMap.feeEng]).replace(/,/g, '') : "";
         document.getElementById('f-team').value = r[colMap.team] || "";
         document.getElementById('f-host').value = r[colMap.host] || "";
         document.getElementById('f-co-host').value = r[colMap.coHost] || "";
@@ -538,17 +557,14 @@
         document.getElementById('f-date-start').value = parseDateForInput(r[colMap.dateStart]);
         document.getElementById('f-date-end').value = parseDateForInput(r[colMap.dateEnd]);
 
-        // 狀態單選
         const status = r[colMap.status] || "";
         document.querySelectorAll('input[name="r-status"]').forEach(r => r.checked = (r.value === status));
 
-        // 複選填入
         checkOptions('input[name="chk-attr"]', r[colMap.attr]);
         checkOptions('input[name="chk-approve"]', r[colMap.approve]);
         checkOptions('input[name="chk-cat-parent"]', r[colMap.cat]);
         checkOptions('input[name="chk-cat-child"]', r[colMap.type]);
 
-        // 地圖處理
         draw.deleteAll();
         const wktStr = r[colMap.wkt] || "";
         if (wktStr.includes('(')) {
@@ -576,6 +592,7 @@
         currentLockedId = null;
         draw.deleteAll();
         document.getElementById('editor-panel').style.display = 'none';
+        document.getElementById('draw-panel').style.display = 'none';
     }
 
     function syncDrawToWKT() {
@@ -588,7 +605,68 @@
         textarea.value = wkt;
     }
 
-    // --- 4. 儲存機制 (全列寫入) ---
+    // --- 4. Google Drive 照片上傳 ---
+    function clearPhotos() {
+        document.getElementById('f-photo').value = "";
+        document.getElementById('photo-upload').value = "";
+    }
+
+    async function handlePhotoUpload() {
+        if (!accessToken) { triggerAuth(); return; }
+        const files = document.getElementById('photo-upload').files;
+        if (files.length === 0) { alert("請先選擇照片檔案！"); return; }
+        if (!currentLockedId) return;
+
+        // 讀取既有陣列
+        let existingUrls = [];
+        const existingStr = document.getElementById('f-photo').value.trim();
+        if (existingStr) {
+            try { existingUrls = JSON.parse(existingStr); } 
+            catch(e) { existingUrls = existingStr.split(',').map(s=>s.trim()).filter(s=>s); }
+        }
+
+        if (existingUrls.length + files.length > 6) {
+            alert(`單案件限制最多 6 張照片。目前已有 ${existingUrls.length} 張，您又選了 ${files.length} 張。`);
+            return;
+        }
+
+        showLoading("照片上傳至 Google Drive 中...");
+        let startIndex = existingUrls.length + 1;
+        let newUrls = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const ext = file.name.split('.').pop();
+            const fileName = `${currentLockedId}-${String(startIndex + i).padStart(2, '0')}.${ext}`;
+            
+            const metadata = { name: fileName, parents: [DRIVE_FOLDER_ID] };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', file);
+
+            try {
+                // 使用 multipart API 直傳
+                const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    body: form
+                });
+                const data = await res.json();
+                if (data.webViewLink) newUrls.push(data.webViewLink);
+                console.log(`已上傳: ${fileName}`);
+            } catch(e) {
+                console.error("上傳失敗:", e);
+            }
+        }
+        
+        const allUrls = existingUrls.concat(newUrls);
+        document.getElementById('f-photo').value = JSON.stringify(allUrls);
+        document.getElementById('photo-upload').value = ""; // 清空選擇
+        hideLoading();
+        alert(`成功上傳 ${newUrls.length} 張照片！請記得點選最下方的「儲存寫入雲端」。`);
+    }
+
+    // --- 5. 儲存機制 (全列寫入) ---
     function getCheckedVals(selector, prefix = '') {
         const checked = Array.from(document.querySelectorAll(selector + ':checked')).map(el => prefix + el.value);
         return checked.join(', ');
@@ -596,7 +674,7 @@
 
     function formatDateForSheet(dStr) {
         if(!dStr) return "";
-        return dStr.replace(/-/g, '/'); // 將 YYYY-MM-DD 轉為 YYYY/MM/DD
+        return dStr.replace(/-/g, '/');
     }
 
     async function saveToGoogleSheet() {
@@ -606,19 +684,16 @@
         showLoading("正在整列更新雲端資料...");
         
         try {
-            // 抓取 Sheet Name
             const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const metaData = await metaRes.json();
             sheetNameStr = metaData.sheets[0].properties.title;
 
-            // 尋找目標 Row Index
             const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetNameStr}!A1:Z`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             const data = await res.json();
             const rows = data.values;
             const rowIdx = rows.findIndex(r => String(r[colMap.id]).trim() === currentLockedId);
             if(rowIdx === -1) throw new Error(`雲端找不到案號: ${currentLockedId}`);
 
-            // 組合新陣列 (補齊長度)
             let newRowData = [...rows[rowIdx]];
             while(newRowData.length < headerRow.length) newRowData.push("");
 
@@ -640,7 +715,7 @@
             setV('pm', document.getElementById('f-pm').value);
             setV('gold', document.getElementById('f-award-gold').value);
             setV('otherAward', document.getElementById('f-award-other').value);
-            setV('photo', document.getElementById('f-photo').value);
+            setV('photo', document.getElementById('f-photo').value); // 這裡包含已上傳照片的 JSON Array
             setV('memo', document.getElementById('f-memo').value);
             setV('dateStart', formatDateForSheet(document.getElementById('f-date-start').value));
             setV('dateEnd', formatDateForSheet(document.getElementById('f-date-end').value));
@@ -653,7 +728,6 @@
             setV('cat', getCheckedVals('input[name="chk-cat-parent"]', '#'));
             setV('type', getCheckedVals('input[name="chk-cat-child"]', '#'));
 
-            // 執行 API 更新 (整列)
             const targetRange = `${sheetNameStr}!A${rowIdx + 1}`;
             const updateRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${targetRange}?valueInputOption=USER_ENTERED`, {
                 method: 'PUT',
@@ -663,9 +737,8 @@
 
             if(updateRes.ok) {
                 console.log("✅ 案件更新成功:", currentLockedId);
-                alert("✅ 儲存成功！");
+                alert("✅ 所有資料儲存成功！");
                 
-                // 更新本地記憶體，避免重整
                 const proj = projectData.find(p => p.id === currentLockedId);
                 if(proj) proj._raw = newRowData;
                 renderList();
