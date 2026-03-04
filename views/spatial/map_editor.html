@@ -44,28 +44,31 @@
     </div>
 
 <script type="module">
-    // [AI Lab 強化區塊：偵錯橋接器]
-    // 必須在所有邏輯執行前啟動，確保攔截到所有 console 輸出
+    // [AI Lab 修改]：修正橋接器協議，使其能與 DebugSystem.js v2.1.0 對接
     const setupDebugBridge = () => {
         ['log', 'warn', 'error'].forEach(type => {
             const original = console[type];
             console[type] = (...args) => {
                 original.apply(console, args);
-                if (window.parent) {
+                if (window.parent && window.parent !== window) {
                     window.parent.postMessage({
-                        source: 'AI_STUDIO_APP', // 對應 DebugSystem 的監聽規則
-                        type: type === 'log' ? 'info' : type,
-                        content: `[MapEditor] ${args.join(' ')}`
+                        type: 'debug', // 必須為 debug 才能觸發 DebugSystem
+                        module: 'MapEditor',
+                        level: type === 'log' ? 'INFO' : type.toUpperCase(), // INFO, WARN, ERROR
+                        msg: args.join(' ')
                     }, '*');
                 }
             };
         });
+        
+        // 額外監控未被捕捉的執行期錯誤
+        window.onerror = (msg) => console.error(msg);
     };
     setupDebugBridge();
 
-import MapEngine from '../../components/MapEngine.js';
-import DraggablePanel from '../../components/DraggablePanel.js';
-import EditorDataService from '../../components/EditorDataService.js';
+    import MapEngine from '../../components/MapEngine.js';
+    import DraggablePanel from '../../components/DraggablePanel.js';
+    import EditorDataService from '../../components/EditorDataService.js';
 
     let engine, dataService, editorPanel, draw;
 
@@ -76,8 +79,13 @@ import EditorDataService from '../../components/EditorDataService.js';
             if (!configResp.ok) throw new Error("無法讀取 manifest.json 配置檔");
             const manifest = await configResp.json();
             
-            const SHEET_ID = manifest.ai_lab_config.env.CASE_SHEET_ID;
-            if (!SHEET_ID) throw new Error("manifest.json 中未定義 CASE_SHEET_ID");
+            // [AI Lab 修改]：改為安全讀取，避免 manifest 結構不完整導致腳本崩潰
+            const env = manifest.ai_lab_config.env || {};
+            const SHEET_ID = env.CASE_SHEET_ID;
+            
+            if (!SHEET_ID) {
+                console.warn("manifest.json 中未定義 CASE_SHEET_ID，將使用預設空值");
+            }
 
             // 1. 初始化引擎
             engine = new MapEngine('map', { center: [121.50, 23.90], zoom: 7, pitch: 0 });
@@ -86,14 +94,14 @@ import EditorDataService from '../../components/EditorDataService.js';
             draw = engine.initDrawingTools();
 
             // 3. 讀取資料服務
-            dataService = new EditorDataService(SHEET_ID);
+            dataService = new EditorDataService(SHEET_ID || "");
             await dataService.fetchSheetData();
 
             // 4. 初始化介面
             setupUI();
             bindMapEvents();
             
-            console.log(`系統啟動成功，資料源：${SHEET_ID.substring(0, 8)}...`);
+            console.log(`系統啟動成功，資料源已準備就緒`);
             
         } catch (error) {
             console.error(`[CRITICAL] 初始化失敗: ${error.message}`);
@@ -144,10 +152,18 @@ import EditorDataService from '../../components/EditorDataService.js';
         `;
         editorPanel.setContent(html);
         document.getElementById('btn-search-trigger').onclick = executeSearch;
+        
+        // 綁定複製按鈕
+        document.getElementById('btn-copy-wkt').onclick = () => {
+            const wkt = document.getElementById('val-wkt').value;
+            if(!wkt) return console.warn("無資料可複製");
+            navigator.clipboard.writeText(wkt);
+            console.log("座標已複製到剪貼簿");
+        };
     }
 
     function renderCheckboxes(list, type) {
-        if (list.length === 0) return '<small class="text-muted">無資料</small>';
+        if (!list || list.length === 0) return '<small class="text-muted">無資料</small>';
         return list.map(item => `
             <div class="form-check">
                 <input class="form-check-input chk-filter" type="checkbox" value="${item}" data-type="${type}" id="chk-${type}-${item}">
@@ -170,6 +186,7 @@ import EditorDataService from '../../components/EditorDataService.js';
             </div>
         `).join('');
         if(results.length === 0) listEl.innerHTML = '<div class="p-2 small text-muted text-center">查無相符案件</div>';
+        console.log(`執行搜尋: "${query}", 找到 ${results.length} 筆結果`);
     }
 
     window.lockCase = (id) => {
