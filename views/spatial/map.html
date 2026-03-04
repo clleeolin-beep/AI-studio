@@ -8,6 +8,22 @@
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script>
     
+    <script>
+        // [防線 1] 全局錯誤過濾器：攔截底層圖磚 Failed to fetch 與 image missing 雜訊
+        const origErr = console.error;
+        console.error = function(...args) {
+            const msg = args.join(' ');
+            if (msg.includes('Failed to fetch') || msg.includes('could not be loaded')) return;
+            origErr.apply(console, args);
+        };
+        const origWarn = console.warn;
+        console.warn = function(...args) {
+            const msg = args.join(' ');
+            if (msg.includes('styleimagemissing')) return;
+            origWarn.apply(console, args);
+        };
+    </script>
+
     <style>
         :root { --primary: #1A5276; --success: #27AE60; --danger: #E74C3C; --bg: #f8f9fa; }
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; display: flex; font-family: 'Microsoft JhengHei', sans-serif; overflow: hidden; background: #333; }
@@ -170,12 +186,20 @@
 </div>
 
 <script>
-    // --- 內部 Debug Console 攔截器 ---
+    // --- 內部 UI 函數 (加載動畫與 Debug 視窗) ---
+    function showLoading(msg) { 
+        const el = document.getElementById('loading-overlay');
+        if(el) { document.getElementById('loading-text').innerText = msg; el.style.display = 'flex'; }
+    }
+    function hideLoading() { 
+        const el = document.getElementById('loading-overlay');
+        if(el) el.style.display = 'none'; 
+    }
+
     const debugLogEl = document.getElementById('debug-log');
     function logToDebug(type, args) {
         if(!debugLogEl) return;
         const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-        // 雜訊過濾
         if (msg.includes('Failed to fetch') || msg.includes('could not be loaded') || msg.includes('styleimagemissing')) return;
         const color = type === 'error' ? '#ff4d4d' : type === 'warn' ? '#f39c12' : '#00ff00';
         const time = new Date().toLocaleTimeString();
@@ -231,7 +255,7 @@
     const terrainRGB = { "type": "raster-dem", "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], "encoding": "terrarium", "tileSize": 256 };
     const buildings = { "type": "vector", "tiles": ["https://{s}.data.osmbuildings.org/0.2/59f80695/tile/{z}/{x}/{y}.json"] };
     const osmStyle = { "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "osm-buildings": buildings, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "osm" }] };
-    const esriStyle = { "version": 8, "sources": { "esri": { "type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256 }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "esri" }] };
+    const esriStyle = { "version": 8, "sources": { "esri": { "type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256, "attribution": "Esri" }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "esri" }] };
 
     window.onload = async () => {
         ['layer-panel', 'tool-panel', 'result-panel', 'debug-panel'].forEach(id => {
@@ -277,7 +301,6 @@
             }
         }, 500);
 
-        // [防線] 補圖機制：若引擎在切換時丟失 Pattern，從快取強制回填
         map.on('styleimagemissing', (e) => {
             const id = e.id;
             if (patternCache[id] && !map.hasImage(id)) {
@@ -294,7 +317,6 @@
             map.addSource('projects-data', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
         
-        // 確保圖層掛載前，Pattern 已經全數寫入
         let reg = [];
         Object.keys(patternCache).forEach(id => {
             if (!map.hasImage(id)) { map.addImage(id, patternCache[id]); reg.push(id); }
@@ -331,7 +353,6 @@
     // --- 2. 視覺設定與 ID 去特徵化 ---
     function getVisualConfig(catString) {
         if(!catString) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
-        
         const codes = [];
         const matches = catString.match(/#\d{2}/g);
         if (matches) matches.forEach(m => codes.push(m.substring(1)));
@@ -345,7 +366,6 @@
         return { isEmpty: false, colors, isMilitary, codes };
     }
 
-    // [ID 去特徵化] 移除 # 號，改用底線
     function generatePattern(colors, isMilitary) {
         const id = 'pattern_' + (colors.length ? colors.map(c=>c.replace('#','')).join('_') : 'empty') + (isMilitary ? '_mil' : '');
         if (patternCache[id]) return id;
@@ -376,7 +396,8 @@
     function createPointMarker(coords, pId, visConfig) {
         const el = document.createElement('div');
         el.style.width = '20px'; el.style.height = '20px';
-        el.style.borderRadius = '50%'; el.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
+        el.style.borderRadius = '50%';
+        el.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
         el.style.cursor = 'pointer';
 
         if (visConfig.isEmpty) {
@@ -398,6 +419,7 @@
 
     // --- 3. 資料處理與 Render Lock ---
     async function fetchManifestAndData() {
+        showLoading("解析系統配置...");
         try {
             const resp = await fetch('../../manifest.json');
             const manifest = await resp.json();
@@ -408,6 +430,7 @@
 
     function loadSheetDataGviz() {
         return new Promise((resolve) => {
+            showLoading("從雲端擷取實績資料表...");
             window.gvizCallback = (json) => {
                 if (json && json.table) {
                     masterFeatures = []; masterMarkers = []; projectDict = {}; dynamicCategories.clear();
@@ -425,11 +448,15 @@
                         pm: getIdx(['專案經理']), status: getIdx(['狀態']), dateS: getIdx(['起始日期']), dateE: getIdx(['結束日期']), memo: getIdx(['備註'])
                     };
 
+                    showLoading("建構 WKT 空間幾何與視覺引擎...");
                     // Step A: 載入與解析
                     json.table.rows.forEach(row => {
                         const get = (i) => (i!==-1 && row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
-                        const wkt = String(get(colMap.wkt));
-                        if (!wkt || wkt.includes("座標") || wkt === "--") return;
+                        let wktRaw = String(get(colMap.wkt));
+                        if (!wktRaw || wktRaw.includes("座標") || wktRaw === "--") return;
+                        
+                        // [強力脫殼] 移除 CSV 匯出時產生的頭尾雙引號
+                        const wkt = wktRaw.replace(/^"|"$/g, '').trim();
 
                         const catRaw = get(colMap.cat) || "";
                         const visConfig = getVisualConfig(catRaw);
@@ -457,7 +484,7 @@
                         projectDict[pData.id] = pData;
 
                         try {
-                            const geo = wellknown.parse(wkt.trim());
+                            const geo = wellknown.parse(wkt);
                             if (!geo) throw new Error("Parsed geo is null");
                             
                             const processGeom = (g) => {
@@ -473,8 +500,7 @@
                             if (geo.type === "GeometryCollection") geo.geometries.forEach(processGeom);
                             else processGeom(geo);
                         } catch(e) {
-                            // [WKT 容錯日誌]
-                            console.error(`[Error] 案號 ${pData.id} 座標格式錯誤: ${wkt}`);
+                            console.error(`[Error] 案號 ${pData.id} 座標解析失敗: ${wkt}`);
                         }
                     });
 
@@ -730,11 +756,10 @@
             Object.keys(patternCache).forEach(id => { 
                 if (!map.hasImage(id)) { map.addImage(id, patternCache[id]); reReg.push(id); }
             });
-            if(reReg.length > 0) console.log(`[Style Switch] Pattern Re-registered: [${reReg.join(', ')}]`);
+            console.log(`[Style Switch] 恢復 ${reReg.length} 個 Pattern`);
             
             setupMapLayers(); 
             if(currentData) map.getSource('projects-data').setData(currentData); 
-            
             ['line', 'polygon'].forEach(t => { if(!showGeom[t]) toggleGeom(t, null, false); });
         });
     }
