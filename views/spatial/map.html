@@ -44,9 +44,9 @@
         .geom-toggle[data-type="polygon"].active { background: #e8f5e9; color: #2e7d32; border-color: #2e7d32; }
 
         /* 核取方塊群組 */
-        .checkbox-group { max-height: 120px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px; background: #fff; margin-bottom: 10px; }
-        .checkbox-item { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; cursor: pointer; }
-        .checkbox-item input { margin-right: 6px; }
+        .checkbox-group { max-height: 140px; overflow-y: auto; border: 1px solid #ccc; border-radius: 4px; padding: 8px; background: #fff; margin-bottom: 10px; }
+        .checkbox-item { display: flex; align-items: flex-start; font-size: 12px; margin-bottom: 6px; cursor: pointer; line-height: 1.3; }
+        .checkbox-item input { margin-right: 6px; margin-top: 2px; }
 
         /* 滑桿 */
         .range-slider-container { position: relative; height: 30px; margin-top: 5px; margin-bottom: 15px; }
@@ -62,7 +62,7 @@
         .item-title { font-size: 13px; font-weight: bold; color: #333; }
         .item-subtitle { font-size: 11px; color: #666; margin-top: 2px; }
 
-        /* Popup 樣式 (完美復刻) */
+        /* Popup 樣式 */
         .maplibregl-popup { z-index: 999999 !important; }
         .maplibregl-popup-content { padding: 0 !important; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; }
         .popup-container { width: 320px; font-size: 12px; line-height: 1.5; max-height: 450px; overflow-y: auto; background: #ffffff; position: relative; }
@@ -175,9 +175,9 @@
     // 資料儲存庫
     let projectDict = {};       // 原始資料對照表
     let masterFeatures = [];    // 拆解後的線與面 GeoJSON Feature
-    let masterMarkers = [];     // 拆解後的 DOM Marker (支援 conic-gradient)
-    let patternCache = {};      // Canvas Pattern 記憶體快取
-    let dynamicCategories = new Set(); 
+    let masterMarkers = [];     // 拆解後的 DOM Marker
+    let patternCache = {};      // Canvas Pattern 快取
+    let dynamicCategories = new Set(); // 存放原始的類別全名
     
     // UI 控制狀態
     let showGeom = { point: true, line: true, polygon: true };
@@ -186,7 +186,7 @@
     const levelNames = ["0", "100萬", "1000萬", "5000萬", "1億", "5億", "5億+"];
     const levels = [0, 1e6, 1e7, 5e7, 1e8, 5e8, 1e12];
 
-    // --- 顏色與代碼對應表 (Code-Driven Map) ---
+    // --- 顏色與代碼對應表 ---
     const CodeColorMap = {
         "01": "#E74C3C", "02": "#8E44AD", "03": "#2E86C1", "04": "#F1C40F",
         "05": "#16A085", "06": "#FF1493", "07": "#00CED1", "08": "#27AE60",
@@ -197,7 +197,7 @@
     const terrainRGB = { "type": "raster-dem", "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], "encoding": "terrarium", "tileSize": 256 };
     const buildings = { "type": "vector", "tiles": ["https://{s}.data.osmbuildings.org/0.2/59f80695/tile/{z}/{x}/{y}.json"] };
     const osmStyle = { "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "osm-buildings": buildings, "t-rgb": terrainRGB }, "layers": [ { "id": "base-layer", "type": "raster", "source": "osm" }, { "id": "3d-buildings", "type": "fill-extrusion", "source": "osm-buildings", "source-layer": "building", "paint": { "fill-extrusion-color": "#fff", "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 0.6 } } ] };
-    const esriStyle = { "version": 8, "sources": { "esri": { "type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256 }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "esri" }] };
+    const esriStyle = { "version": 8, "sources": { "esri": { "type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256, "attribution": "Esri" }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "esri" }] };
 
     // --- 啟動程序 ---
     window.onload = async () => {
@@ -254,7 +254,7 @@
             map.addSource('projects-data', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
 
-        // Polygon: 使用 fill-pattern 實現 45度斜紋
+        // Polygon: 面填色與邊線
         if(!map.getLayer('layer-polygon')) {
             map.addLayer({ id: 'layer-polygon', type: 'fill', source: 'projects-data', filter: ['==', '$type', 'Polygon'], 
                 paint: { 'fill-pattern': ['get', 'patternId'], 'fill-opacity': 0.8 } 
@@ -264,16 +264,17 @@
             });
         }
         
-        // Line: 使用 line-pattern 實現多色節段
+        // Line: 主線段與軍方發光特效
         if(!map.getLayer('layer-line')) {
+            // [修正] 軍方金邊底層發光：使用 filter，避免陣列解析錯誤
+            map.addLayer({ id: 'layer-line-glow', type: 'line', source: 'projects-data', 
+                filter: ['all', ['==', '$type', 'LineString'], ['==', 'isMilitary', true]], 
+                paint: { 'line-color': '#FFD700', 'line-width': 9, 'line-opacity': 0.7 } 
+            }); 
+            // 主線段 (節段圖案)
             map.addLayer({ id: 'layer-line', type: 'line', source: 'projects-data', filter: ['==', '$type', 'LineString'], 
                 paint: { 'line-pattern': ['get', 'patternId'], 'line-width': 5 } 
             });
-            // 針對 13 號軍方的金邊發光特效 (底層)
-            map.addLayer({ id: 'layer-line-glow', type: 'line', source: 'projects-data', 
-                filter: ['all', ['==', '$type', 'LineString'], ['==', ['get', 'isMilitary'], true]], 
-                paint: { 'line-color': '#FFD700', 'line-width': 9, 'line-opacity': 0.6 } 
-            }, 'layer-line'); 
         }
 
         // 綁定 Popup
@@ -284,13 +285,13 @@
             map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
         });
 
-        // 重載 Pattern (針對 Style 切換)
+        // 重新註冊所有已生成的 Pattern 圖片
         Object.keys(patternCache).forEach(id => {
             if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
         });
     }
 
-    // --- 2. 視覺解析引擎 (Visual Config & Pattern Generator) ---
+    // --- 2. 視覺解析引擎 (Visual Config) ---
     function getVisualConfig(catString) {
         if(!catString) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
         
@@ -303,7 +304,7 @@
         
         if (colors.length === 0) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
         
-        // 確保顏色照代號大小排序
+        // 顏色按代號排序
         colors.sort((a, b) => {
             const idxA = Object.values(CodeColorMap).indexOf(a);
             const idxB = Object.values(CodeColorMap).indexOf(b);
@@ -352,7 +353,6 @@
         return id;
     }
 
-    // 建立 Conic Gradient 的 DOM Marker
     function createPointMarker(coords, pId, visConfig) {
         const el = document.createElement('div');
         el.style.width = '18px'; el.style.height = '18px';
@@ -423,20 +423,25 @@
 
                         const catRaw = get(colMap.cat) || "";
                         const visConfig = getVisualConfig(catRaw);
-                        visConfig.codes.forEach(c => dynamicCategories.add(`#${c}`)); // 加入篩選器
+                        
+                        // [修改點] 提取並儲存類別的完整名稱，而不是只有 #01
+                        const fullCategories = catRaw.split(',').map(c => c.trim()).filter(c => c);
+                        fullCategories.forEach(c => {
+                            if (c.match(/^#\d{2}/)) dynamicCategories.add(c);
+                        });
                         
                         const pData = {
                             id: get(colMap.id), name: get(colMap.name), contract: get(colMap.contract),
                             owner: get(colMap.owner), eng: get(colMap.eng), city: get(colMap.city), 
                             location: get(colMap.city) + get(colMap.town), scale: get(colMap.scale),
                             fee: get(colMap.fee), feeVal: parseFloat(String(get(colMap.fee)).replace(/[^0-9.]/g, "")) || 0,
-                            photo: get(colMap.photo), cat: catRaw, codes: visConfig.codes, 
+                            photo: get(colMap.photo), cat: catRaw, codes: visConfig.codes, fullCats: fullCategories,
                             type: get(colMap.type), attr: get(colMap.attr), 
                             awards: [get(colMap.gold), get(colMap.other)].filter(x=>x).join(" / "),
                             team: get(colMap.team), host: get(colMap.host), pm: get(colMap.pm),
                             dates: `${get(colMap.dateS)||'--'} - ${get(colMap.dateE)||'--'}`, 
                             status: get(colMap.status), memo: get(colMap.memo),
-                            filtered: true
+                            filtered: true, selected: true, color: visConfig.colors[0] || '#ccc'
                         };
                         projectDict[pData.id] = pData;
 
@@ -451,6 +456,7 @@
                                     } else {
                                         masterFeatures.push({ 
                                             type: 'Feature', geometry: g, 
+                                            // [修正] 提供 isMilitary 以供 Layer filter 判斷
                                             properties: { id: pData.id, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } 
                                         });
                                     }
@@ -490,14 +496,17 @@
         const cities = [...new Set(Object.values(projectDict).map(p => p.city))].filter(c => c && c.length >= 2).sort();
         cities.forEach(c => document.getElementById('city-filter').innerHTML += `<option value="${c}">${c}</option>`);
 
+        // [修改點] 顯示類別全名，但 checkbox 的 value 依然綁定純代碼
         const catGroup = document.getElementById('type-checkbox-group');
-        catGroup.innerHTML = Array.from(dynamicCategories).sort().map(c => `
+        catGroup.innerHTML = Array.from(dynamicCategories).sort().map(cFull => {
+            const code = cFull.substring(1, 3); // 取得 01, 02 等代碼
+            return `
             <label class="checkbox-item">
-                <input type="checkbox" class="cat-cb" value="${c.substring(1)}" checked onchange="filterProjects()">
-                <span style="display:inline-block; width:12px; height:12px; background:${CodeColorMap[c.substring(1)]||'#333'}; margin-right:5px; border-radius:2px;"></span>
-                ${c}
+                <input type="checkbox" class="cat-cb" value="${code}" checked onchange="filterProjects()">
+                <span style="display:inline-block; width:12px; height:12px; background:${CodeColorMap[code]||'#ccc'}; margin-right:6px; border-radius:2px; flex-shrink:0;"></span>
+                <span>${cFull}</span>
             </label>
-        `).join('');
+        `}).join('');
     }
 
     function toggleAllTypes(isChecked) { document.querySelectorAll('.cat-cb').forEach(cb => cb.checked = isChecked); filterProjects(); }
@@ -530,7 +539,7 @@
         listEl.innerHTML = "";
 
         Object.values(projectDict).forEach(p => {
-            // 1. 勾選類別判斷
+            // 1. 勾選類別判斷 (只要專案包含任何一個打勾的代碼即可)
             let mCat = p.codes.length === 0 || p.codes.some(c => checkedCats.includes(c));
             
             // 2. 布林搜尋判斷
@@ -554,11 +563,9 @@
             // 4. Turf 空間繪圖判斷
             if (p.filtered && polygonFilter) {
                 p.filtered = false; 
-                // 檢查 Marker
                 for(let m of masterMarkers.filter(x=>x.id===p.id)) {
                     if (turf.booleanPointInPolygon(m.featureRef, polygonFilter)) { p.filtered = true; break; }
                 }
-                // 檢查 Line/Polygon
                 if (!p.filtered) {
                     for(let f of masterFeatures.filter(x=>x.properties.id===p.id)) {
                         if (turf.booleanIntersects(f, polygonFilter)) { p.filtered = true; break; }
@@ -571,7 +578,7 @@
                 count++;
                 listEl.innerHTML += `
                     <div class="list-item" style="border-left-color:${p.color}">
-                        <input type="checkbox" checked onchange="toggleSelect(event, '${p.id}')" style="width:16px; height:16px;">
+                        <input type="checkbox" ${p.selected?'checked':''} onchange="toggleSelect(event, '${p.id}')" style="width:16px; height:16px;">
                         <div class="item-content" onclick="flyToProject('${p.id}')">
                             <div class="item-title">${p.id} - ${p.name}</div>
                             <div class="item-subtitle">${p.location} | ${p.owner}</div>
@@ -587,12 +594,10 @@
     function toggleSelect(e, id) { e.stopPropagation(); projectDict[id].selected = e.target.checked; updateMapSource(); }
 
     function updateMapSource() {
-        // 渲染 GeoJSON (線/面)
         if (map.getSource('projects-data')) {
             const displayFeatures = masterFeatures.filter(f => projectDict[f.properties.id] && projectDict[f.properties.id].filtered && projectDict[f.properties.id].selected);
             map.getSource('projects-data').setData({ type: 'FeatureCollection', features: displayFeatures });
         }
-        // 渲染 Markers (點)
         masterMarkers.forEach(m => {
             const p = projectDict[m.id];
             if (p && p.filtered && p.selected && showGeom.point) m.marker.addTo(map);
@@ -685,7 +690,7 @@
         const visibility = showGeom[type] ? 'visible' : 'none';
         if (type === 'line' && map.getLayer('layer-line')) { map.setLayoutProperty('layer-line', 'visibility', visibility); map.setLayoutProperty('layer-line-glow', 'visibility', visibility); }
         if (type === 'polygon' && map.getLayer('layer-polygon')) { map.setLayoutProperty('layer-polygon', 'visibility', visibility); map.setLayoutProperty('layer-polygon-outline', 'visibility', visibility); }
-        updateMapSource(); // 觸發 Marker 隱藏
+        updateMapSource(); 
     }
 
     function toggle3D() {
@@ -706,7 +711,7 @@
             setupMapLayers(); 
             if(currentData) map.getSource('projects-data').setData(currentData); 
             ['line', 'polygon'].forEach(t => {
-                if(!showGeom[t]) toggleGeom(t, {classList:{toggle:()=>{}}}); // 恢復隱藏
+                if(!showGeom[t]) toggleGeom(t, {classList:{toggle:()=>{}}}); 
             });
         });
     }
