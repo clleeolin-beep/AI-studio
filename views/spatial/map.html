@@ -166,14 +166,6 @@
 </div>
 
 <script>
-    // --- 過濾原生的 console error (消除 Failed to fetch 雜訊) ---
-    const originalConsoleError = console.error;
-    console.error = function(...args) {
-        const msg = args.join(' ');
-        if (msg.includes('Failed to fetch') || msg.includes('could not be loaded')) return; 
-        originalConsoleError.apply(console, args);
-    };
-
     // --- 核心系統定義 ---
     let map;
     let sheetId = "";
@@ -184,7 +176,7 @@
     let projectDict = {};       // 原始資料對照表
     let masterFeatures = [];    // 拆解後的線與面 GeoJSON Feature
     let masterMarkers = [];     // 拆解後的 DOM Marker
-    let patternCache = {};      // Canvas Pattern 記憶體快取
+    let patternCache = {};      // Canvas Pattern 快取
     let dynamicCategories = new Set(); // 存放原始的類別全名
     
     // UI 控制狀態
@@ -209,10 +201,9 @@
 
     // --- 啟動程序 ---
     window.onload = async () => {
-        ['list-panel', 'tool-panel', 'result-panel', 'layer-panel'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) makeDraggable(el, el.querySelector('.panel-header'));
-        });
+        makeDraggable(document.getElementById('layer-panel'), document.getElementById('layer-header'));
+        makeDraggable(document.getElementById('tool-panel'), document.getElementById('tool-header'));
+        makeDraggable(document.getElementById('result-panel'), document.getElementById('result-header'));
         initMap();
         await fetchManifestAndData();
     };
@@ -223,7 +214,7 @@
     function makeDraggable(element, handle) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         handle.onmousedown = (e) => {
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            if(e.target.tagName === 'BUTTON') return;
             e.preventDefault();
             pos3 = e.clientX; pos4 = e.clientY;
             document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
@@ -263,11 +254,6 @@
             map.addSource('projects-data', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
 
-        // [關鍵修正]：主動將快取中的 Pattern 重新注入，確保切換 Style 時不會 Missing
-        Object.keys(patternCache).forEach(id => {
-            if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
-        });
-
         // Polygon: 面填色與邊線
         if(!map.getLayer('layer-polygon')) {
             map.addLayer({ id: 'layer-polygon', type: 'fill', source: 'projects-data', filter: ['==', '$type', 'Polygon'], 
@@ -280,10 +266,12 @@
         
         // Line: 主線段與軍方發光特效
         if(!map.getLayer('layer-line')) {
+            // [修正] 軍方金邊底層發光：使用 filter，避免陣列解析錯誤
             map.addLayer({ id: 'layer-line-glow', type: 'line', source: 'projects-data', 
                 filter: ['all', ['==', '$type', 'LineString'], ['==', 'isMilitary', true]], 
                 paint: { 'line-color': '#FFD700', 'line-width': 9, 'line-opacity': 0.7 } 
             }); 
+            // 主線段 (節段圖案)
             map.addLayer({ id: 'layer-line', type: 'line', source: 'projects-data', filter: ['==', '$type', 'LineString'], 
                 paint: { 'line-pattern': ['get', 'patternId'], 'line-width': 5 } 
             });
@@ -295,6 +283,11 @@
             map.on('click', layer, (e) => showPopup(e.features[0].properties.id, e.lngLat));
             map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+        });
+
+        // 重新註冊所有已生成的 Pattern 圖片
+        Object.keys(patternCache).forEach(id => {
+            if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
         });
     }
 
@@ -311,6 +304,7 @@
         
         if (colors.length === 0) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
         
+        // 顏色按代號排序
         colors.sort((a, b) => {
             const idxA = Object.values(CodeColorMap).indexOf(a);
             const idxB = Object.values(CodeColorMap).indexOf(b);
@@ -320,10 +314,13 @@
         return { isEmpty: false, colors, isMilitary, codes };
     }
 
-    // [關鍵修正] 預先產生 Pattern，供地圖隨時取用
-    function generatePattern(colors, isMilitary) {
+    function getOrCreatePattern(colors, isMilitary) {
         const id = 'pattern-' + colors.join('-') + (isMilitary ? '-mil' : '');
-        if (patternCache[id]) return id;
+        if (map.loaded() && map.hasImage(id)) return id;
+        if (patternCache[id]) { 
+            if(map.loaded()) map.addImage(id, patternCache[id]); 
+            return id; 
+        }
 
         const canvas = document.createElement('canvas');
         canvas.width = 64; canvas.height = 64;
@@ -351,12 +348,8 @@
         }
 
         const imgData = ctx.getImageData(0,0,64,64);
-        patternCache[id] = imgData; // 存入全域快取
-        
-        // 若地圖已準備好，立刻注入
-        if (map.loaded() && !map.hasImage(id)) {
-            map.addImage(id, imgData);
-        }
+        patternCache[id] = imgData;
+        if (map.loaded()) map.addImage(id, imgData);
         return id;
     }
 
@@ -431,15 +424,12 @@
                         const catRaw = get(colMap.cat) || "";
                         const visConfig = getVisualConfig(catRaw);
                         
-                        // 提取並儲存類別的完整名稱
+                        // [修改點] 提取並儲存類別的完整名稱，而不是只有 #01
                         const fullCategories = catRaw.split(',').map(c => c.trim()).filter(c => c);
                         fullCategories.forEach(c => {
                             if (c.match(/^#\d{2}/)) dynamicCategories.add(c);
                         });
                         
-                        // [關鍵修正] 在這裡提早生成並快取 Pattern
-                        const patternId = generatePattern(visConfig.colors, visConfig.isMilitary);
-
                         const pData = {
                             id: get(colMap.id), name: get(colMap.name), contract: get(colMap.contract),
                             owner: get(colMap.owner), eng: get(colMap.eng), city: get(colMap.city), 
@@ -455,6 +445,8 @@
                         };
                         projectDict[pData.id] = pData;
 
+                        const patternId = getOrCreatePattern(visConfig.colors, visConfig.isMilitary);
+
                         try {
                             const geo = wellknown.parse(wkt.trim());
                             if (geo) {
@@ -464,6 +456,7 @@
                                     } else {
                                         masterFeatures.push({ 
                                             type: 'Feature', geometry: g, 
+                                            // [修正] 提供 isMilitary 以供 Layer filter 判斷
                                             properties: { id: pData.id, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } 
                                         });
                                     }
@@ -473,13 +466,6 @@
                             }
                         } catch(e) {}
                     });
-
-                    // [關鍵機制] 確保地圖載入後，一口氣把所有的 Pattern 塞進去
-                    if (map.loaded()) {
-                        Object.keys(patternCache).forEach(id => {
-                            if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
-                        });
-                    }
 
                     buildDynamicFilters();
                     filterProjects();
@@ -510,9 +496,10 @@
         const cities = [...new Set(Object.values(projectDict).map(p => p.city))].filter(c => c && c.length >= 2).sort();
         cities.forEach(c => document.getElementById('city-filter').innerHTML += `<option value="${c}">${c}</option>`);
 
+        // [修改點] 顯示類別全名，但 checkbox 的 value 依然綁定純代碼
         const catGroup = document.getElementById('type-checkbox-group');
         catGroup.innerHTML = Array.from(dynamicCategories).sort().map(cFull => {
-            const code = cFull.substring(1, 3);
+            const code = cFull.substring(1, 3); // 取得 01, 02 等代碼
             return `
             <label class="checkbox-item">
                 <input type="checkbox" class="cat-cb" value="${code}" checked onchange="filterProjects()">
@@ -552,14 +539,17 @@
         listEl.innerHTML = "";
 
         Object.values(projectDict).forEach(p => {
+            // 1. 勾選類別判斷 (只要專案包含任何一個打勾的代碼即可)
             let mCat = p.codes.length === 0 || p.codes.some(c => checkedCats.includes(c));
             
+            // 2. 布林搜尋判斷
             let mSearch = true;
             if (parsedQ.text && !(p.name + p.owner + p.host + p.id).toLowerCase().includes(parsedQ.text)) mSearch = false;
             if (parsedQ.nots.some(c => p.codes.includes(c))) mSearch = false;
             if (parsedQ.andGroups.some(g => !g.every(c => p.codes.includes(c)))) mSearch = false;
             if (parsedQ.ors.length > 0 && !parsedQ.ors.some(c => p.codes.includes(c))) mSearch = false;
 
+            // 3. 數值與下拉
             let mPrice = (p.feeVal >= minV && p.feeVal <= maxV);
             let mCity = (city === "全國" || p.city === city);
             let mYear = true;
@@ -570,6 +560,7 @@
 
             p.filtered = mCat && mSearch && mPrice && mCity && mYear;
 
+            // 4. Turf 空間繪圖判斷
             if (p.filtered && polygonFilter) {
                 p.filtered = false; 
                 for(let m of masterMarkers.filter(x=>x.id===p.id)) {
@@ -582,6 +573,7 @@
                 }
             }
 
+            // 生成清單 UI
             if (p.filtered) {
                 count++;
                 listEl.innerHTML += `
