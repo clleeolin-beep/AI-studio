@@ -1,6 +1,6 @@
 /**
- * @fileoverview MapEngine.js v2.3.1 - 惇陽 AI 實驗室 通用空間分析引擎
- * @description 完整整合版：支援 3D 地形、WKT 雙向解析、動態繪製與 ES Module 導出。
+ * @fileoverview MapEngine.js v2.3.2 - 惇陽 AI 實驗室 通用空間分析引擎
+ * @description 完整整合版：修正生命週期衝突，確保 MapboxDraw 安全掛載。
  */
 
 class MapEngine {
@@ -39,7 +39,11 @@ class MapEngine {
         };
 
         this.init(options);
-        this.initDrawingTools(); 
+        
+        // 【AI Lab 修正】延遲繪圖工具掛載，等待地圖實例 Ready
+        this.map.on('load', () => {
+            this.initDrawingTools();
+        });
     }
 
     init(options) {
@@ -158,7 +162,7 @@ class MapEngine {
     }
 
     initDrawingTools() {
-        if (typeof MapboxDraw === 'undefined') return;
+        if (typeof MapboxDraw === 'undefined' || this.draw) return this.draw;
         this.draw = new MapboxDraw({
             displayControlsDefault: false,
             styles: [
@@ -168,6 +172,7 @@ class MapEngine {
             ]
         });
         this.map.addControl(this.draw);
+        this.log("繪製引擎已掛載", "SUCCESS");
         return this.draw;
     }
 
@@ -184,5 +189,4 @@ class MapEngine {
     }
 }
 
-// 匯出類別，供 ESM 模組使用
 export default MapEngine;

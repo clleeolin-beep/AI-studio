@@ -1,7 +1,6 @@
 /**
  * @fileoverview DraggablePanel.js - 惇陽 AI 實驗室 互動 UI 模組 v1.2
  * @module components/DraggablePanel
- * @description 建立可拖移、最小化、支援動態內容注入的浮動面板。
  */
 
 if (typeof document === 'undefined') {

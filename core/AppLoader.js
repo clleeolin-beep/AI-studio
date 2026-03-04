@@ -1,14 +1,14 @@
 /**
- * @Core: AppLoader
- * @Version: 2.3.0 (Optimized)
- * @Description: 管理 Manifest 分類選單生成、摺疊收合與模組切換。
+ * @fileoverview AppLoader.js v2.3.0 (Optimized)
+ * @module core/AppLoader
+ * @description 管理 Manifest 分類選單生成、摺疊收合與模組切換。
  * 強化點：新增 Iframe 生命週期監控與 DebugSystem 通訊橋接。
  */
 
 export default class AppLoader {
     /**
      * 初始化 AppLoader
-     * @param {Object} manifest - 傳入已加載的 JSON 配置
+     * @param {Object} manifest - 傳入已加載的 JSON 配置 (由 index.html 提供)
      */
     constructor(manifest) {
         if (!manifest || !manifest.ai_lab_config) {
@@ -54,11 +54,13 @@ export default class AppLoader {
             const groupDiv = document.createElement('div');
             groupDiv.className = 'module-group';
 
+            // 綁定收合事件
             catHeader.addEventListener('click', () => {
                 groupDiv.classList.toggle('collapsed');
                 catHeader.classList.toggle('collapsed');
             });
 
+            // 生成子模組項目
             groups[catName].forEach(mod => {
                 const item = document.createElement('a');
                 item.className = 'nav-link d-flex align-items-center';
@@ -122,6 +124,10 @@ export default class AppLoader {
         document.querySelectorAll('.nav-link').forEach(nav => nav.classList.remove('active'));
         if (el) el.classList.add('active');
 
+        // 同步通知 Debug 視窗
+        if (window.sysLog) {
+            window.sysLog(`準備切換至: ${mod.name}`, "info");
+        }
         console.log(`[System] 準備切換至: ${mod.name} -> ${mod.path}`);
     }
 
@@ -136,7 +142,6 @@ export default class AppLoader {
         }
 
         // 2. 核心通訊校驗：通知 DebugSystem 重新檢查 Iframe
-        // 如果父視窗有 DebugSystem，則在此主動標記連線
         console.log(`[System] 模組 [${mod.name}] 已載入完成，通訊管道建立中...`);
 
         // 3. 針對 MapEditor 等複雜模組進行自動初始化訊號

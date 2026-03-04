@@ -1,6 +1,6 @@
 /**
- * @fileoverview EditorDataService.js - 惇陽 AI 實驗室 資料服務模組 v2.5.1
- * [分組模塊邏輯：補全偵錯橋接與資料清洗]
+ * @fileoverview EditorDataService.js - 惇陽 AI 實驗室 資料服務模組 v2.6.0
+ * [分組模塊邏輯：支援多表單架構、偵錯橋接與資料清洗]
  */
 
 if (typeof fetch === 'undefined') {
@@ -8,14 +8,14 @@ if (typeof fetch === 'undefined') {
 }
 
 export default class EditorDataService {
-    constructor(sheetId = null) {
-        this.sheetId = sheetId;
+    constructor() {
+        this.sheetId = null;
         this.gid = '0';
         this.rawRecords = [];
         this.headerMap = {};
         this.isLoaded = false;
         
-        // [標準欄位對照配置]
+        // 預設針對「公司案例地圖」的欄位對照配置
         this.fieldConfig = {
             id: '案號',
             wkt: '座標',
@@ -27,25 +27,30 @@ export default class EditorDataService {
         this.categoryData = { class: [], status: [] };
     }
 
-    async initAndFetch() {
+    /**
+     * @param {string} envKey - 指定要讀取 manifest 中的哪一個表單 (例如 'SHEET_CASES')
+     */
+    async initAndFetch(envKey = 'SHEET_CASES') {
         try {
-            if (!this.sheetId) {
-                this.log("嘗試從 manifest.json 獲取外部資料配置...", "INFO");
-                const configResp = await fetch('../../manifest.json');
-                const manifest = await configResp.json();
-                this.sheetId = manifest.ai_lab_config.env.CASE_SHEET_ID;
-            }
+            this.log(`嘗試從 manifest 獲取表單配置 [${envKey}]...`, "INFO");
+            const configResp = await fetch('../../manifest.json');
+            const manifest = await configResp.json();
+            
+            this.sheetId = manifest.ai_lab_config.env[envKey];
 
-            if (!this.sheetId) throw new Error("找不到有效的 CASE_SHEET_ID 配置");
+            if (!this.sheetId) throw new Error(`找不到有效的 ${envKey} 配置`);
 
             const url = `https://docs.google.com/spreadsheets/d/${this.sheetId}/export?format=csv&gid=${this.gid}`;
             const response = await fetch(url);
+            
+            if (!response.ok) throw new Error("Google 表單存取被拒或連結無效 (HTTP " + response.status + ")");
+            
             const csvText = await response.text();
             
             this._processCSV(csvText);
             this.isLoaded = true;
             
-            this.log(`資料源連線成功 ID: ${this.sheetId.substring(0, 8)}...`, "SUCCESS");
+            this.log(`表單 [${envKey}] 連線成功，載入 ${this.rawRecords.length} 筆資料`, "SUCCESS");
             return this.rawRecords;
         } catch (error) {
             this.log(`初始化失敗: ${error.message}`, "ERROR");
@@ -64,15 +69,18 @@ export default class EditorDataService {
         this.rawRecords = lines.slice(1).map(line => {
             const values = this._parseLine(line);
             const obj = {};
+            // 如果資料表沒有 wkt 欄位 (如測站資料)，依然會保留原始物件供擴充使用
             for (const [key, colName] of Object.entries(this.fieldConfig)) {
                 const idx = this.headerMap[colName];
                 let val = (idx !== undefined) ? (values[idx] || '') : '';
                 
-                if (key === 'wkt') {
+                if (key === 'wkt' && val) {
                     val = val.replace(/^["']|["']$/g, '').trim();
                 }
                 obj[key] = val;
             }
+            // 儲存完整原始資料以備不時之需
+            obj._raw = values;
             return obj;
         });
 

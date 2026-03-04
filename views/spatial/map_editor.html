@@ -44,24 +44,31 @@
     </div>
 
 <script>
-    // 獨立的 Debug 橋接器，確保在模組載入前就啟動
+    // 獨立 Debug 橋接器：過濾無關圖磚雜訊
     const setupDebugBridge = () => {
         ['log', 'warn', 'error'].forEach(type => {
             const original = console[type];
             console[type] = (...args) => {
                 original.apply(console, args);
+                const msgString = args.join(' ');
+                
+                if (msgString.includes('Failed to fetch') || msgString.includes('Script error')) return;
+
                 if (window.parent && window.parent !== window) {
                     window.parent.postMessage({
                         source: 'AI_STUDIO_APP',
                         type: 'debug',
                         module: 'MapEditor',
                         level: type === 'log' ? 'INFO' : type.toUpperCase(),
-                        msg: args.join(' ')
+                        msg: msgString
                     }, '*');
                 }
             };
         });
-        window.onerror = (msg) => console.error(msg);
+        window.onerror = (msg) => {
+            if (typeof msg === 'string' && msg.includes('Script error')) return;
+            console.error(msg);
+        };
     };
     setupDebugBridge();
 </script>
@@ -76,35 +83,21 @@
     async function init() {
         console.log("正在啟動地圖編輯器環境...");
         try {
-            const configResp = await fetch('../../manifest.json');
-            if (!configResp.ok) throw new Error("無法讀取 manifest.json 配置檔");
-            const manifest = await configResp.json();
-            
-            const env = manifest.ai_lab_config.env || {};
-            const SHEET_ID = env.CASE_SHEET_ID;
-            
-            if (!SHEET_ID) {
-                console.warn("manifest.json 中未定義 CASE_SHEET_ID，將使用預設空值");
-            }
-
             // 1. 初始化引擎
             engine = new MapEngine('map', { center: [121.50, 23.90], zoom: 7, pitch: 0 });
             
-            // 2. 掛載繪圖工具
+            // 2. 獲取繪圖工具實例
             draw = engine.initDrawingTools();
 
-            // 3. 讀取資料服務
-            dataService = new EditorDataService(SHEET_ID || "");
-            
-            // [AI Lab 修正]：呼叫正確的方法名稱 initAndFetch()
-            await dataService.initAndFetch();
+            // 3. 讀取資料服務 (指定讀取公司案例表單)
+            dataService = new EditorDataService();
+            await dataService.initAndFetch('SHEET_CASES');
 
             // 4. 初始化介面
             setupUI();
             bindMapEvents();
             
             console.log(`系統啟動成功，資料源已準備就緒`);
-            
         } catch (error) {
             console.error(`[CRITICAL] 初始化失敗: ${error.message}`);
         }
@@ -196,7 +189,8 @@
         document.getElementById('info-id').innerText = target.id;
         document.getElementById('info-name').innerText = target.name;
         document.getElementById('val-wkt').value = target.wkt;
-        if (target.wkt && target.wkt.trim() !== "") {
+        
+        if (target.wkt && target.wkt.trim() !== "" && draw) {
             const feature = engine.parseWKT(target.wkt);
             if (feature) {
                 draw.deleteAll();
@@ -208,6 +202,7 @@
     };
 
     function syncMapToField() {
+        if (!draw) return;
         const data = draw.getAll();
         if (data.features.length > 0) {
             const wktArr = engine.featuresToWKT(data.features);

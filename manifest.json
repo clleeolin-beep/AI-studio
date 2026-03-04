@@ -5,8 +5,8 @@
   "display": "standalone",
   "theme_color": "#1A5276",
   "ai_lab_config": {
-    "version": "2.2.3",
-    "description": "模組化空間資訊編輯平台 (正式權限控管版)",
+    "version": "2.3.0",
+    "description": "模組化空間資訊編輯平台",
     "core": {
       "loader": "core/AppLoader.js",
       "debug": "core/DebugSystem.js"
@@ -38,110 +38,28 @@
         "copic.wang@gmail.com",
         "swallowa81@gmail.com"
       ],
-      "CASE_SHEET_ID": "1r1e0Nl7y-8BvH7I8f5I6Y5I8p9X8Y8Z",
+      "SHEET_CASES": "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE",
+      "SHEET_WEATHER": "12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg",
+      "SHEET_INSPECTION": "1YmRd6S6JY1NpXXc6Ix4qAtXiKQO6-RAjZ-gi_6-9q4g",
       "ADMIN_KEY": "AI_LAB_2026",
       "MAP_DEFAULT_CENTER": [121.50, 23.90],
       "TERRAIN_EXAGGERATION": 1.5
     },
     "modules": [
-      {
-        "id": "MapViewer",
-        "name": "空間實績地圖",
-        "icon": "🌐",
-        "path": "views/spatial/map.html",
-        "category": "空間資訊"
-      },
-      {
-        "id": "MapEditor",
-        "name": "圖資編輯工具",
-        "icon": "🛠️",
-        "path": "views/spatial/map_editor.html",
-        "category": "空間資訊"
-      },
-      {
-        "id": "WeatherMonitor",
-        "name": "氣象監測系統",
-        "icon": "☁️",
-        "path": "views/spatial/Weather.html",
-        "category": "空間資訊"
-      },
-      {
-        "id": "WeatherData",
-        "name": "氣候資料工具",
-        "icon": "📅",
-        "path": "views/spatial/WeatherData.html",
-        "category": "空間資訊"
-      },
-      {
-        "id": "CalcEngine",
-        "name": "工程換算引擎",
-        "icon": "📐",
-        "path": "views/productivity/calc.html",
-        "category": "生產力"
-      },
-      {
-        "id": "DocAssistant",
-        "name": "公文智能助手",
-        "icon": "📝",
-        "path": "views/productivity/doc.html",
-        "category": "生產力"
-      },
-      {
-        "id": "GreenTool",
-        "name": "植栽選取工具",
-        "icon": "🌿",
-        "path": "views/productivity/green.html",
-        "category": "生產力"
-      },
-      {
-        "id": "TreeNav",
-        "name": "數據階層導覽",
-        "icon": "🌳",
-        "path": "views/productivity/tree.html",
-        "category": "生產力"
-      },
-      {
-        "id": "GanttManager",
-        "name": "專案進度管理",
-        "icon": "📊",
-        "path": "views/management/Gantt.html",
-        "category": "管理決策"
-      },
-      {
-        "id": "InspectionTool",
-        "name": "現場會勘記錄",
-        "icon": "📸",
-        "path": "views/management/inspection_tool.html",
-        "category": "現場採集"
-      },
-      {
-        "id": "BusinessCardVision",
-        "name": "數位名片管理",
-        "icon": "🪪",
-        "path": "views/management/BusinessCard_Vision.html",
-        "category": "管理決策"
-      },
-      {
-        "id": "AdminConsole",
-        "name": "系統後台管理",
-        "icon": "⚙️",
-        "path": "views/management/admin_console.html",
-        "category": "管理決策"
-      },
-      {
-        "id": "NasSync",
-        "name": "NAS 架構說明",
-        "icon": "🔗",
-        "path": "views/knowledge/AI_NAS.html",
-        "category": "知識架構"
-      },
-      {
-        "id": "Tutorial",
-        "name": "操作教學指南",
-        "icon": "📖",
-        "path": "views/knowledge/tutorial.html",
-        "category": "知識架構"
-      }
+      { "id": "MapViewer", "name": "空間實績地圖", "icon": "🌐", "path": "views/spatial/map.html", "category": "空間資訊" },
+      { "id": "MapEditor", "name": "圖資編輯工具", "icon": "🛠️", "path": "views/spatial/map_editor.html", "category": "空間資訊" },
+      { "id": "WeatherMonitor", "name": "氣象監測系統", "icon": "☁️", "path": "views/spatial/Weather.html", "category": "空間資訊" },
+      { "id": "WeatherData", "name": "氣候資料工具", "icon": "📅", "path": "views/spatial/WeatherData.html", "category": "空間資訊" },
+      { "id": "CalcEngine", "name": "工程換算引擎", "icon": "📐", "path": "views/productivity/calc.html", "category": "生產力" },
+      { "id": "DocAssistant", "name": "公文智能助手", "icon": "📝", "path": "views/productivity/doc.html", "category": "生產力" },
+      { "id": "GreenTool", "name": "植栽選取工具", "icon": "🌿", "path": "views/productivity/green.html", "category": "生產力" },
+      { "id": "TreeNav", "name": "數據階層導覽", "icon": "🌳", "path": "views/productivity/tree.html", "category": "生產力" },
+      { "id": "GanttManager", "name": "專案進度管理", "icon": "📊", "path": "views/management/Gantt.html", "category": "管理決策" },
+      { "id": "InspectionTool", "name": "現場會勘記錄", "icon": "📸", "path": "views/management/inspection_tool.html", "category": "現場採集" },
+      { "id": "BusinessCardVision", "name": "數位名片管理", "icon": "🪪", "path": "views/management/BusinessCard_Vision.html", "category": "管理決策" },
+      { "id": "AdminConsole", "name": "系統後台管理", "icon": "⚙️", "path": "views/management/admin_console.html", "category": "管理決策" },
+      { "id": "NasSync", "name": "NAS 架構說明", "icon": "🔗", "path": "views/knowledge/AI_NAS.html", "category": "知識架構" },
+      { "id": "Tutorial", "name": "操作教學指南", "icon": "📖", "path": "views/knowledge/tutorial.html", "category": "知識架構" }
     ]
   }
 }
