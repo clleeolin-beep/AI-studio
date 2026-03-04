@@ -8,22 +8,6 @@
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script>
     
-    <script>
-        // [防線 1] 全局錯誤過濾器：攔截底層圖磚 Failed to fetch 與 image missing 雜訊
-        const origErr = console.error;
-        console.error = function(...args) {
-            const msg = args.join(' ');
-            if (msg.includes('Failed to fetch') || msg.includes('could not be loaded')) return;
-            origErr.apply(console, args);
-        };
-        const origWarn = console.warn;
-        console.warn = function(...args) {
-            const msg = args.join(' ');
-            if (msg.includes('styleimagemissing')) return;
-            origWarn.apply(console, args);
-        };
-    </script>
-
     <style>
         :root { --primary: #1A5276; --success: #27AE60; --danger: #E74C3C; --bg: #f8f9fa; }
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; display: flex; font-family: 'Microsoft JhengHei', sans-serif; overflow: hidden; background: #333; }
@@ -34,11 +18,22 @@
         .panel-header { background: var(--primary); color: white; padding: 10px 15px; cursor: move; display: flex; justify-content: space-between; align-items: center; user-select: none; }
         .panel-header h3 { margin: 0; font-size: 14px; letter-spacing: 1px; }
         .panel-body { padding: 12px; overflow-y: auto; flex-grow: 1; background: var(--bg); }
+        .panel-close { background: none; border: none; color: white; font-size: 16px; cursor: pointer; padding: 0 5px; }
+        .panel-close:hover { color: #ccc; }
         
+        /* 面板位置 */
         #layer-panel { top: 20px; left: 20px; width: 300px; }
         #tool-panel { top: 20px; left: 340px; width: 350px; }
         #result-panel { top: 20px; right: 20px; width: 350px; height: 80vh; }
 
+        /* 內部 Debug 終端機 */
+        #debug-panel { bottom: 20px; left: 80px; width: 500px; height: 250px; display: none; background: rgba(30,30,30,0.95); border: 1px solid #555; z-index: 9999; }
+        #debug-panel .panel-header { background: #222; }
+        #debug-panel .panel-body { background: transparent; padding: 10px; font-family: monospace; font-size: 12px; color: #0f0; }
+        #debug-toggle { position: absolute; bottom: 20px; left: 20px; width: 45px; height: 45px; background: #222; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.5); font-size: 20px; border: 2px solid #555; transition: 0.2s; }
+        #debug-toggle:hover { background: #333; transform: scale(1.1); }
+
+        /* UI 基礎元件 */
         .section-title { font-size: 13px; font-weight: bold; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 10px; margin-top: 15px; }
         .section-title:first-child { margin-top: 0; }
         select, input[type="text"] { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-size: 12px; margin-bottom: 10px; }
@@ -83,15 +78,27 @@
         .popup-container td:first-child { width: 95px; color: #1A5276; font-weight: bold; background: #f9fbfc; border-right: 1px solid #eee; padding: 6px 8px; }
 
         .instruction-box { background: #eef2f5; padding: 8px; border-radius: 4px; font-size: 11px; margin-bottom: 10px; color: #555; border-left: 4px solid #E67E22; }
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; flex-direction: column; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; flex-direction: column; }
         .maplibregl-ctrl-pitch { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E"); background-size: 20px; background-repeat: no-repeat; background-position: center; }
     </style>
 </head>
 <body>
 
-<div id="loading-overlay"><div id="loading-text">系統核心引擎加載中...</div></div>
+<div id="loading-overlay"><div id="loading-text">系統核心引擎與資料加載中...</div></div>
 
 <div id="map"></div>
+
+<div id="debug-toggle" onclick="toggleDebug()" title="開啟系統除錯終端">🐛</div>
+<div id="debug-panel" class="floating-panel">
+    <div class="panel-header" id="debug-header">
+        <h3 style="color:#0f0; font-family:monospace;">Terminal [Debug Console]</h3>
+        <div>
+            <button class="panel-close" onclick="minimizeDebug()" title="最小化">_</button>
+            <button class="panel-close" onclick="toggleDebug()" title="關閉">✖</button>
+        </div>
+    </div>
+    <div class="panel-body" id="debug-log"></div>
+</div>
 
 <div id="layer-panel" class="floating-panel">
     <div class="panel-header"><h3>🎛️ 圖層與視角控制</h3></div>
@@ -163,22 +170,53 @@
 </div>
 
 <script>
+    // --- 內部 Debug Console 攔截器 ---
+    const debugLogEl = document.getElementById('debug-log');
+    function logToDebug(type, args) {
+        if(!debugLogEl) return;
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+        // 雜訊過濾
+        if (msg.includes('Failed to fetch') || msg.includes('could not be loaded') || msg.includes('styleimagemissing')) return;
+        const color = type === 'error' ? '#ff4d4d' : type === 'warn' ? '#f39c12' : '#00ff00';
+        const time = new Date().toLocaleTimeString();
+        debugLogEl.innerHTML += `<div style="color:${color}; margin-bottom:4px; border-bottom:1px dashed #444; padding-bottom:4px;">[${time}] [${type.toUpperCase()}] ${msg}</div>`;
+        debugLogEl.scrollTop = debugLogEl.scrollHeight;
+    }
+    const origLog = console.log, origWarn = console.warn, origErr = console.error;
+    console.log = function(...args) { logToDebug('info', args); origLog.apply(console, args); };
+    console.warn = function(...args) { logToDebug('warn', args); origWarn.apply(console, args); };
+    console.error = function(...args) { logToDebug('error', args); origErr.apply(console, args); };
+
+    function toggleDebug() { 
+        const p = document.getElementById('debug-panel'); 
+        p.style.display = (p.style.display === 'none' || p.style.display === '') ? 'flex' : 'none'; 
+    }
+    function minimizeDebug() {
+        const p = document.getElementById('debug-panel');
+        const body = p.querySelector('.panel-body');
+        if(body.style.display === 'none') {
+            body.style.display = 'block'; p.style.height = '250px';
+        } else {
+            body.style.display = 'none'; p.style.height = '40px';
+        }
+    }
+
     // --- 核心系統變數 ---
     let map, sheetId;
     let isSatellite = false, is3D = false;
-    let projectDict = {};       // 原始資料表
-    let masterFeatures = [];    // GeoJSON Feature (Line/Polygon)
-    let masterMarkers = [];     // DOM Markers (Point)
-    let patternCache = {};      // Canvas 快取
+    let projectDict = {};       
+    let masterFeatures = [];    
+    let masterMarkers = [];     
+    let patternCache = {};      
+    let dynamicCategories = new Set(); 
     
     let showGeom = { point: true, line: true, polygon: true };
     let polygonFilter = null, drawPoints = [];
-    let searchTimeout;          // 防抖計時器
+    let searchTimeout;          
 
     const levelNames = ["0", "100萬", "1000萬", "5000萬", "1億", "5億", "5億+"];
     const levels = [0, 1e6, 1e7, 5e7, 1e8, 5e8, 1e12];
     
-    // 定義 13 項類別色碼與全名對照
     const CategoryFullNames = {
         "01": "01 產業園區開發", "02": "02 都市計畫及都市更新", "03": "03 國土計畫及非都市土地開發",
         "04": "04 再生能源基地設計", "05": "05 促參招商", "06": "06 遊憩規劃", "07": "07 建築及土木設計",
@@ -191,11 +229,12 @@
     };
 
     const terrainRGB = { "type": "raster-dem", "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], "encoding": "terrarium", "tileSize": 256 };
-    const osmStyle = { "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "osm" }] };
+    const buildings = { "type": "vector", "tiles": ["https://{s}.data.osmbuildings.org/0.2/59f80695/tile/{z}/{x}/{y}.json"] };
+    const osmStyle = { "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "osm-buildings": buildings, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "osm" }] };
     const esriStyle = { "version": 8, "sources": { "esri": { "type": "raster", "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], "tileSize": 256 }, "t-rgb": terrainRGB }, "layers": [{ "id": "base-layer", "type": "raster", "source": "esri" }] };
 
     window.onload = async () => {
-        ['layer-panel', 'tool-panel', 'result-panel'].forEach(id => {
+        ['layer-panel', 'tool-panel', 'result-panel', 'debug-panel'].forEach(id => {
             const el = document.getElementById(id);
             if (el) makeDraggable(el, el.querySelector('.panel-header'));
         });
@@ -206,7 +245,7 @@
     function makeDraggable(el, header) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         header.onmousedown = (e) => {
-            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            if (e.target.closest('button') || e.target.tagName === 'INPUT') return;
             e.preventDefault();
             pos3 = e.clientX; pos4 = e.clientY;
             document.onmouseup = () => { document.onmouseup = null; document.onmousemove = null; };
@@ -222,7 +261,7 @@
         };
     }
 
-    // --- 1. 核心渲染引擎與圖層註冊 ---
+    // --- 1. 核心地圖初始化 ---
     function initMap() {
         map = new maplibregl.Map({ container: 'map', style: osmStyle, center: [121.0, 23.8], zoom: 7, pitch: 0 });
         map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
@@ -238,11 +277,12 @@
             }
         }, 500);
 
-        // [防線 2] 補圖機制：若引擎丟失 Pattern，從快取強制回填
+        // [防線] 補圖機制：若引擎在切換時丟失 Pattern，從快取強制回填
         map.on('styleimagemissing', (e) => {
             const id = e.id;
             if (patternCache[id] && !map.hasImage(id)) {
                 map.addImage(id, patternCache[id]);
+                console.warn(`[Fallback] 補圖成功: ${id}`);
             }
         });
 
@@ -254,12 +294,13 @@
             map.addSource('projects-data', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
         
-        // 切換底圖時主動先註冊所有圖片，防止 could not be loaded 錯誤
+        // 確保圖層掛載前，Pattern 已經全數寫入
+        let reg = [];
         Object.keys(patternCache).forEach(id => {
-            if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
+            if (!map.hasImage(id)) { map.addImage(id, patternCache[id]); reg.push(id); }
         });
+        if(reg.length > 0) console.log(`[Map Load] Pattern Ready: [${reg.join(', ')}]`);
 
-        // Polygon
         if(!map.getLayer('layer-polygon')) {
             map.addLayer({ id: 'layer-polygon', type: 'fill', source: 'projects-data', filter: ['==', '$type', 'Polygon'], 
                 paint: { 'fill-pattern': ['get', 'patternId'], 'fill-opacity': 0.8 } 
@@ -269,14 +310,11 @@
             });
         }
         
-        // LineString
         if(!map.getLayer('layer-line')) {
-            // 軍方底層金邊發光
             map.addLayer({ id: 'layer-line-glow', type: 'line', source: 'projects-data', 
                 filter: ['all', ['==', '$type', 'LineString'], ['==', 'isMilitary', true]], 
                 paint: { 'line-color': '#FFD700', 'line-width': 10, 'line-opacity': 0.8, 'line-blur': 2 } 
             }); 
-            // 節段多色主線段
             map.addLayer({ id: 'layer-line', type: 'line', source: 'projects-data', filter: ['==', '$type', 'LineString'], 
                 paint: { 'line-pattern': ['get', 'patternId'], 'line-width': 6 } 
             });
@@ -290,9 +328,26 @@
         });
     }
 
-    // --- 2. 視覺設定與 Pattern 預熱 ---
+    // --- 2. 視覺設定與 ID 去特徵化 ---
+    function getVisualConfig(catString) {
+        if(!catString) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
+        
+        const codes = [];
+        const matches = catString.match(/#\d{2}/g);
+        if (matches) matches.forEach(m => codes.push(m.substring(1)));
+        
+        let isMilitary = codes.includes("13");
+        let colors = [...new Set(codes.map(c => CodeColorMap[c]).filter(c => c))];
+        
+        if (colors.length === 0) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
+        
+        colors.sort((a, b) => Object.values(CodeColorMap).indexOf(a) - Object.values(CodeColorMap).indexOf(b));
+        return { isEmpty: false, colors, isMilitary, codes };
+    }
+
+    // [ID 去特徵化] 移除 # 號，改用底線
     function generatePattern(colors, isMilitary) {
-        const id = 'pattern-' + (colors.length ? colors.join('-').replace(/#/g, '') : 'empty') + (isMilitary ? '-mil' : '');
+        const id = 'pattern_' + (colors.length ? colors.map(c=>c.replace('#','')).join('_') : 'empty') + (isMilitary ? '_mil' : '');
         if (patternCache[id]) return id;
 
         const canvas = document.createElement('canvas');
@@ -300,53 +355,40 @@
         const ctx = canvas.getContext('2d');
 
         if (isMilitary) {
-            ctx.fillStyle = '#34495E';
-            ctx.fillRect(0, 0, 64, 64);
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2; // 極細金斜紋
-            ctx.beginPath();
-            for (let i = -64; i < 128; i += 16) { ctx.moveTo(i, 0); ctx.lineTo(i + 64, 64); }
-            ctx.stroke();
+            ctx.fillStyle = '#34495E'; ctx.fillRect(0, 0, 64, 64);
+            ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2;
+            ctx.beginPath(); for (let i = -64; i < 128; i += 16) { ctx.moveTo(i, 0); ctx.lineTo(i + 64, 64); } ctx.stroke();
         } else if (colors.length > 0) {
-            const num = colors.length;
-            const bandWidth = 64 / num; 
+            const num = colors.length; const bandWidth = 64 / num; 
             ctx.rotate(45 * Math.PI / 180);
             for (let i = -10; i < 10; i++) {
-                ctx.fillStyle = colors[((i % num) + num) % num];
-                ctx.fillRect(i * bandWidth, -100, bandWidth, 200);
+                ctx.fillStyle = colors[((i % num) + num) % num]; ctx.fillRect(i * bandWidth, -100, bandWidth, 200);
             }
             ctx.setTransform(1, 0, 0, 1, 0, 0);
         } else {
-            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64); // 空值防呆
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64);
         }
 
-        const imgData = ctx.getImageData(0,0,64,64);
-        patternCache[id] = imgData;
-        if (map.loaded() && !map.hasImage(id)) map.addImage(id, imgData);
+        patternCache[id] = ctx.getImageData(0,0,64,64);
         return id;
     }
 
-    function createPointMarker(coords, pId, colors, isMilitary) {
+    function createPointMarker(coords, pId, visConfig) {
         const el = document.createElement('div');
         el.style.width = '20px'; el.style.height = '20px';
-        el.style.borderRadius = '50%';
-        el.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
+        el.style.borderRadius = '50%'; el.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
         el.style.cursor = 'pointer';
 
-        if (colors.length === 0 && !isMilitary) {
-            el.style.backgroundColor = '#fff';
-            el.style.border = '2px solid #aaa'; // 空值白色空心圓
-        } else if (isMilitary) {
-            el.style.backgroundColor = '#34495E';
-            el.style.border = '3px solid #FFD700'; // 軍方鐵灰金邊
-        } else if (colors.length === 1) {
-            el.style.backgroundColor = colors[0];
-            el.style.border = '2px solid #fff';
+        if (visConfig.isEmpty) {
+            el.style.backgroundColor = '#fff'; el.style.border = '2px solid #aaa';
+        } else if (visConfig.isMilitary) {
+            el.style.backgroundColor = '#34495E'; el.style.border = '3px solid #FFD700';
+        } else if (visConfig.colors.length === 1) {
+            el.style.backgroundColor = visConfig.colors[0]; el.style.border = '2px solid #fff';
         } else {
-            const step = 100 / colors.length;
-            const stops = colors.map((c, i) => `${c} ${i*step}% ${(i+1)*step}%`).join(', ');
-            el.style.background = `conic-gradient(${stops})`; // 等分圓餅圖
-            el.style.border = '2px solid #fff';
+            const step = 100 / visConfig.colors.length;
+            const stops = visConfig.colors.map((c, i) => `${c} ${i*step}% ${(i+1)*step}%`).join(', ');
+            el.style.background = `conic-gradient(${stops})`; el.style.border = '2px solid #fff';
         }
 
         el.addEventListener('click', (e) => { e.stopPropagation(); showPopup(pId, coords); });
@@ -354,20 +396,23 @@
         return { marker: marker, id: pId, featureRef: { type: 'Feature', geometry: { type: 'Point', coordinates: coords } } };
     }
 
-    // --- 3. 資料處理 ---
+    // --- 3. 資料處理與 Render Lock ---
     async function fetchManifestAndData() {
         try {
             const resp = await fetch('../../manifest.json');
             const manifest = await resp.json();
             sheetId = manifest.ai_lab_config.env.SHEET_CASES;
             await loadSheetDataGviz();
-        } catch (error) { alert("配置檔載入失敗"); hideLoading(); }
+        } catch (error) { console.error("配置檔載入失敗", error); hideLoading(); }
     }
 
     function loadSheetDataGviz() {
         return new Promise((resolve) => {
             window.gvizCallback = (json) => {
                 if (json && json.table) {
+                    masterFeatures = []; masterMarkers = []; projectDict = {}; dynamicCategories.clear();
+                    let patternsToRegister = new Set();
+
                     const headerRow = json.table.cols.map(c => c.label || "");
                     const getIdx = (keywords) => headerRow.findIndex(h => keywords.some(k => h.includes(k)));
                     let colMap = {
@@ -380,53 +425,72 @@
                         pm: getIdx(['專案經理']), status: getIdx(['狀態']), dateS: getIdx(['起始日期']), dateE: getIdx(['結束日期']), memo: getIdx(['備註'])
                     };
 
+                    // Step A: 載入與解析
                     json.table.rows.forEach(row => {
                         const get = (i) => (i!==-1 && row.c && row.c[i]) ? (row.c[i].f || row.c[i].v || "") : "";
                         const wkt = String(get(colMap.wkt));
                         if (!wkt || wkt.includes("座標") || wkt === "--") return;
 
                         const catRaw = get(colMap.cat) || "";
-                        const codes = (catRaw.match(/#\d{2}/g) || []).map(m => m.substring(1));
-                        const isMilitary = codes.includes("13");
-                        const colors = [...new Set(codes.map(c => CodeColorMap[c]).filter(c=>c))].sort((a,b)=> Object.values(CodeColorMap).indexOf(a) - Object.values(CodeColorMap).indexOf(b));
+                        const visConfig = getVisualConfig(catRaw);
                         
-                        // [Pre-warming] 提早生成 Pattern，確保 WebGL 就緒
-                        const patternId = generatePattern(colors, isMilitary);
+                        catRaw.split(',').map(c => c.trim()).filter(c => c).forEach(c => {
+                            if (c.match(/^#\d{2}/)) dynamicCategories.add(c);
+                        });
+                        
+                        const patternId = generatePattern(visConfig.colors, visConfig.isMilitary);
+                        patternsToRegister.add(patternId);
                         
                         const pData = {
                             id: get(colMap.id), name: get(colMap.name), contract: get(colMap.contract),
                             owner: get(colMap.owner), eng: get(colMap.eng), city: get(colMap.city), 
                             location: get(colMap.city) + get(colMap.town), scale: get(colMap.scale),
                             fee: get(colMap.fee), feeVal: parseFloat(String(get(colMap.fee)).replace(/[^0-9.]/g, "")) || 0,
-                            photo: get(colMap.photo), cat: catRaw, codes: codes,
+                            photo: get(colMap.photo), cat: catRaw, codes: visConfig.codes, 
                             type: get(colMap.type), attr: get(colMap.attr), 
                             awards: [get(colMap.gold), get(colMap.other)].filter(x=>x).join(" / "),
                             team: get(colMap.team), host: get(colMap.host), pm: get(colMap.pm),
                             dates: `${get(colMap.dateS)||'--'} - ${get(colMap.dateE)||'--'}`, 
                             status: get(colMap.status), memo: get(colMap.memo),
-                            filtered: true, selected: true, color: colors[0] || '#ccc'
+                            filtered: true, selected: true, color: visConfig.colors[0] || '#ccc'
                         };
                         projectDict[pData.id] = pData;
 
                         try {
                             const geo = wellknown.parse(wkt.trim());
-                            if (geo) {
-                                const processGeom = (g) => {
-                                    if (g.type === 'Point') {
-                                        masterMarkers.push(createPointMarker(g.coordinates, pData.id, colors, isMilitary));
-                                    } else {
-                                        masterFeatures.push({ 
-                                            type: 'Feature', geometry: g, 
-                                            properties: { id: pData.id, patternId: patternId, mainColor: pData.color, isMilitary: isMilitary } 
-                                        });
-                                    }
-                                };
-                                if (geo.type === "GeometryCollection") geo.geometries.forEach(processGeom);
-                                else processGeom(geo);
-                            }
-                        } catch(e) {}
+                            if (!geo) throw new Error("Parsed geo is null");
+                            
+                            const processGeom = (g) => {
+                                if (g.type === 'Point') {
+                                    masterMarkers.push(createPointMarker(g.coordinates, pData.id, visConfig));
+                                } else {
+                                    masterFeatures.push({ 
+                                        type: 'Feature', geometry: g, 
+                                        properties: { id: pData.id, patternId: patternId, mainColor: pData.color, isMilitary: visConfig.isMilitary } 
+                                    });
+                                }
+                            };
+                            if (geo.type === "GeometryCollection") geo.geometries.forEach(processGeom);
+                            else processGeom(geo);
+                        } catch(e) {
+                            // [WKT 容錯日誌]
+                            console.error(`[Error] 案號 ${pData.id} 座標格式錯誤: ${wkt}`);
+                        }
                     });
 
+                    // Step B & C: 批次註冊 Pattern 並印出
+                    if (map.loaded()) {
+                        let registered = [];
+                        patternsToRegister.forEach(id => {
+                            if (patternCache[id] && !map.hasImage(id)) {
+                                map.addImage(id, patternCache[id]);
+                                registered.push(id);
+                            }
+                        });
+                        console.log(`[System] Pattern Ready: [${registered.join(', ')}]`);
+                    }
+
+                    // Step D: 更新地圖 (Render Lock 解除)
                     buildDynamicFilters();
                     debouncedFilter();
                 }
@@ -460,7 +524,7 @@
         catGroup.innerHTML = Object.keys(CategoryFullNames).sort().map(code => `
             <label class="checkbox-item">
                 <input type="checkbox" class="cat-cb" value="${code}" checked onchange="debouncedFilter()">
-                <span style="display:inline-block; width:12px; height:12px; background:${CodeColorMap[code]}; margin-right:6px; border-radius:2px; flex-shrink:0;"></span>
+                <span style="display:inline-block; width:12px; height:12px; background:${CodeColorMap[code]||'#ccc'}; margin-right:6px; border-radius:2px; flex-shrink:0;"></span>
                 <span>${CategoryFullNames[code]}</span>
             </label>
         `).join('');
@@ -662,8 +726,12 @@
         map.once('style.load', () => {
             if (is3D) map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
             
-            // 切換底圖後，主動在 source 前註冊 pattern
-            Object.keys(patternCache).forEach(id => { if (!map.hasImage(id)) map.addImage(id, patternCache[id]); });
+            let reReg = [];
+            Object.keys(patternCache).forEach(id => { 
+                if (!map.hasImage(id)) { map.addImage(id, patternCache[id]); reReg.push(id); }
+            });
+            if(reReg.length > 0) console.log(`[Style Switch] Pattern Re-registered: [${reReg.join(', ')}]`);
+            
             setupMapLayers(); 
             if(currentData) map.getSource('projects-data').setData(currentData); 
             
