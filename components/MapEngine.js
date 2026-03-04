@@ -1,6 +1,6 @@
 /**
- * @fileoverview MapEngine.js v2.3.0 - 惇陽 AI 實驗室 通用空間分析引擎
- * @description 完整整合版：支援 3D 地形、WKT 雙向解析、動態繪製與單例介面。
+ * @fileoverview MapEngine.js v2.3.1 - 惇陽 AI 實驗室 通用空間分析引擎
+ * @description 完整整合版：支援 3D 地形、WKT 雙向解析、動態繪製與 ES Module 導出。
  */
 
 class MapEngine {
@@ -11,7 +11,6 @@ class MapEngine {
         this.isSatellite = false;
         this.terrainActive = options.terrainDefault !== undefined ? options.terrainDefault : true;
         
-        // 1. 資源定義
         this.terrainSource = {
             "type": "raster-dem",
             "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
@@ -39,7 +38,6 @@ class MapEngine {
             "terrain": this.terrainActive ? { "source": "t-rgb", "exaggeration": 1.5 } : null
         };
 
-        // 2. 啟動初始化
         this.init(options);
         this.initDrawingTools(); 
     }
@@ -59,7 +57,6 @@ class MapEngine {
         this.log("MapEngine 核心初始化成功", "SUCCESS");
     }
 
-    // 3. 繪製引擎 (給 map_editor.html 使用)
     startDrawing(mode, callback) {
         if (!this.draw) {
             this.log("繪製工具未準備就緒", "ERROR");
@@ -80,7 +77,6 @@ class MapEngine {
         if (this.draw) this.draw.deleteAll();
     }
 
-    // 4. 視角與底圖控制
     switchBaseMap() {
         this.isSatellite = !this.isSatellite;
         const currentStyle = this.isSatellite ? this.esriStyle : this.osmStyle;
@@ -106,7 +102,6 @@ class MapEngine {
         this.log("視角已重置", "INFO");
     }
 
-    // 5. WKT 雙向解析邏輯
     featuresToWKT(features) {
         return features.map(feature => {
             const type = feature.geometry.type;
@@ -128,13 +123,40 @@ class MapEngine {
             if (str.startsWith('POINT')) {
                 const c = str.replace('POINT', '').replace(/[()]/g, '').trim().split(/\s+/);
                 return { type: 'Feature', geometry: { type: 'Point', coordinates: [parseFloat(c[0]), parseFloat(c[1])] }, properties: {} };
+            } else if (str.startsWith('LINESTRING')) {
+                const content = str.replace('LINESTRING', '').replace(/[()]/g, '').trim();
+                const coordinates = content.split(',').map(p => p.trim().split(/\s+/).map(Number));
+                return { type: 'Feature', geometry: { type: 'LineString', coordinates: coordinates }, properties: {} };
+            } else if (str.startsWith('POLYGON')) {
+                const rawContent = str.substring(str.indexOf('(') + 1, str.lastIndexOf(')'));
+                const ringStrings = rawContent.match(/\([^)]+\)/g);
+                const coordinates = ringStrings.map(ring => {
+                    const ringContent = ring.replace(/[()]/g, '').trim();
+                    return ringContent.split(',').map(p => p.trim().split(/\s+/).map(Number));
+                });
+                return { type: 'Feature', geometry: { type: 'Polygon', coordinates: coordinates }, properties: {} };
             }
-            // ... (其餘解析邏輯相同，為簡潔此處保留核心邏輯)
-        } catch (e) { this.log("WKT 解析出錯", "ERROR"); }
+        } catch (e) { 
+            this.log(`WKT 解析出錯: ${e.message}`, "ERROR"); 
+        }
         return null;
     }
 
-    // 6. 內部組件初始化
+    flyToWKT(wkt) {
+        const feature = this.parseWKT(wkt);
+        if (!feature) return;
+        let center;
+        const geom = feature.geometry;
+        if (geom.type === 'Point') center = geom.coordinates;
+        else if (geom.type === 'Polygon') center = geom.coordinates[0][0];
+        else if (geom.type === 'LineString') center = geom.coordinates[0];
+
+        if (center) {
+            this.map.flyTo({ center: center, zoom: 16, pitch: 45, essential: true, duration: 2000 });
+            this.log(`地圖定位至: ${center[0].toFixed(4)}, ${center[1].toFixed(4)}`, "INFO");
+        }
+    }
+
     initDrawingTools() {
         if (typeof MapboxDraw === 'undefined') return;
         this.draw = new MapboxDraw({
@@ -146,20 +168,21 @@ class MapEngine {
             ]
         });
         this.map.addControl(this.draw);
+        return this.draw;
     }
 
-    log(msg, level) {
-        if (window.parent) window.parent.postMessage({ type: 'debug', module: 'MapEngine', msg, level }, '*');
+    log(msg, level = "INFO") {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ 
+                source: 'AI_STUDIO_APP',
+                type: 'debug', 
+                module: 'MapEngine', 
+                msg: msg, 
+                level: level 
+            }, '*');
+        }
     }
 }
 
-// 7. Singleton 介面暴露 (供外部 HTML 直接調用)
-let mapInstance = null;
-window.MapEngine = {
-    init: (id, opt) => { mapInstance = new MapEngine(id, opt); },
-    startDrawing: (m, c) => mapInstance?.startDrawing(m, c),
-    clear: () => mapInstance?.clear(),
-    switchBaseMap: () => mapInstance?.switchBaseMap(),
-    toggle3D: () => mapInstance?.toggle3D(),
-    resetView: () => mapInstance?.resetView()
-};
+// 匯出類別，供 ESM 模組使用
+export default MapEngine;

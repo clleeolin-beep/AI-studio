@@ -43,8 +43,8 @@
         <span id="txt-coords">0.00000, 0.00000</span>
     </div>
 
-<script type="module">
-    // [AI Lab 修改]：修正橋接器協議，使其能與 DebugSystem.js v2.1.0 對接
+<script>
+    // 獨立的 Debug 橋接器，確保在模組載入前就啟動
     const setupDebugBridge = () => {
         ['log', 'warn', 'error'].forEach(type => {
             const original = console[type];
@@ -52,20 +52,21 @@
                 original.apply(console, args);
                 if (window.parent && window.parent !== window) {
                     window.parent.postMessage({
-                        type: 'debug', // 必須為 debug 才能觸發 DebugSystem
+                        source: 'AI_STUDIO_APP',
+                        type: 'debug',
                         module: 'MapEditor',
-                        level: type === 'log' ? 'INFO' : type.toUpperCase(), // INFO, WARN, ERROR
+                        level: type === 'log' ? 'INFO' : type.toUpperCase(),
                         msg: args.join(' ')
                     }, '*');
                 }
             };
         });
-        
-        // 額外監控未被捕捉的執行期錯誤
         window.onerror = (msg) => console.error(msg);
     };
     setupDebugBridge();
+</script>
 
+<script type="module">
     import MapEngine from '../../components/MapEngine.js';
     import DraggablePanel from '../../components/DraggablePanel.js';
     import EditorDataService from '../../components/EditorDataService.js';
@@ -79,7 +80,6 @@
             if (!configResp.ok) throw new Error("無法讀取 manifest.json 配置檔");
             const manifest = await configResp.json();
             
-            // [AI Lab 修改]：改為安全讀取，避免 manifest 結構不完整導致腳本崩潰
             const env = manifest.ai_lab_config.env || {};
             const SHEET_ID = env.CASE_SHEET_ID;
             
@@ -95,7 +95,9 @@
 
             // 3. 讀取資料服務
             dataService = new EditorDataService(SHEET_ID || "");
-            await dataService.fetchSheetData();
+            
+            // [AI Lab 修正]：呼叫正確的方法名稱 initAndFetch()
+            await dataService.initAndFetch();
 
             // 4. 初始化介面
             setupUI();
@@ -153,7 +155,6 @@
         editorPanel.setContent(html);
         document.getElementById('btn-search-trigger').onclick = executeSearch;
         
-        // 綁定複製按鈕
         document.getElementById('btn-copy-wkt').onclick = () => {
             const wkt = document.getElementById('val-wkt').value;
             if(!wkt) return console.warn("無資料可複製");

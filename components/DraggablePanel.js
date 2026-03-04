@@ -2,24 +2,13 @@
  * @fileoverview DraggablePanel.js - 惇陽 AI 實驗室 互動 UI 模組 v1.2
  * @module components/DraggablePanel
  * @description 建立可拖移、最小化、支援動態內容注入的浮動面板。
- * 已對接全域 DebugSystem 通訊協定。
  */
 
-// --- 模組防禦性檢查 ---
 if (typeof document === 'undefined') {
     console.error('[DraggablePanel] 嚴重錯誤：此模組僅支援瀏覽器環境。');
 }
 
 export default class DraggablePanel {
-    /**
-     * @param {Object} options - 配置參數
-     * @param {string} options.id - 面板唯一 ID
-     * @param {string} options.title - 面板顯示標題
-     * @param {number} [options.width=350] - 面板寬度
-     * @param {number} [options.top=20] - 初始頂部偏移
-     * @param {number} [options.left=20] - 初始左側偏移
-     * @param {boolean} [options.isClosable=true] - 是否顯示關閉按鈕
-     */
     constructor(options) {
         this.options = {
             id: 'default',
@@ -39,12 +28,7 @@ export default class DraggablePanel {
         this._init();
     }
 
-    /**
-     * 初始化 DOM 結構
-     * @private
-     */
     _init() {
-        // 1. 建立主容器
         this.container = document.createElement('div');
         this.container.id = `panel-${this.options.id}`;
         this.container.className = 'ai-lab-panel shadow-lg';
@@ -64,7 +48,6 @@ export default class DraggablePanel {
             transition: 'width 0.3s ease'
         });
 
-        // 2. 建立標題欄 (拖移點) - 實驗室招牌配色 (Cyan/Dark)
         this.header = document.createElement('div');
         this.header.className = 'panel-header d-flex justify-content-between align-items-center p-2';
         Object.assign(this.header.style, {
@@ -83,7 +66,6 @@ export default class DraggablePanel {
             </div>
         `;
 
-        // 3. 建立內容區
         this.body = document.createElement('div');
         this.body.className = 'panel-body p-3';
         Object.assign(this.body.style, {
@@ -99,32 +81,23 @@ export default class DraggablePanel {
         this._bindEvents();
     }
 
-    /**
-     * 綁定事件監聽
-     * @private
-     */
     _bindEvents() {
         let isDragging = false;
         let offsetX, offsetY;
 
-        // 拖拽啟動
         this.header.addEventListener('mousedown', (e) => {
             if (e.target.closest('button')) return;
             isDragging = true;
             offsetX = e.clientX - this.container.offsetLeft;
             offsetY = e.clientY - this.container.offsetTop;
-            this.container.style.zIndex = '1100'; // 置頂
+            this.container.style.zIndex = '1100';
             this.container.style.transition = 'none'; 
         });
 
-        // 拖拽移動
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            
             let left = e.clientX - offsetX;
             let top = e.clientY - offsetY;
-            
-            // 邊界檢查
             const maxX = window.innerWidth - this.container.offsetWidth;
             const maxY = window.innerHeight - this.header.offsetHeight;
             left = Math.max(0, Math.min(left, maxX));
@@ -134,7 +107,6 @@ export default class DraggablePanel {
             this.container.style.top = `${top}px`;
         });
 
-        // 拖拽停止
         document.addEventListener('mouseup', () => {
             if (isDragging) {
                 isDragging = false;
@@ -143,17 +115,12 @@ export default class DraggablePanel {
             }
         });
 
-        // UI 控制
         this.header.querySelector('.minimize-btn').addEventListener('click', () => this.toggleMinimize());
         if (this.options.isClosable) {
             this.header.querySelector('.close-btn').addEventListener('click', () => this.destroy());
         }
     }
 
-    /**
-     * 注入新內容
-     * @param {string|HTMLElement} content 
-     */
     setContent(content) {
         if (typeof content === 'string') {
             this.body.innerHTML = content;
@@ -164,9 +131,6 @@ export default class DraggablePanel {
         this.log(`內容已更新: ${this.options.id}`);
     }
 
-    /**
-     * 切換最小化/展開狀態
-     */
     toggleMinimize() {
         this.isMinimized = !this.isMinimized;
         if (this.isMinimized) {
@@ -179,23 +143,15 @@ export default class DraggablePanel {
         this.log(`面板狀態: ${this.isMinimized ? '最小化' : '展開'}`);
     }
 
-    /**
-     * 銷毀組件
-     */
     destroy() {
         this.container.remove();
         this.log(`面板 ${this.options.id} 已關閉並銷毀`);
     }
 
-    /**
-     * 對接全域偵錯中樞
-     * @param {string} msg 
-     * @param {string} [level="INFO"]
-     */
     log(msg, level = "INFO") {
-        if (window.parent && typeof window.parent.postMessage === 'function') {
+        if (window.parent && window.parent !== window) {
             window.parent.postMessage({ 
-                source: 'AI_STUDIO_APP', // 關鍵補全：與 DebugSystem 標籤對齊
+                source: 'AI_STUDIO_APP',
                 type: 'debug', 
                 module: 'DraggablePanel', 
                 msg: msg,
