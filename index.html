@@ -11,17 +11,118 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <style>
-        :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
-        body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
+        /* =========================================
+           [1] 核心變數系統 (Core Variables)
+           ========================================= */
+        :root { 
+            --lab-cyan: #00f2ff; /* 預設高亮色，將被主題覆寫 */
+            --lab-bg: #0f172a; 
+            --lab-sidebar: #1e293b; 
+            --box-radius: 20px;
+            --font-main: 'Segoe UI', sans-serif;
+            --login-overlay-bg: var(--lab-bg);
+        }
+
+        /* =========================================
+           [2] 8 種風格矩陣定義 (Theme Matrix)
+           ========================================= */
         
-        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; }
+        /* 1. 惇陽專業 (TY-Pro) - 預設 */
+        body.theme-ty-pro {
+            --lab-cyan: #F39C12; /* 惇陽橘 */
+            --lab-bg: #1B2631;
+            --lab-sidebar: #2C3E50;
+        }
+
+        /* 2. 典雅大地 (Elegant Earth) */
+        body.theme-elegant {
+            --lab-cyan: #D35400; /* 深橘 */
+            --lab-bg: #212F3D;
+            --lab-sidebar: #5D6D7E;
+            --font-main: 'Georgia', serif;
+        }
+
+        /* 3. 紙感文青 (Paper Studio) */
+        body.theme-paper {
+            --lab-cyan: #E67E22; /* 磚橘 */
+            --lab-bg: #FDF6E3;
+            --lab-sidebar: #EEE8D5;
+            --login-overlay-bg: #FDF6E3;
+            color: #333 !important; /* 文青風需要深色字 */
+        }
+        body.theme-paper .login-box { background: #FFF; border-color: #DDD; color: #333; }
+        body.theme-paper .text-muted { color: #888 !important; }
+
+        /* 4. 萌點開發 (Kawaii Tech) */
+        body.theme-kawaii {
+            --lab-cyan: #FF8C00;
+            --lab-bg: #FFF0F5; /* 淺粉 */
+            --lab-sidebar: #FADBD8;
+            --box-radius: 35px; /* 超大圓角 */
+            color: #555 !important;
+        }
+        body.theme-kawaii .login-box { background: #FFF; border: 2px solid #FFC0CB; color: #555; }
+        body.theme-kawaii .navbar { background: #FFB6C1 !important; border-bottom: none; }
+
+        /* 5. 鋼鐵結構 (Industrial Pro) */
+        body.theme-steel {
+            --lab-cyan: #CA6F1E;
+            --lab-bg: #17202A;
+            --lab-sidebar: #273746;
+            --font-main: 'Consolas', monospace; /* 工程師等寬字 */
+            --box-radius: 0px; /* 直角 */
+        }
+
+        /* 6. 清新工作室 (Studio Fresh) */
+        body.theme-studio {
+            --lab-cyan: #FB8C00;
+            --lab-bg: #E0F2F1;
+            --lab-sidebar: #B2DFDB;
+            color: #004D40 !important;
+        }
+        body.theme-studio .login-box { background: #FFF; border: none; box-shadow: 0 10px 30px rgba(0,77,64,0.1); color: #004D40; }
+        body.theme-studio .navbar { background: #00796B !important; }
+
+        /* 7. 藝術畫廊 (Art Gallery) */
+        body.theme-art-gallery {
+            --lab-cyan: #E59866;
+            --lab-bg: #000000;
+            --lab-sidebar: #111111;
+            --font-main: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-weight: 300;
+        }
+
+        /* 8. 幻彩星雲 (Nebula Flow) - 漸層特例 */
+        body.theme-nebula {
+            --lab-cyan: #FF5722;
+            --lab-bg: transparent; /* 讓 body 背景透出 */
+            --lab-sidebar: rgba(20, 10, 30, 0.8);
+            background: linear-gradient(135deg, #2E0854, #8E44AD, #E67E22);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+        @keyframes gradientBG { 0% {background-position: 0% 50%;} 50% {background-position: 100% 50%;} 100% {background-position: 0% 50%;} }
+
+        /* =========================================
+           [3] 基礎框架樣式
+           ========================================= */
+        body, html { background-color: var(--lab-bg); color: white; font-family: var(--font-main); margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; transition: background 0.5s ease; }
+        
+        .navbar { background: #000 !important; border-bottom: 1px solid rgba(255,255,255,0.1); height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; transition: background 0.3s ease; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; text-decoration: none; }
         
-        #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        #auth-overlay { position: fixed; inset: 0; background-color: var(--login-overlay-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: background 0.5s ease; }
+        .login-box { background: var(--lab-sidebar); padding: 30px; border-radius: var(--box-radius); border: 1px solid rgba(255,255,255,0.1); text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); transition: all 0.3s ease; }
         
+        /* GitHub 日誌面板樣式 */
+        .github-log-panel { margin-top: 25px; padding-top: 15px; border-top: 1px dashed rgba(150,150,150,0.3); text-align: left; }
+        .github-log-panel h6 { color: var(--lab-cyan); font-size: 0.85rem; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; }
+        .commit-item { font-size: 0.8rem; margin-bottom: 6px; display: flex; opacity: 0.8; }
+        .commit-date { font-family: 'Consolas', monospace; margin-right: 10px; color: var(--lab-cyan); min-width: 45px; }
+        .commit-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
-        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; height: 100%; overflow-y: auto; transition: background 0.3s ease; }
 
         /* 偵錯視窗樣式 */
         #debug-log-window { 
@@ -31,7 +132,7 @@
             backdrop-filter: blur(10px);
         }
         #debug-header { 
-            padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid #334155;
+            padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 10px 10px 0 0;
         }
         #debug-log { 
@@ -42,35 +143,43 @@
         .content-area { flex-grow: 1; background: #000; position: relative; }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
-        /* 選單與收合樣式 */
-        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
+        /* 選單樣式 */
+        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 13px; }
         .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
         .module-group.collapsed { max-height: 0; }
         .bi-chevron-down { transition: transform 0.3s; font-size: 10px; }
         .collapsed .bi-chevron-down { transform: rotate(-90deg); }
-
-        .nav-link { color: #94a3b8; padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; }
-        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
-        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
+        .nav-link { padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; opacity: 0.8; color: inherit; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,0,0,0.1); opacity: 1; }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(0,0,0,0.2); border-left: 4px solid var(--lab-cyan); opacity: 1; font-weight: bold; }
     </style>
 </head>
-<body>
+<body style="opacity: 0; transition: opacity 0.3s ease;">
 
     <div id="auth-overlay">
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan);"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan);">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small">安全性管制中 (v2.2.3)</p>
+            <p class="text-muted mb-4 small">空間資訊與效能實驗室 (v2.5 Pro)</p>
+            
             <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
+            
+            <div class="github-log-panel">
+                <h6><i class="bi bi-github me-2"></i>Recent Core Updates</h6>
+                <div id="github-commits-list">
+                    <div class="text-muted small"><i class="bi bi-hourglass-split"></i> 讀取訊號中...</div>
+                </div>
+            </div>
         </div>
     </div>
 
     <nav class="navbar navbar-dark">
         <a class="navbar-brand me-auto" href="#"><i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span></a>
         <div class="d-flex align-items-center">
+            <button class="btn btn-sm btn-outline-warning me-2 border-0" id="btn-random-theme" title="隨機視覺風格"><i class="bi bi-palette-fill"></i></button>
             <button class="btn btn-sm btn-outline-info me-3" onclick="toggleDebugWindow()"><i class="bi bi-terminal me-1"></i>偵錯</button>
-            <span id="user-display" class="me-3 small text-muted font-monospace"></span>
+            <span id="user-display" class="me-3 small font-monospace" style="opacity:0.8;"></span>
             <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
         </div>
     </nav>
@@ -88,21 +197,36 @@
         <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
     </div>
 
-<script>
-    /**
-     * [手動偵錯程序加回]
-     * 支援全域 sysLog 呼叫，並自動對接 DebugSystem 實例
-     */
+<script type="module">
+    import AppLoader from './core/AppLoader.js';
+    import { debugSystem } from './core/DebugSystem.js';
+    import { ThemeManager } from './core/ThemeManager.js'; // 引入新模組
+
+    // --- 1. 視覺主題與日誌初始化 ---
+    document.addEventListener("DOMContentLoaded", () => {
+        // 隨機套用主題並解除 body 隱藏 (防閃爍)
+        ThemeManager.initRandomTheme();
+        document.body.style.opacity = 1;
+        
+        // 觸發 GitHub 日誌抓取 (請確認 repo 路徑是否正確)
+        ThemeManager.fetchGitHubLogs("clleeolin-beep/ai-studio");
+
+        // 綁定手動切換按鈕
+        const btnTheme = document.getElementById('btn-random-theme');
+        if(btnTheme) {
+            btnTheme.addEventListener('click', () => {
+                ThemeManager.initRandomTheme();
+            });
+        }
+    });
+
+    // --- 2. 系統核心與 Auth 邏輯 ---
     window.sysLog = function(msg, type = '') {
         console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
-        
-        // 1. 如果 DebugSystem 實例存在，使用其實例方法 (維持核心一致性)
         if (window.DebugInstance && typeof window.DebugInstance.addLog === 'function') {
             window.DebugInstance.addLog(type || 'info', msg);
             return;
         }
-
-        // 2. 備用機制：直接更新 DOM (確保初始化期間訊息不遺失)
         const logBox = document.getElementById('debug-log');
         if (logBox) {
             const div = document.createElement('div');
@@ -116,7 +240,6 @@
         }
     };
 
-    // 接收來自 Iframe (MapEditor) 的偵錯訊息橋接
     window.addEventListener('message', (event) => {
         if (event.data && event.data.source === 'AI_STUDIO_APP') {
             const { type, content } = event.data;
@@ -130,7 +253,6 @@
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
-    // Google Auth 回調：修正 Scope 隔離導致的啟動失敗
     window.handleCredentialResponse = async (response) => {
         window.sysLog("收到憑證，開始驗證...", "success");
         try {
@@ -140,76 +262,34 @@
             const res = await fetch('./manifest.json?v=' + Date.now());
             window.appConfig = await res.json();
 
-            const allowed = (window.appConfig.ai_lab_config.env.ALLOWED_USERS || []).map(u => u.toLowerCase());
+            const allowed = (window.appConfig.ai_lab_config.env?.ALLOWED_USERS || []).map(u => u.toLowerCase());
             if (allowed.includes(userEmail) || userEmail.endsWith("@dunyang.com.tw")) {
                 window.sysLog("驗證通過！解鎖系統。", "success");
                 sessionStorage.setItem('ai_lab_auth', 'true');
                 sessionStorage.setItem('user_email', userEmail);
                 
-                // 觸發模組內的啟動程序
-                if (window.startSystem) {
-                    window.startSystem();
-                } else {
-                    window.dispatchEvent(new CustomEvent('manual-start'));
-                }
+                if (window.startSystem) { window.startSystem(); } 
+                else { window.dispatchEvent(new CustomEvent('manual-start')); }
             } else {
                 alert("未經授權: " + userEmail);
             }
         } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
     };
 
-    // 偵錯視窗拖移邏輯 (完全補回)
-    const dragWin = document.getElementById("debug-log-window");
-    const dragHeader = document.getElementById("debug-header");
-    let isDragging = false, startX, startY, transX = 0, transY = 0;
-
-    window.toggleDebugWindow = () => {
-        dragWin.style.display = (dragWin.style.display === 'none' || dragWin.style.display === '') ? 'flex' : 'none';
+    window.startSystem = function() {
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('main-layout').style.display = 'flex';
+        document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+        
+        window.DebugInstance = debugSystem; 
+        window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
+        
+        if (AppLoader && window.appConfig) {
+            const loader = new AppLoader(window.appConfig);
+            loader.renderMenu('menu-container');
+        }
     };
 
-    dragHeader.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        startX = e.clientX - transX;
-        startY = e.clientY - transY;
-        dragHeader.style.cursor = 'grabbing';
-    });
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        transX = e.clientX - startX;
-        transY = e.clientY - startY;
-        dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
-    });
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-        dragHeader.style.cursor = 'move';
-    });
-</script>
-
-<script type="module">
-    import AppLoader from './core/AppLoader.js';
-    import { debugSystem } from './core/DebugSystem.js';
-
-    /**
-     * [核心啟動程序]
-     * 對接全域 startSystem 供 Auth 回調使用
-     */
-// 確保 DebugInstance 為單例模式，並能接收來自 iframe 的訊息
-window.startSystem = function() {
-    document.getElementById('auth-overlay').style.display = 'none';
-    document.getElementById('main-layout').style.display = 'flex';
-    document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-    
-    // 將 core/DebugSystem.js 的實例掛載至全域
-    window.DebugInstance = debugSystem; 
-    window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
-    
-    if (AppLoader && window.appConfig) {
-        const loader = new AppLoader(window.appConfig);
-        loader.renderMenu('menu-container');
-    }
-};
-
-    // 初始化檢測
     async function init() {
         try {
             const response = await fetch('./manifest.json?v=' + Date.now());
@@ -222,11 +302,24 @@ window.startSystem = function() {
         } catch (e) { console.error("Init Error", e); }
     }
 
-    // 監聽手動啟動事件 (預防 Race Condition)
     window.addEventListener('manual-start', window.startSystem);
-    
     init();
     window.logout = () => { sessionStorage.clear(); location.reload(); };
+
+    // --- 3. 偵錯視窗拖移邏輯 ---
+    const dragWin = document.getElementById("debug-log-window");
+    const dragHeader = document.getElementById("debug-header");
+    let isDragging = false, startX, startY, transX = 0, transY = 0;
+
+    window.toggleDebugWindow = () => { dragWin.style.display = (dragWin.style.display === 'none' || dragWin.style.display === '') ? 'flex' : 'none'; };
+
+    dragHeader.addEventListener('mousedown', (e) => {
+        isDragging = true; startX = e.clientX - transX; startY = e.clientY - transY; dragHeader.style.cursor = 'grabbing';
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return; transX = e.clientX - startX; transY = e.clientY - startY; dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; dragHeader.style.cursor = 'move'; });
 </script>
 </body>
 </html>
