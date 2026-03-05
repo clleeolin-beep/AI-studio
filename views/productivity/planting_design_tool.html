@@ -222,7 +222,7 @@
         // --- 設定常數 ---
         const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
         const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; 
-        const DRIVE_FOLDER_ID = '1KyolmR0PGxRTbMzo8eicyMrO2jNOVYU5'; 
+        const DRIVE_FOLDER_ID = '1sESiquxxLxQEBBD0xBqN72F8hqroJTrx'; // 更新為新資料夾 ID
         const SHEET_NAME = '工作表1';
 
         // --- 監視器與拖曳邏輯 ---
@@ -452,7 +452,6 @@
 
             triggerAuth() { if (!this.accessToken) this.tokenClient.requestAccessToken(); }
 
-            // 🔥 強制標頭校準補丁版 (v2.5)
             loadSheetData() {
                 Utility.showLoading("載入雲端植栽資料庫...");
                 window.gvizCallback = (json) => {
@@ -502,7 +501,6 @@
                 document.body.appendChild(s);
             }
 
-            // 🔥 嚴格 Fetch 錯誤攔截補丁版 (v2.5)
             async saveToGoogleSheet() {
                 if (!this.accessToken) { this.triggerAuth(); return; }
                 const nameInput = document.getElementById('v_name').value.trim();
