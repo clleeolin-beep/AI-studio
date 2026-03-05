@@ -49,6 +49,7 @@
       "SHEET_CASES": "18YWAoD2SY8gb82fluWb3YmbTDqcFmUNhryoPS6kBnHE",
       "SHEET_WEATHER": "12VSSPJFnvY9cHpCxWpg0jsfWQ4bh1pYy9i7xk-55gdg",
       "SHEET_INSPECTION": "1YmRd6S6JY1NpXXc6Ix4qAtXiKQO6-RAjZ-gi_6-9q4g",
+      "SHEET_PLANTING": "14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs",
       "ADMIN_KEY": "AI_LAB_2026",
       "MAP_DEFAULT_CENTER": [121.50, 23.90],
       "TERRAIN_EXAGGERATION": 1.5
@@ -67,7 +68,8 @@
       { "id": "BusinessCardVision", "name": "數位名片管理", "icon": "🪪", "path": "views/management/BusinessCard_Vision.html", "category": "管理決策" },
       { "id": "AdminConsole", "name": "系統後台管理", "icon": "⚙️", "path": "views/management/admin_console.html", "category": "管理決策" },
       { "id": "NasSync", "name": "NAS 架構說明", "icon": "🔗", "path": "views/knowledge/AI_NAS.html", "category": "知識架構" },
-      { "id": "Tutorial", "name": "操作教學指南", "icon": "📖", "path": "views/knowledge/tutorial.html", "category": "知識架構" }
+      { "id": "Tutorial", "name": "操作教學指南", "icon": "📖", "path": "views/knowledge/tutorial.html", "category": "知識架構" },
+      { "id": "PlantingDesignTool", "name": "植栽設計表工具", "icon": "🌱", "path": "views/productivity/planting_design_tool.html", "category": "生產力" }
     ]
   }
 }
