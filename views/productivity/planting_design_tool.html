@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Studio - 景觀設計植栽表工具 (Planting Design Tool)</title>
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --secondary-color: #81c784;
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 20px;
+            height: 95vh;
+        }
+
+        h1, h2, h3 { color: var(--primary-color); margin-top: 0; }
+        
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+
+        /* Scientific Name Formatting Requirement */
+        .scientific-name {
+            font-family: 'Times New Roman', Times, serif;
+            font-style: italic;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        /* Filter Controls */
+        .controls {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        select, button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background 0.3s;
+        }
+
+        button:hover { background-color: #1b5e20; }
+
+        /* Plant Grid */
+        .plant-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .plant-card {
+            border: 1px solid #eee;
+            border-radius: var(--border-radius);
+            padding: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .plant-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            border-color: var(--secondary-color);
+        }
+
+        .plant-card .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .tag {
+            background: #e8f5e9;
+            color: var(--primary-color);
+            font-size: 0.75em;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .tag.native { background: #ffe0b2; color: #e65100; }
+
+        /* Selected List */
+        .selected-list table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .selected-list th, .selected-list td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .selected-list th {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .remove-btn {
+            background-color: #d32f2f;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .remove-btn:hover { background-color: #b71c1c; }
+
+        /* Schedule Timeline */
+        .schedule-panel {
+            grid-column: 1 / -1;
+            height: 250px;
+        }
+
+        .timeline-grid {
+            display: grid;
+            grid-template-columns: 150px repeat(12, 1fr);
+            gap: 2px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .timeline-header {
+            font-weight: bold;
+            text-align: center;
+            background: #eee;
+            padding: 5px;
+        }
+
+        .timeline-row { display: contents; }
+        .timeline-name { padding: 5px; font-weight: bold; border-bottom: 1px solid #eee; }
+        .timeline-cell {
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+            border-right: 1px solid #fff;
+            position: relative;
+        }
+        
+        .bloom-bar {
+            position: absolute;
+            top: 20%;
+            bottom: 20%;
+            left: 0;
+            right: 0;
+            background-color: #ff4081;
+            border-radius: 2px;
+            opacity: 0.8;
+        }
+        .color-bar {
+            background-color: #ffb300;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h3>🌱 植栽篩選器</h3>
+        <select id="categoryFilter">
+            <option value="all">所有分類 (All)</option>
+            <option value="喬木">喬木 (Trees)</option>
+            <option value="灌木">灌木 (Shrubs)</option>
+            <option value="地被草花">地被草花 (Groundcovers)</option>
+            <option value="水生植物">水生植物 (Aquatic)</option>
+        </select>
+        <select id="envFilter">
+            <option value="all">所有環境 (Environment)</option>
+            <option value="全日照">全日照</option>
+            <option value="半日照">半日照</option>
+            <option value="耐陰">耐陰</option>
+            <option value="水生">水生</option>
+        </select>
+        <button onclick="app.renderCatalog()">套用篩選</button>
+        <span style="margin-left:auto; font-size: 12px; color: #666;">*點擊植栽卡片加入設計表</span>
+    </div>
+
+    <div class="panel">
+        <h2>📚 植栽資料庫 (點選加入)</h2>
+        <div class="plant-grid" id="plantCatalog">
+            </div>
+    </div>
+
+    <div class="panel">
+        <h2>📋 我的設計植栽表</h2>
+        <div class="selected-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>分類</th>
+                        <th>中文俗名</th>
+                        <th>學名</th>
+                        <th>生長環境</th>
+                        <th>原生種</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="selectedTableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel schedule-panel">
+        <h2>🎨 視覺色彩變化時程表 (花期/變葉)</h2>
+        <div class="timeline-grid" id="timelineGrid">
+            </div>
+    </div>
+
+    <script>
+        /**
+         * @description 高度模組化的資料庫，封裝了植栽數據 (Data Encapsulation)
+         */
+        const PlantDatabase = [
+            // --- 喬木 ---
+            { id: 'T01', name: '台灣欒樹', scientific: 'Koelreuteria elegans', category: '喬木', env: '全日照', isNative: true, bloomStart: 9, bloomEnd: 10, colorStart: 11, colorEnd: 12, features: ['常見景觀', '開花變葉', '耐候性', '耐鹽鹼'] },
+            { id: 'T02', name: '樟樹', scientific: 'Cinnamomum camphora', category: '喬木', env: '全日照', isNative: true, bloomStart: 3, bloomEnd: 5, colorStart: 0, colorEnd: 0, features: ['常見景觀', '耐候性'] },
+            { id: 'T03', name: '楓香', scientific: 'Liquidambar formosana', category: '喬木', env: '全日照', isNative: true, bloomStart: 2, bloomEnd: 3, colorStart: 11, colorEnd: 12, features: ['變葉植物', '常見景觀'] },
+            { id: 'T04', name: '水黃皮', scientific: 'Pongamia pinnata', category: '喬木', env: '全日照', isNative: true, bloomStart: 5, bloomEnd: 7, colorStart: 0, colorEnd: 0, features: ['耐鹽鹼', '固氮土壤友善'] },
+            // --- 灌木 ---
+            { id: 'S01', name: '桂花', scientific: 'Osmanthus fragrans', category: '灌木', env: '半日照', isNative: false, bloomStart: 9, bloomEnd: 11, colorStart: 0, colorEnd: 0, features: ['芳香', '常見景觀'] },
+            { id: 'S02', name: '七里香', scientific: 'Murraya paniculata', category: '灌木', env: '全日照', isNative: true, bloomStart: 4, bloomEnd: 9, colorStart: 0, colorEnd: 0, features: ['常見景觀', '誘鳥誘蝶', '耐候性'] },
+            { id: 'S03', name: '厚葉石斑木', scientific: 'Rhaphiolepis umbellata', category: '灌木', env: '全日照', isNative: true, bloomStart: 3, bloomEnd: 5, colorStart: 0, colorEnd: 0, features: ['耐鹽鹼', '耐候性'] },
+            // --- 地被草花 ---
+            { id: 'G01', name: '蔓花生', scientific: 'Arachis duranensis', category: '地被草花', env: '全日照', isNative: false, bloomStart: 4, bloomEnd: 10, colorStart: 0, colorEnd: 0, features: ['固氮土壤友善', '開花'] },
+            { id: 'G02', name: '馬櫻丹', scientific: 'Lantana camara', category: '地被草花', env: '全日照', isNative: false, bloomStart: 1, bloomEnd: 12, colorStart: 0, colorEnd: 0, features: ['誘鳥誘蝶', '耐鹽鹼', '耐候性'] },
+            { id: 'G03', name: '腎蕨', scientific: 'Nephrolepis auriculata', category: '地被草花', env: '耐陰', isNative: true, bloomStart: 0, bloomEnd: 0, colorStart: 0, colorEnd: 0, features: ['常見景觀'] },
+            // --- 水生植物 ---
+            { id: 'A01', name: '野薑花', scientific: 'Hedychium coronarium', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 11, colorStart: 0, colorEnd: 0, features: ['芳香', '誘蝶'] },
+            { id: 'A02', name: '香蒲', scientific: 'Typha orientalis', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 8, colorStart: 0, colorEnd: 0, features: ['水質淨化'] },
+            { id: 'A03', name: '台灣萍蓬草', scientific: 'Nuphar shimadae', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 10, colorStart: 0, colorEnd: 0, features: ['特有種', '開花'] }
+            // 備註：架構已設計支援超過 300+ 筆資料的動態渲染
+        ];
+
+        /**
+         * @class PlantApp
+         * @description 管理介面狀態與邏輯交互 (Application Controller)
+         */
+        class PlantApp {
+            constructor(data) {
+                this.plants = data;
+                this.selectedPlants = new Map(); // 使用 Map 確保唯一性與快速查找 (Scalability)
+                this.init();
+            }
+
+            init() {
+                try {
+                    this.renderCatalog();
+                    this.renderTimelineHeader();
+                } catch (error) {
+                    console.error("[DebugSystem/Log] 應用程式初始化失敗:", error);
+                }
+            }
+
+            /**
+             * @description 渲染左側植栽目錄
+             */
+            renderCatalog() {
+                const catalog = document.getElementById('plantCatalog');
+                const catFilter = document.getElementById('categoryFilter').value;
+                const envFilter = document.getElementById('envFilter').value;
+                
+                catalog.innerHTML = '';
+
+                this.plants.forEach(plant => {
+                    if (catFilter !== 'all' && plant.category !== catFilter) return;
+                    if (envFilter !== 'all' && plant.env !== envFilter) return;
+
+                    const card = document.createElement('div');
+                    card.className = 'plant-card';
+                    card.onclick = () => this.addPlant(plant.id);
+
+                    // 標籤渲染邏輯
+                    const nativeTag = plant.isNative ? '<span class="tag native">原生種</span>' : '';
+                    const features = plant.features.map(f => `<span class="tag">${f}</span>`).join('');
+
+                    card.innerHTML = `
+                        <div style="font-weight: bold; font-size: 1.1em;">${plant.name}</div>
+                        <div class="scientific-name">${plant.scientific}</div>
+                        <div style="font-size: 0.85em; margin-top: 5px;">環境: ${plant.env} | 類型: ${plant.category}</div>
+                        <div class="tags">${nativeTag}${features}</div>
+                    `;
+                    catalog.appendChild(card);
+                });
+            }
+
+            /**
+             * @description 將植栽加入設計清單
+             * @param {string} plantId 
+             */
+            addPlant(plantId) {
+                if (this.selectedPlants.has(plantId)) {
+                    alert('此植栽已在設計表中！');
+                    return;
+                }
+                const plant = this.plants.find(p => p.id === plantId);
+                if(plant) {
+                    this.selectedPlants.set(plantId, plant);
+                    this.updateDesignViews();
+                }
+            }
+
+            /**
+             * @description 從清單中移除植栽
+             * @param {string} plantId 
+             */
+            removePlant(plantId) {
+                this.selectedPlants.delete(plantId);
+                this.updateDesignViews();
+            }
+
+            /**
+             * @description 更新表格與時間軸視圖
+             */
+            updateDesignViews() {
+                this.renderSelectedTable();
+                this.renderTimeline();
+            }
+
+            renderSelectedTable() {
+                const tbody = document.getElementById('selectedTableBody');
+                tbody.innerHTML = '';
+                
+                this.selectedPlants.forEach(plant => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${plant.category}</td>
+                        <td><strong>${plant.name}</strong></td>
+                        <td class="scientific-name">${plant.scientific}</td>
+                        <td>${plant.env}</td>
+                        <td>${plant.isNative ? '✅ 是' : '❌ 否'}</td>
+                        <td><button class="remove-btn" onclick="app.removePlant('${plant.id}')">移除</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            renderTimelineHeader() {
+                const grid = document.getElementById('timelineGrid');
+                let headerHTML = '<div class="timeline-header">植栽名稱</div>';
+                for(let i=1; i<=12; i++) {
+                    headerHTML += `<div class="timeline-header">${i}月</div>`;
+                }
+                grid.innerHTML = headerHTML;
+            }
+
+            renderTimeline() {
+                const grid = document.getElementById('timelineGrid');
+                // 保留 Header
+                const headerHTML = grid.innerHTML.split('</div>').slice(0, 13).join('</div>') + '</div>';
+                grid.innerHTML = headerHTML;
+
+                this.selectedPlants.forEach(plant => {
+                    let rowHTML = `<div class="timeline-row"><div class="timeline-name">${plant.name}</div>`;
+                    
+                    for(let i=1; i<=12; i++) {
+                        let barHTML = '';
+                        // 處理花期 (粉紅色)
+                        if (plant.bloomStart && plant.bloomEnd) {
+                            if ((plant.bloomStart <= plant.bloomEnd && i >= plant.bloomStart && i <= plant.bloomEnd) ||
+                                (plant.bloomStart > plant.bloomEnd && (i >= plant.bloomStart || i <= plant.bloomEnd))) {
+                                barHTML += '<div class="bloom-bar" title="花期"></div>';
+                            }
+                        }
+                        // 處理變葉/落果期 (橘黃色)
+                        if (plant.colorStart && plant.colorEnd) {
+                            if ((plant.colorStart <= plant.colorEnd && i >= plant.colorStart && i <= plant.colorEnd) ||
+                                (plant.colorStart > plant.colorEnd && (i >= plant.colorStart || i <= plant.colorEnd))) {
+                                barHTML += '<div class="bloom-bar color-bar" title="變葉/落果期"></div>';
+                            }
+                        }
+                        rowHTML += `<div class="timeline-cell">${barHTML}</div>`;
+                    }
+                    rowHTML += `</div>`;
+                    grid.innerHTML += rowHTML;
+                });
+            }
+        }
+
+        // 依賴注入 (Dependency Injection) 的概念：將資料庫注入到應用程式中啟動
+        const app = new PlantApp(PlantDatabase);
+    </script>
+</body>
+</html>
