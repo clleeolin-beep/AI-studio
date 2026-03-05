@@ -3,411 +3,623 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 景觀設計植栽表工具 (Planting Design Tool)</title>
+    <title>AI Studio - Pro 進階植栽設計與編輯系統 (Google API 直連版)</title>
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    
     <style>
         :root {
-            --primary-color: #2e7d32;
-            --secondary-color: #81c784;
-            --bg-color: #f5f5f5;
-            --text-color: #333;
-            --border-radius: 8px;
+            --primary: #2e7d32; --secondary: #81c784; --bg: #f4f6f8; --text: #333;
+            --tag-sun: #fbc02d; --tag-shade: #7b1fa2; --tag-water: #1976d2; --tag-low: #8d6e63; --tag-high: #00838f;
         }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto 1fr auto;
-            gap: 20px;
-            height: 95vh;
-        }
-
-        h1, h2, h3 { color: var(--primary-color); margin-top: 0; }
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; height: 95vh; box-sizing: border-box; overflow: hidden; }
+        h1, h2, h3 { color: var(--primary); margin-top: 0; }
+        .scientific { font-family: 'Times New Roman', serif; font-style: italic; }
         
-        .panel {
-            background: white;
-            padding: 20px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            overflow-y: auto;
-        }
-
-        /* Scientific Name Formatting Requirement */
-        .scientific-name {
-            font-family: 'Times New Roman', Times, serif;
-            font-style: italic;
-            color: #555;
-            font-size: 0.9em;
-        }
-
-        /* Filter Controls */
-        .controls {
-            grid-column: 1 / -1;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            background: white;
-            padding: 15px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        select, button {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        button {
-            background-color: var(--primary-color);
-            color: white;
-            cursor: pointer;
-            border: none;
-            transition: background 0.3s;
-        }
-
-        button:hover { background-color: #1b5e20; }
-
-        /* Plant Grid */
-        .plant-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 15px;
-        }
-
-        .plant-card {
-            border: 1px solid #eee;
-            border-radius: var(--border-radius);
-            padding: 10px;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            position: relative;
-        }
-
-        .plant-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            border-color: var(--secondary-color);
-        }
-
-        .plant-card .tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-top: 8px;
-        }
-
-        .tag {
-            background: #e8f5e9;
-            color: var(--primary-color);
-            font-size: 0.75em;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        .tag.native { background: #ffe0b2; color: #e65100; }
-
-        /* Selected List */
-        .selected-list table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-
-        .selected-list th, .selected-list td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-
-        .selected-list th {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-
-        .remove-btn {
-            background-color: #d32f2f;
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-        .remove-btn:hover { background-color: #b71c1c; }
-
-        /* Schedule Timeline */
-        .schedule-panel {
-            grid-column: 1 / -1;
-            height: 250px;
-        }
-
-        .timeline-grid {
-            display: grid;
-            grid-template-columns: 150px repeat(12, 1fr);
-            gap: 2px;
-            margin-top: 10px;
-            font-size: 12px;
-        }
-
-        .timeline-header {
-            font-weight: bold;
-            text-align: center;
-            background: #eee;
-            padding: 5px;
-        }
-
-        .timeline-row { display: contents; }
-        .timeline-name { padding: 5px; font-weight: bold; border-bottom: 1px solid #eee; }
-        .timeline-cell {
-            background: #fafafa;
-            border-bottom: 1px solid #eee;
-            border-right: 1px solid #fff;
-            position: relative;
-        }
+        /* Layout Grid */
+        .app-container { display: grid; grid-template-columns: 450px 1fr; gap: 20px; flex: 1; min-height: 0; }
+        .panel { background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
         
-        .bloom-bar {
-            position: absolute;
-            top: 20%;
-            bottom: 20%;
-            left: 0;
-            right: 0;
-            background-color: #ff4081;
-            border-radius: 2px;
-            opacity: 0.8;
-        }
-        .color-bar {
-            background-color: #ffb300;
-        }
+        /* Auth Banner (參照 map_editor) */
+        #auth-banner { background: #fff3cd; color: #856404; padding: 10px; font-size: 13px; text-align: center; font-weight: bold; border-radius: 6px; margin-bottom: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #auth-banner.authorized { background: #d4edda; color: #155724; cursor: default; }
+
+        /* Form & Editor */
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 0.9em; color: #555; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .form-group input[readonly] { background: #eee; }
+        
+        /* Tagging System */
+        .tag-display { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8em; color: white; background: #607d8b; }
+        .badge.sun { background: var(--tag-sun); color: #333; }
+        .badge.shade { background: var(--tag-shade); }
+        .badge.water { background: var(--tag-water); }
+        .badge.low-alt { background: var(--tag-low); }
+        .badge.high-alt { background: var(--tag-high); }
+
+        /* Gantt Chart Range Selector */
+        .gantt-container { display: flex; gap: 2px; height: 30px; background: #eee; border-radius: 4px; overflow: hidden; position: relative; user-select: none; }
+        .gantt-cell { flex: 1; border-right: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7em; color: #999; cursor: pointer; transition: background 0.2s; }
+        .gantt-cell.active-bloom { background: #ff4081; color: white; font-weight: bold; }
+        .gantt-cell.active-color { background: #ffb300; color: white; font-weight: bold; }
+
+        /* Image Box & Cropper */
+        .img-preview-box { width: 100%; height: 200px; background: #eee; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; border-radius: 6px; }
+        .img-preview-box img { max-width: 100%; max-height: 100%; object-fit: cover; }
+        #cropperModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
+        .cropper-wrapper { width: 80%; max-width: 800px; height: 70%; background: white; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; }
+
+        /* Buttons */
+        button { background: var(--primary); color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #1b5e20; }
+        button:disabled { background: #9e9e9e; cursor: not-allowed; }
+        button.danger { background: #d32f2f; }
+        button.danger:hover { background: #b71c1c; }
+
+        /* Loading Overlay (參照 map_editor) */
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
+
+        /* Catalog Grid */
+        .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
+        .card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; cursor: pointer; transition: 0.2s; background: white; display: flex; flex-direction: column; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-color: var(--primary); }
+        .card img { width: 100%; height: 140px; object-fit: cover; border-radius: 4px; background: #eee; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <h3>🌱 植栽篩選器</h3>
-        <select id="categoryFilter">
-            <option value="all">所有分類 (All)</option>
-            <option value="喬木">喬木 (Trees)</option>
-            <option value="灌木">灌木 (Shrubs)</option>
-            <option value="地被草花">地被草花 (Groundcovers)</option>
-            <option value="水生植物">水生植物 (Aquatic)</option>
-        </select>
-        <select id="envFilter">
-            <option value="all">所有環境 (Environment)</option>
-            <option value="全日照">全日照</option>
-            <option value="半日照">半日照</option>
-            <option value="耐陰">耐陰</option>
-            <option value="水生">水生</option>
-        </select>
-        <button onclick="app.renderCatalog()">套用篩選</button>
-        <span style="margin-left:auto; font-size: 12px; color: #666;">*點擊植栽卡片加入設計表</span>
+    <div id="loading-overlay">
+        <div id="loading-text">資料處理中，請稍候...</div>
     </div>
 
-    <div class="panel">
-        <h2>📚 植栽資料庫 (點選加入)</h2>
-        <div class="plant-grid" id="plantCatalog">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h2>🌿 植栽設計與編輯系統 (Google Sheets API 直連)</h2>
+        <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
+    </div>
+
+    <div id="auth-banner" onclick="app.triggerAuth()">
+        🔒 唯讀模式：點擊登入 Google 授權，以啟用照片上傳與資料寫入功能
+    </div>
+
+    <div class="app-container">
+        <div class="panel">
+            <h3 style="border-bottom: 2px solid var(--primary); padding-bottom: 5px;">📝 植栽屬性編輯</h3>
+            
+            <div style="display: flex; gap: 10px;">
+                <div class="form-group" style="flex:1;">
+                    <label>系統編號 (留白自動生成)</label>
+                    <input type="text" id="v_id" placeholder="如：T001" readonly title="新增時留白，系統會自動編號">
+                </div>
+                <div class="form-group" style="flex:2;">
+                    <label>中文名稱 *</label>
+                    <input type="text" id="v_name" placeholder="輸入中文俗名">
+                </div>
             </div>
-    </div>
 
-    <div class="panel">
-        <h2>📋 我的設計植栽表</h2>
-        <div class="selected-list">
-            <table>
-                <thead>
-                    <tr>
-                        <th>分類</th>
-                        <th>中文俗名</th>
-                        <th>學名</th>
-                        <th>生長環境</th>
-                        <th>原生種</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="selectedTableBody">
-                    </tbody>
-            </table>
+            <div class="form-group">
+                <label>拉丁學名 <span style="font-weight:normal; font-size:0.8em;">(強制作業規範斜體)</span></label>
+                <input type="text" id="v_scientific" class="scientific" placeholder="例如: Koelreuteria elegans">
+            </div>
+
+            <div class="form-group" style="display: flex; gap: 10px;">
+                <div style="flex:1;">
+                    <label>分類高度</label>
+                    <select id="v_category">
+                        <option value="喬木">喬木</option><option value="灌木">灌木</option>
+                        <option value="地被草花">地被草花</option><option value="水生植物">水生植物</option>
+                    </select>
+                </div>
+                <div style="flex:1;">
+                    <label>光照環境</label>
+                    <select id="v_env">
+                        <option value="全日照">全日照</option><option value="半日照">半日照</option>
+                        <option value="耐陰">耐陰</option><option value="水生">水生</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="display: flex; gap: 10px;">
+                <div style="flex:1;">
+                    <label>海拔</label>
+                    <select id="v_alt">
+                        <option value="低海拔">低海拔</option><option value="高海拔">高海拔</option>
+                    </select>
+                </div>
+                <div style="flex:1; display:flex; align-items:center; padding-top:20px;">
+                    <input type="checkbox" id="v_native" style="width:auto; margin-right:5px;"> 
+                    <label for="v_native" style="margin:0; cursor:pointer;">是台灣原生種</label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>景觀特性標籤 (自動加 #，空格分隔)</label>
+                <input type="text" id="v_tags" placeholder="例如：耐鹽 誘鳥 固氮" onkeyup="app.renderTagsPreview()">
+                <div class="tag-display" id="tagPreview"></div>
+            </div>
+
+            <div class="form-group">
+                <label>🌺 開花時程 (滑鼠拖曳選擇月份)</label>
+                <div class="gantt-container" id="ganttBloom"></div>
+                <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
+            </div>
+            <div class="form-group">
+                <label>🍁 變葉/落果時程 (滑鼠拖曳選擇月份)</label>
+                <div class="gantt-container" id="ganttColor"></div>
+                <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
+            </div>
+
+            <div class="form-group">
+                <label>植栽照片 (將上傳至 Google Drive)</label>
+                <input type="file" id="fileInput" accept="image/*" style="display:none;">
+                <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInput').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
+                    <img id="v_img_preview" src="" alt="圖片預覽" style="display:none;">
+                    <span id="v_img_text">📷 點擊上傳照片 (自動 4:3 裁切)</span>
+                </div>
+                <input type="hidden" id="v_image_url">
+            </div>
+
+            <div style="font-size: 0.8em; color: #888; margin-top: 10px;" id="v_meta">最後更新：無</div>
+            
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button id="btn-save" onclick="app.saveToGoogleSheet()" style="flex: 2;" disabled>💾 儲存寫入 Google Sheets</button>
+                <button onclick="app.clearForm()" class="danger" style="flex: 1;">✨ 清空/新增</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--secondary); padding-bottom: 5px;">
+                <h3 style="margin:0;">📚 雲端植栽資料庫</h3>
+                <input type="text" id="searchInput" placeholder="🔍 搜尋名稱、編號或 #標籤..." oninput="app.renderCatalog()" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; width: 200px;">
+            </div>
+            <div class="catalog-grid" id="catalogGrid">
+                </div>
         </div>
     </div>
 
-    <div class="panel schedule-panel">
-        <h2>🎨 視覺色彩變化時程表 (花期/變葉)</h2>
-        <div class="timeline-grid" id="timelineGrid">
+    <div id="cropperModal">
+        <div class="cropper-wrapper">
+            <h3 style="margin-top:0;">✂️ 圖片裁切 (固定 4:3 比例)</h3>
+            <div style="flex: 1; background: #eee; min-height: 0;">
+                <img id="cropperImage" src="" style="max-width: 100%; max-height: 100%;">
             </div>
+            <div style="margin-top: 15px; text-align: right;">
+                <button class="danger" onclick="cropperSvc.closeModal()">取消</button>
+                <button onclick="cropperSvc.cropAndPrepare()">確認裁切並暫存</button>
+            </div>
+        </div>
     </div>
 
     <script>
         /**
-         * @description 高度模組化的資料庫，封裝了植栽數據 (Data Encapsulation)
+         * @constant Configuration
+         * 參照 map_editor.html 的配置方式，使用直接呼叫 API 模式
          */
-        const PlantDatabase = [
-            // --- 喬木 ---
-            { id: 'T01', name: '台灣欒樹', scientific: 'Koelreuteria elegans', category: '喬木', env: '全日照', isNative: true, bloomStart: 9, bloomEnd: 10, colorStart: 11, colorEnd: 12, features: ['常見景觀', '開花變葉', '耐候性', '耐鹽鹼'] },
-            { id: 'T02', name: '樟樹', scientific: 'Cinnamomum camphora', category: '喬木', env: '全日照', isNative: true, bloomStart: 3, bloomEnd: 5, colorStart: 0, colorEnd: 0, features: ['常見景觀', '耐候性'] },
-            { id: 'T03', name: '楓香', scientific: 'Liquidambar formosana', category: '喬木', env: '全日照', isNative: true, bloomStart: 2, bloomEnd: 3, colorStart: 11, colorEnd: 12, features: ['變葉植物', '常見景觀'] },
-            { id: 'T04', name: '水黃皮', scientific: 'Pongamia pinnata', category: '喬木', env: '全日照', isNative: true, bloomStart: 5, bloomEnd: 7, colorStart: 0, colorEnd: 0, features: ['耐鹽鹼', '固氮土壤友善'] },
-            // --- 灌木 ---
-            { id: 'S01', name: '桂花', scientific: 'Osmanthus fragrans', category: '灌木', env: '半日照', isNative: false, bloomStart: 9, bloomEnd: 11, colorStart: 0, colorEnd: 0, features: ['芳香', '常見景觀'] },
-            { id: 'S02', name: '七里香', scientific: 'Murraya paniculata', category: '灌木', env: '全日照', isNative: true, bloomStart: 4, bloomEnd: 9, colorStart: 0, colorEnd: 0, features: ['常見景觀', '誘鳥誘蝶', '耐候性'] },
-            { id: 'S03', name: '厚葉石斑木', scientific: 'Rhaphiolepis umbellata', category: '灌木', env: '全日照', isNative: true, bloomStart: 3, bloomEnd: 5, colorStart: 0, colorEnd: 0, features: ['耐鹽鹼', '耐候性'] },
-            // --- 地被草花 ---
-            { id: 'G01', name: '蔓花生', scientific: 'Arachis duranensis', category: '地被草花', env: '全日照', isNative: false, bloomStart: 4, bloomEnd: 10, colorStart: 0, colorEnd: 0, features: ['固氮土壤友善', '開花'] },
-            { id: 'G02', name: '馬櫻丹', scientific: 'Lantana camara', category: '地被草花', env: '全日照', isNative: false, bloomStart: 1, bloomEnd: 12, colorStart: 0, colorEnd: 0, features: ['誘鳥誘蝶', '耐鹽鹼', '耐候性'] },
-            { id: 'G03', name: '腎蕨', scientific: 'Nephrolepis auriculata', category: '地被草花', env: '耐陰', isNative: true, bloomStart: 0, bloomEnd: 0, colorStart: 0, colorEnd: 0, features: ['常見景觀'] },
-            // --- 水生植物 ---
-            { id: 'A01', name: '野薑花', scientific: 'Hedychium coronarium', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 11, colorStart: 0, colorEnd: 0, features: ['芳香', '誘蝶'] },
-            { id: 'A02', name: '香蒲', scientific: 'Typha orientalis', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 8, colorStart: 0, colorEnd: 0, features: ['水質淨化'] },
-            { id: 'A03', name: '台灣萍蓬草', scientific: 'Nuphar shimadae', category: '水生植物', env: '水生', isNative: true, bloomStart: 5, bloomEnd: 10, colorStart: 0, colorEnd: 0, features: ['特有種', '開花'] }
-            // 備註：架構已設計支援超過 300+ 筆資料的動態渲染
-        ];
+        const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
+        const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; // 植栽手冊雲端資料庫
+        const DRIVE_FOLDER_ID = '1KyolmR0PGxRTbMzo8eicyMrO2jNOVYU5'; // 沿用圖資編輯工具的圖庫，或替換為植栽專屬 Folder ID
+        const SHEET_NAME = '工作表1';
 
-        /**
-         * @class PlantApp
-         * @description 管理介面狀態與邏輯交互 (Application Controller)
-         */
-        class PlantApp {
-            constructor(data) {
-                this.plants = data;
-                this.selectedPlants = new Map(); // 使用 Map 確保唯一性與快速查找 (Scalability)
-                this.init();
+        // --- 共用工具模組 ---
+        class Utility {
+            static generateID(category) {
+                const prefix = category === '喬木' ? 'T' : category === '灌木' ? 'S' : category === '地被草花' ? 'G' : 'A';
+                return prefix + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+            }
+            static getUserStamp() {
+                const d = new Date();
+                return `Editor / ${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')} ${d.getHours()}:${d.getMinutes()}`;
+            }
+            static formatTags(rawString) {
+                if(!rawString) return '';
+                return rawString.split(/\s+/).filter(t => t).map(t => t.startsWith('#') ? t : `#${t}`).join(' ');
+            }
+            static showLoading(msg) {
+                document.getElementById('loading-text').innerText = msg;
+                document.getElementById('loading-overlay').style.display = 'flex';
+            }
+            static hideLoading() {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }
+        }
+
+        // --- 甘特圖拖拉控制器 (封裝) ---
+        class GanttController {
+            constructor(containerId, startInputId, endInputId, activeClass) {
+                this.container = document.getElementById(containerId);
+                this.startInput = document.getElementById(startInputId);
+                this.endInput = document.getElementById(endInputId);
+                this.activeClass = activeClass;
+                this.isDragging = false;
+                this.tempStart = null;
+                this.initGrid();
             }
 
-            init() {
-                try {
-                    this.renderCatalog();
-                    this.renderTimelineHeader();
-                } catch (error) {
-                    console.error("[DebugSystem/Log] 應用程式初始化失敗:", error);
+            initGrid() {
+                this.container.innerHTML = '';
+                for(let i = 1; i <= 12; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'gantt-cell';
+                    cell.innerText = i;
+                    cell.dataset.month = i;
+                    
+                    cell.onmousedown = (e) => this.startDrag(i);
+                    cell.onmouseenter = (e) => this.dragEnter(i);
+                    cell.onmouseup = (e) => this.endDrag();
+                    
+                    this.container.appendChild(cell);
+                }
+                this.container.onmouseleave = () => this.endDrag();
+            }
+
+            startDrag(month) {
+                this.isDragging = true;
+                this.tempStart = month;
+                this.updateVisuals(month, month);
+            }
+
+            dragEnter(month) {
+                if(this.isDragging) {
+                    const s = Math.min(this.tempStart, month);
+                    const e = Math.max(this.tempStart, month);
+                    this.updateVisuals(s, e);
                 }
             }
 
-            /**
-             * @description 渲染左側植栽目錄
-             */
-            renderCatalog() {
-                const catalog = document.getElementById('plantCatalog');
-                const catFilter = document.getElementById('categoryFilter').value;
-                const envFilter = document.getElementById('envFilter').value;
-                
-                catalog.innerHTML = '';
+            endDrag() { this.isDragging = false; }
 
-                this.plants.forEach(plant => {
-                    if (catFilter !== 'all' && plant.category !== catFilter) return;
-                    if (envFilter !== 'all' && plant.env !== envFilter) return;
+            updateVisuals(start, end) {
+                this.startInput.value = start;
+                this.endInput.value = end;
+                Array.from(this.container.children).forEach(cell => {
+                    const m = parseInt(cell.dataset.month);
+                    if(m >= start && m <= end) cell.classList.add(this.activeClass);
+                    else cell.classList.remove(this.activeClass);
+                });
+            }
+
+            setData(start, end) {
+                if(start && end) this.updateVisuals(parseInt(start), parseInt(end));
+                else { this.updateVisuals(0, 0); this.startInput.value = ''; this.endInput.value = ''; }
+            }
+        }
+
+        // --- 照片裁切與上傳服務 ---
+        class ImageCropperService {
+            constructor() {
+                this.modal = document.getElementById('cropperModal');
+                this.imageElement = document.getElementById('cropperImage');
+                this.fileInput = document.getElementById('fileInput');
+                this.cropper = null;
+                this.pendingBlob = null; // 暫存要上傳的 Blob
+
+                this.fileInput.addEventListener('change', (e) => this.handleFile(e));
+            }
+
+            handleFile(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        this.imageElement.src = event.target.result;
+                        this.openModal();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            openModal() {
+                this.modal.style.display = 'flex';
+                if(this.cropper) this.cropper.destroy();
+                this.cropper = new Cropper(this.imageElement, { aspectRatio: 4 / 3, viewMode: 1 });
+            }
+
+            closeModal() {
+                this.modal.style.display = 'none';
+                if(this.cropper) this.cropper.destroy();
+                this.fileInput.value = '';
+            }
+
+            cropAndPrepare() {
+                if(this.cropper) {
+                    const canvas = this.cropper.getCroppedCanvas({ width: 800, height: 600 });
+                    
+                    // 顯示預覽
+                    document.getElementById('v_img_preview').src = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById('v_img_preview').style.display = 'block';
+                    document.getElementById('v_img_text').style.display = 'none';
+                    
+                    // 轉為 Blob 暫存等待寫入時上傳
+                    canvas.toBlob((blob) => { this.pendingBlob = blob; }, 'image/jpeg', 0.8);
+                    
+                    this.closeModal();
+                }
+            }
+
+            // 直傳 Google Drive 邏輯 (參照 map_editor.html)
+            async uploadToDrive(fileName, accessToken) {
+                if (!this.pendingBlob) return null;
+                
+                const metadata = { name: fileName, parents: [DRIVE_FOLDER_ID] };
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', this.pendingBlob);
+
+                try {
+                    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + accessToken },
+                        body: form
+                    });
+                    const data = await res.json();
+                    this.pendingBlob = null; // 清除暫存
+                    return data.webViewLink;
+                } catch(e) {
+                    console.error("Drive Upload Error:", e);
+                    throw e;
+                }
+            }
+        }
+
+        // --- 核心應用程式邏輯 ---
+        class AppCore {
+            constructor() {
+                this.dataStore = [];
+                this.colMap = {};
+                this.headerRow = [];
+                this.accessToken = null;
+                
+                this.bloomGantt = new GanttController('ganttBloom', 'v_bloom_start', 'v_bloom_end', 'active-bloom');
+                this.colorGantt = new GanttController('ganttColor', 'v_color_start', 'v_color_end', 'active-color');
+            }
+
+            // [OAuth] 初始化 GSI
+            initGoogleAuth() {
+                this.tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
+                    callback: (resp) => { 
+                        this.accessToken = resp.access_token; 
+                        const banner = document.getElementById('auth-banner');
+                        banner.className = 'authorized';
+                        banner.innerHTML = '🟢 授權成功：已解鎖植栽資料寫入與照片上傳功能';
+                        document.getElementById('btn-save').disabled = false;
+                        console.log("OAuth 2.0 授權完成");
+                    }
+                });
+            }
+
+            triggerAuth() { if (!this.accessToken) this.tokenClient.requestAccessToken(); }
+
+            // [Read] 透過 Gviz 讀取
+            loadSheetData() {
+                Utility.showLoading("載入雲端植栽資料庫...");
+                window.gvizCallback = (json) => {
+                    if (json && json.table) {
+                        this.headerRow = json.table.cols.map(c => c.label || "");
+                        
+                        // 動態映射欄位索引 (容錯處理)
+                        const getIdx = (name) => this.headerRow.findIndex(h => h.includes(name));
+                        this.colMap = {
+                            id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
+                            category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
+                            native: getIdx('原生種'), bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
+                            colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
+                            tags: getIdx('景觀特性標籤'), url: getIdx('照片網址'), meta: getIdx('維護訊息')
+                        };
+
+                        this.dataStore = json.table.rows.map(r => {
+                            const vals = this.headerRow.map((_, i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "");
+                            return { id: String(vals[this.colMap.id] || "").trim(), _raw: vals };
+                        }).filter(p => p.id);
+
+                        this.renderCatalog();
+                    }
+                    Utility.hideLoading();
+                };
+                
+                // 插入 Gviz script
+                const oldScript = document.getElementById('gvizScript');
+                if(oldScript) oldScript.remove();
+                const s = document.createElement('script');
+                s.id = 'gvizScript';
+                s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:gvizCallback&sheet=${SHEET_NAME}`;
+                document.body.appendChild(s);
+            }
+
+            // [Write] 寫入 Google Sheet
+            async saveToGoogleSheet() {
+                if (!this.accessToken) { this.triggerAuth(); return; }
+                const nameInput = document.getElementById('v_name').value.trim();
+                if (!nameInput) { alert("請填寫中文名稱！"); return; }
+
+                Utility.showLoading("正在同步資料至雲端...");
+                try {
+                    // 1. 處理圖片上傳
+                    let finalImgUrl = document.getElementById('v_image_url').value;
+                    if(cropperSvc.pendingBlob) {
+                        Utility.showLoading("上傳圖片至 Google Drive...");
+                        const uploadUrl = await cropperSvc.uploadToDrive(`Plant-${Date.now()}.jpg`, this.accessToken);
+                        if(uploadUrl) finalImgUrl = uploadUrl;
+                    }
+
+                    // 2. 準備列資料
+                    let plantId = document.getElementById('v_id').value.trim() || Utility.generateID(document.getElementById('v_category').value);
+                    
+                    // 取得最新 Sheets 狀態找 Row Index
+                    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:Z`, { 
+                        headers: { 'Authorization': `Bearer ${this.accessToken}` } 
+                    });
+                    const data = await res.json();
+                    const rows = data.values || [];
+                    
+                    // 如果原本表單沒有 header，以我們讀取到的為主
+                    if(rows.length === 0) rows.push(this.headerRow);
+                    
+                    let targetRowIdx = rows.findIndex(r => String(r[this.colMap.id]).trim() === plantId);
+                    
+                    let newRowData = targetRowIdx > -1 ? [...rows[targetRowIdx]] : new Array(this.headerRow.length).fill("");
+                    
+                    const setV = (keyMapName, val) => { 
+                        const idx = this.colMap[keyMapName];
+                        if(idx !== -1 && idx !== undefined) newRowData[idx] = val; 
+                    };
+
+                    setV('id', plantId);
+                    setV('name', nameInput);
+                    setV('scientific', document.getElementById('v_scientific').value);
+                    setV('category', document.getElementById('v_category').value);
+                    setV('env', document.getElementById('v_env').value);
+                    setV('alt', document.getElementById('v_alt').value);
+                    setV('native', document.getElementById('v_native').checked ? "TRUE" : "FALSE");
+                    setV('bloomS', document.getElementById('v_bloom_start').value);
+                    setV('bloomE', document.getElementById('v_bloom_end').value);
+                    setV('colorS', document.getElementById('v_color_start').value);
+                    setV('colorE', document.getElementById('v_color_end').value);
+                    setV('tags', Utility.formatTags(document.getElementById('v_tags').value));
+                    setV('url', finalImgUrl);
+                    setV('meta', Utility.getUserStamp());
+
+                    if (targetRowIdx > -1) {
+                        // Update (PUT)
+                        const range = `${SHEET_NAME}!A${targetRowIdx + 1}`;
+                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ values: [newRowData] })
+                        });
+                    } else {
+                        // Append (POST)
+                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:append?valueInputOption=USER_ENTERED`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ values: [newRowData] })
+                        });
+                    }
+
+                    alert(`✅ 植栽 [${nameInput}] 儲存成功！`);
+                    this.clearForm();
+                    this.loadSheetData(); // 重新讀取刷新目錄
+
+                } catch (error) {
+                    console.error("Save Error:", error);
+                    alert("❌ 儲存失敗: " + error.message);
+                } finally {
+                    Utility.hideLoading();
+                }
+            }
+
+            // 將選取的植栽載入編輯面板
+            editPlant(id) {
+                const plant = this.dataStore.find(p => p.id === id);
+                if(!plant) return;
+                const r = plant._raw;
+
+                document.getElementById('v_id').value = r[this.colMap.id] || "";
+                document.getElementById('v_name').value = r[this.colMap.name] || "";
+                document.getElementById('v_scientific').value = r[this.colMap.scientific] || "";
+                
+                if(r[this.colMap.category]) document.getElementById('v_category').value = r[this.colMap.category];
+                if(r[this.colMap.env]) document.getElementById('v_env').value = r[this.colMap.env];
+                if(r[this.colMap.alt]) document.getElementById('v_alt').value = r[this.colMap.alt];
+                
+                document.getElementById('v_native').checked = (String(r[this.colMap.native]).toUpperCase() === 'TRUE');
+                document.getElementById('v_tags').value = r[this.colMap.tags] || "";
+                
+                this.bloomGantt.setData(r[this.colMap.bloomS], r[this.colMap.bloomE]);
+                this.colorGantt.setData(r[this.colMap.colorS], r[this.colMap.colorE]);
+                
+                document.getElementById('v_meta').innerText = `最後更新：${r[this.colMap.meta] || '無'}`;
+                
+                const imgUrl = r[this.colMap.url] || "";
+                document.getElementById('v_image_url').value = imgUrl;
+                if(imgUrl && imgUrl.startsWith('http')) {
+                    document.getElementById('v_img_preview').src = imgUrl;
+                    document.getElementById('v_img_preview').style.display = 'block';
+                    document.getElementById('v_img_text').style.display = 'none';
+                } else {
+                    document.getElementById('v_img_preview').style.display = 'none';
+                    document.getElementById('v_img_text').style.display = 'block';
+                }
+
+                this.renderTagsPreview();
+            }
+
+            clearForm() {
+                document.getElementById('v_id').value = '';
+                document.getElementById('v_name').value = '';
+                document.getElementById('v_scientific').value = '';
+                document.getElementById('v_tags').value = '';
+                document.getElementById('v_native').checked = false;
+                this.bloomGantt.setData(0,0);
+                this.colorGantt.setData(0,0);
+                document.getElementById('v_img_preview').style.display = 'none';
+                document.getElementById('v_img_text').style.display = 'block';
+                document.getElementById('v_image_url').value = '';
+                document.getElementById('v_meta').innerText = '最後更新：無';
+                cropperSvc.pendingBlob = null;
+                this.renderTagsPreview();
+            }
+
+            renderTagsPreview() {
+                const raw = document.getElementById('v_tags').value;
+                const formatted = Utility.formatTags(raw);
+                const container = document.getElementById('tagPreview');
+                container.innerHTML = '';
+                formatted.split(' ').filter(t=>t).forEach(tag => container.innerHTML += `<span class="badge">${tag}</span>`);
+            }
+
+            renderCatalog() {
+                const kw = document.getElementById('searchInput').value.toLowerCase();
+                const grid = document.getElementById('catalogGrid');
+                grid.innerHTML = '';
+
+                this.dataStore.forEach(plant => {
+                    const r = plant._raw;
+                    const searchStr = `${plant.id} ${r[this.colMap.name]} ${r[this.colMap.tags]}`.toLowerCase();
+                    if(kw && !searchStr.includes(kw)) return;
+
+                    const env = r[this.colMap.env];
+                    const alt = r[this.colMap.alt];
+                    let envClass = env === '全日照' ? 'sun' : env === '耐陰' ? 'shade' : env === '水生' ? 'water' : '';
+                    let altClass = alt === '高海拔' ? 'high-alt' : 'low-alt';
+                    let nativeTag = (String(r[this.colMap.native]).toUpperCase() === 'TRUE') ? `<span class="badge" style="background:#e65100">#原生種</span>` : '';
+
+                    const url = r[this.colMap.url];
+                    const imgSrc = (url && url.startsWith('http')) ? url : 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect fill="%23eeeeee" width="400" height="300"/%3E%3Ctext fill="%23999999" font-family="sans-serif" font-size="20" font-weight="bold" x="50%" y="50%" text-anchor="middle"%3E無照片%3C/text%3E%3C/svg%3E';
 
                     const card = document.createElement('div');
-                    card.className = 'plant-card';
-                    card.onclick = () => this.addPlant(plant.id);
-
-                    // 標籤渲染邏輯
-                    const nativeTag = plant.isNative ? '<span class="tag native">原生種</span>' : '';
-                    const features = plant.features.map(f => `<span class="tag">${f}</span>`).join('');
-
+                    card.className = 'card';
+                    card.onclick = () => this.editPlant(plant.id);
                     card.innerHTML = `
-                        <div style="font-weight: bold; font-size: 1.1em;">${plant.name}</div>
-                        <div class="scientific-name">${plant.scientific}</div>
-                        <div style="font-size: 0.85em; margin-top: 5px;">環境: ${plant.env} | 類型: ${plant.category}</div>
-                        <div class="tags">${nativeTag}${features}</div>
+                        <img src="${imgSrc}" alt="Plant">
+                        <div style="padding: 5px 0; flex: 1;">
+                            <div style="font-size:0.8em; color:#888;">${plant.id} | ${r[this.colMap.category] || '未分類'}</div>
+                            <strong style="font-size:1.1em; color:var(--primary);">${r[this.colMap.name] || '無名稱'}</strong>
+                            <div class="scientific" style="font-size:0.85em; color:#666; margin-bottom:5px;">${r[this.colMap.scientific] || ''}</div>
+                            <div class="tag-display">
+                                ${env ? `<span class="badge ${envClass}">#${env}</span>` : ''}
+                                ${alt ? `<span class="badge ${altClass}">#${alt}</span>` : ''}
+                                ${nativeTag}
+                            </div>
+                        </div>
                     `;
-                    catalog.appendChild(card);
-                });
-            }
-
-            /**
-             * @description 將植栽加入設計清單
-             * @param {string} plantId 
-             */
-            addPlant(plantId) {
-                if (this.selectedPlants.has(plantId)) {
-                    alert('此植栽已在設計表中！');
-                    return;
-                }
-                const plant = this.plants.find(p => p.id === plantId);
-                if(plant) {
-                    this.selectedPlants.set(plantId, plant);
-                    this.updateDesignViews();
-                }
-            }
-
-            /**
-             * @description 從清單中移除植栽
-             * @param {string} plantId 
-             */
-            removePlant(plantId) {
-                this.selectedPlants.delete(plantId);
-                this.updateDesignViews();
-            }
-
-            /**
-             * @description 更新表格與時間軸視圖
-             */
-            updateDesignViews() {
-                this.renderSelectedTable();
-                this.renderTimeline();
-            }
-
-            renderSelectedTable() {
-                const tbody = document.getElementById('selectedTableBody');
-                tbody.innerHTML = '';
-                
-                this.selectedPlants.forEach(plant => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${plant.category}</td>
-                        <td><strong>${plant.name}</strong></td>
-                        <td class="scientific-name">${plant.scientific}</td>
-                        <td>${plant.env}</td>
-                        <td>${plant.isNative ? '✅ 是' : '❌ 否'}</td>
-                        <td><button class="remove-btn" onclick="app.removePlant('${plant.id}')">移除</button></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-
-            renderTimelineHeader() {
-                const grid = document.getElementById('timelineGrid');
-                let headerHTML = '<div class="timeline-header">植栽名稱</div>';
-                for(let i=1; i<=12; i++) {
-                    headerHTML += `<div class="timeline-header">${i}月</div>`;
-                }
-                grid.innerHTML = headerHTML;
-            }
-
-            renderTimeline() {
-                const grid = document.getElementById('timelineGrid');
-                // 保留 Header
-                const headerHTML = grid.innerHTML.split('</div>').slice(0, 13).join('</div>') + '</div>';
-                grid.innerHTML = headerHTML;
-
-                this.selectedPlants.forEach(plant => {
-                    let rowHTML = `<div class="timeline-row"><div class="timeline-name">${plant.name}</div>`;
-                    
-                    for(let i=1; i<=12; i++) {
-                        let barHTML = '';
-                        // 處理花期 (粉紅色)
-                        if (plant.bloomStart && plant.bloomEnd) {
-                            if ((plant.bloomStart <= plant.bloomEnd && i >= plant.bloomStart && i <= plant.bloomEnd) ||
-                                (plant.bloomStart > plant.bloomEnd && (i >= plant.bloomStart || i <= plant.bloomEnd))) {
-                                barHTML += '<div class="bloom-bar" title="花期"></div>';
-                            }
-                        }
-                        // 處理變葉/落果期 (橘黃色)
-                        if (plant.colorStart && plant.colorEnd) {
-                            if ((plant.colorStart <= plant.colorEnd && i >= plant.colorStart && i <= plant.colorEnd) ||
-                                (plant.colorStart > plant.colorEnd && (i >= plant.colorStart || i <= plant.colorEnd))) {
-                                barHTML += '<div class="bloom-bar color-bar" title="變葉/落果期"></div>';
-                            }
-                        }
-                        rowHTML += `<div class="timeline-cell">${barHTML}</div>`;
-                    }
-                    rowHTML += `</div>`;
-                    grid.innerHTML += rowHTML;
+                    grid.appendChild(card);
                 });
             }
         }
 
-        // 依賴注入 (Dependency Injection) 的概念：將資料庫注入到應用程式中啟動
-        const app = new PlantApp(PlantDatabase);
+        // --- 系統啟動 ---
+        const cropperSvc = new ImageCropperService();
+        const app = new AppCore();
+
+        window.onload = () => {
+            app.initGoogleAuth();
+            app.loadSheetData();
+        };
     </script>
 </body>
 </html>
