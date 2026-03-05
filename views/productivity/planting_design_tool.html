@@ -99,7 +99,7 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2>🌿 植栽設計與編輯系統 (Pro+)</h2>
+        <h2>🌿 植栽設計與編輯系統 (Pro+ 穩定版)</h2>
         <div style="display: flex; gap: 10px;">
             <button class="info" onclick="toggleDebug()">⚙️ 開啟監視器</button>
             <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
@@ -241,7 +241,6 @@
             win.style.display = win.style.display === 'none' || win.style.display === '' ? 'flex' : 'none';
         };
 
-        // 監視器拖曳
         const dragHeader = document.getElementById("debug-header");
         const dragWin = document.getElementById("debug-terminal");
         let isDragging = false, startX, startY, transX = 0, transY = 0;
@@ -412,6 +411,7 @@
                         body: form
                     });
                     const data = await res.json();
+                    if(!res.ok) throw new Error(data.error.message);
                     this.pendingBlob = null; 
                     sysLog(`上傳成功，取得 URL: ${data.webViewLink}`, 'success');
                     return data.webViewLink;
@@ -452,13 +452,23 @@
 
             triggerAuth() { if (!this.accessToken) this.tokenClient.requestAccessToken(); }
 
+            // 🔥 強制標頭校準補丁版 (v2.5)
             loadSheetData() {
                 Utility.showLoading("載入雲端植栽資料庫...");
                 window.gvizCallback = (json) => {
                     if (json && json.table) {
-                        this.headerRow = json.table.cols.map(c => c.label || "");
+                        // 1. 取得標頭 (優先用 label，若無則從第一個 row 抓取)
+                        let rawHeaders = json.table.cols.map(c => c.label || "");
+                        const firstRow = json.table.rows[0] ? json.table.rows[0].c.map(cell => cell ? (cell.f || cell.v || "") : "") : [];
                         
-                        const getIdx = (name) => this.headerRow.findIndex(h => h.includes(name));
+                        // 修正：如果 Gviz 遺失標籤，強制使用首列
+                        if (rawHeaders.every(h => h === "")) {
+                            rawHeaders = firstRow;
+                            sysLog("⚠️ 偵測到標頭標籤遺失，已手動從首列資料校正。", "warn");
+                        }
+                        this.headerRow = rawHeaders;
+
+                        const getIdx = (name) => this.headerRow.findIndex(h => String(h).trim().includes(name));
                         this.colMap = {
                             id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
                             category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
@@ -467,10 +477,16 @@
                             tags: getIdx('景觀特性標籤'), url: getIdx('照片網址'), meta: getIdx('維護訊息')
                         };
 
+                        if (this.colMap.id === -1 || this.colMap.name === -1) {
+                            sysLog("❌ 欄位映射失敗！請檢查 Google Sheet 第一列標題是否正確。", "error");
+                        } else {
+                            sysLog(`✅ 欄位映射成功 (名稱位置: ${this.colMap.name})`, "success");
+                        }
+
                         this.dataStore = json.table.rows.map(r => {
                             const vals = this.headerRow.map((_, i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "");
                             return { id: String(vals[this.colMap.id] || "").trim(), _raw: vals };
-                        }).filter(p => p.id);
+                        }).filter(p => p.id && p.id !== '植栽編號'); // 過濾掉標頭列本身
 
                         this.renderCatalog();
                         sysLog(`成功載入 ${this.dataStore.length} 筆植栽資料`, "success");
@@ -482,14 +498,16 @@
                 if(oldScript) oldScript.remove();
                 const s = document.createElement('script');
                 s.id = 'gvizScript';
-                s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:gvizCallback&sheet=${SHEET_NAME}`;
+                s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:gvizCallback&sheet=${SHEET_NAME}&tq=SELECT *`;
                 document.body.appendChild(s);
             }
 
+            // 🔥 嚴格 Fetch 錯誤攔截補丁版 (v2.5)
             async saveToGoogleSheet() {
                 if (!this.accessToken) { this.triggerAuth(); return; }
                 const nameInput = document.getElementById('v_name').value.trim();
                 if (!nameInput) { alert("請填寫中文名稱！"); return; }
+                if (this.colMap.name === -1) { alert("系統尚未正確識別表單欄位，請重新載入頁面或確認表單標題。"); return; }
 
                 Utility.showLoading("正在同步資料至雲端...");
                 try {
@@ -507,21 +525,28 @@
                     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:Z`, { 
                         headers: { 'Authorization': `Bearer ${this.accessToken}` } 
                     });
-                    const data = await res.json();
-                    const rows = data.values || [];
+                    const sheetData = await res.json();
                     
-                    if(rows.length === 0) rows.push(this.headerRow);
+                    if (!res.ok) throw new Error(sheetData.error.message); // 嚴格攔截讀取錯誤
+                    
+                    const rows = sheetData.values || [];
+                    if(rows.length === 0) {
+                        if(this.headerRow.length === 0) throw new Error("表單完全空白且無法解析結構");
+                        rows.push(this.headerRow); 
+                    }
+                    
                     let targetRowIdx = rows.findIndex(r => String(r[this.colMap.id]).trim() === plantId);
-                    
                     let newRowData = targetRowIdx > -1 ? [...rows[targetRowIdx]] : new Array(this.headerRow.length).fill("");
                     
+                    // 確保陣列長度足夠塞入所有資料
+                    while(newRowData.length < this.headerRow.length) newRowData.push("");
+
                     const setV = (keyMapName, val) => { 
                         const idx = this.colMap[keyMapName];
                         if(idx !== -1 && idx !== undefined) newRowData[idx] = val; 
                     };
 
-                    setV('id', plantId);
-                    setV('name', nameInput);
+                    setV('id', plantId); setV('name', nameInput);
                     setV('scientific', document.getElementById('v_scientific').value);
                     setV('category', document.getElementById('v_category').value);
                     setV('env', document.getElementById('v_env').value);
@@ -537,35 +562,40 @@
                     const timeStamp = Utility.getUserStamp();
                     setV('meta', timeStamp);
 
+                    let writeRes;
                     if (targetRowIdx > -1) {
                         sysLog("執行 PUT 更新既有資料列", "info");
                         const range = `${SHEET_NAME}!A${targetRowIdx + 1}`;
-                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`, {
+                        writeRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`, {
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ values: [newRowData] })
                         });
                     } else {
                         sysLog("執行 POST 新增資料列", "info");
-                        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:append?valueInputOption=USER_ENTERED`, {
+                        writeRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:append?valueInputOption=USER_ENTERED`, {
                             method: 'POST',
                             headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ values: [newRowData] })
                         });
                     }
 
-                    // 更新 UI 而不清空表單，實現「防呆與連續編輯」
+                    if (!writeRes.ok) {
+                        const err = await writeRes.json();
+                        throw new Error(err.error.message); // 嚴格攔截寫入錯誤
+                    }
+
                     document.getElementById('v_id').value = plantId;
                     document.getElementById('v_meta').innerText = `最後更新：剛才 (${timeStamp})`;
                     
                     sysLog(`✅ 植栽 [${nameInput}] 儲存成功！`, "success");
                     alert(`✅ 植栽 [${nameInput}] 儲存成功！\n資料已保留於表單，可繼續編輯。若需建立新項目，請點擊「清空/新增」。`);
                     
-                    this.loadSheetData(); // 重新讀取刷新右側目錄
+                    this.loadSheetData(); 
 
                 } catch (error) {
                     sysLog(`❌ 儲存失敗: ${error.message}`, "error");
-                    alert("❌ 儲存失敗: " + error.message);
+                    alert(`❌ 儲存失敗！\n\n系統訊息：${error.message}\n\n請打開右下角監視器查看詳細資訊。`);
                 } finally {
                     Utility.hideLoading();
                 }
@@ -673,7 +703,6 @@
             }
         }
 
-        // --- 系統啟動 ---
         const cropperSvc = new ImageCropperService();
         const app = new AppCore();
 
