@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - Pro 進階植栽設計與編輯系統 (Google API 直連版)</title>
+    <title>AI Studio - Pro 進階植栽設計與編輯系統</title>
     
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
@@ -22,7 +22,7 @@
         .app-container { display: grid; grid-template-columns: 450px 1fr; gap: 20px; flex: 1; min-height: 0; }
         .panel { background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
         
-        /* Auth Banner (參照 map_editor) */
+        /* Auth Banner */
         #auth-banner { background: #fff3cd; color: #856404; padding: 10px; font-size: 13px; text-align: center; font-weight: bold; border-radius: 6px; margin-bottom: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         #auth-banner.authorized { background: #d4edda; color: #155724; cursor: default; }
 
@@ -59,15 +59,29 @@
         button:disabled { background: #9e9e9e; cursor: not-allowed; }
         button.danger { background: #d32f2f; }
         button.danger:hover { background: #b71c1c; }
+        button.info { background: #0288d1; }
+        button.info:hover { background: #01579b; }
 
-        /* Loading Overlay (參照 map_editor) */
+        /* Loading Overlay */
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
 
         /* Catalog Grid */
         .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
-        .card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; cursor: pointer; transition: 0.2s; background: white; display: flex; flex-direction: column; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-color: var(--primary); }
+        .card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; cursor: pointer; transition: 0.2s; background: white; display: flex; flex-direction: column; position: relative; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(46,125,50,0.2); border-color: var(--primary); }
         .card img { width: 100%; height: 140px; object-fit: cover; border-radius: 4px; background: #eee; margin-bottom: 8px; }
+        .card .click-hint { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; opacity: 0; transition: 0.2s; }
+        .card:hover .click-hint { opacity: 1; }
+
+        /* Debug Terminal */
+        #debug-terminal { position: fixed; bottom: 20px; right: 20px; width: 450px; height: 300px; background: rgba(15,23,42,0.95); border: 1px solid #334155; border-radius: 8px; z-index: 9000; display: none; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+        #debug-header { padding: 8px 12px; background: #1e293b; color: #00f2ff; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 8px 8px 0 0; user-select: none; }
+        #debug-log { flex: 1; overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; color: #0f0; word-break: break-all; }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+        .log-time { color: #888; margin-right: 5px; }
+        .log-success { color: #00f2ff; }
+        .log-error { color: #ff4b4b; }
+        .log-warn { color: #ffbb33; }
     </style>
 </head>
 <body>
@@ -76,9 +90,20 @@
         <div id="loading-text">資料處理中，請稍候...</div>
     </div>
 
+    <div id="debug-terminal">
+        <div id="debug-header">
+            <span>🖥️ AI 實驗室監視器 (System Monitor)</span>
+            <span style="cursor:pointer; color:#fff;" onclick="toggleDebug()">✖</span>
+        </div>
+        <div id="debug-log"></div>
+    </div>
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2>🌿 植栽設計與編輯系統 (Google Sheets API 直連)</h2>
-        <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
+        <h2>🌿 植栽設計與編輯系統 (Pro+)</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="info" onclick="toggleDebug()">⚙️ 開啟監視器</button>
+            <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
+        </div>
     </div>
 
     <div id="auth-banner" onclick="app.triggerAuth()">
@@ -166,7 +191,7 @@
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button id="btn-save" onclick="app.saveToGoogleSheet()" style="flex: 2;" disabled>💾 儲存寫入 Google Sheets</button>
-                <button onclick="app.clearForm()" class="danger" style="flex: 1;">✨ 清空/新增</button>
+                <button onclick="app.clearForm()" class="danger" style="flex: 1;" title="清空目前輸入，準備建立全新的一筆資料">✨ 清空/新增</button>
             </div>
         </div>
 
@@ -194,14 +219,49 @@
     </div>
 
     <script>
-        /**
-         * @constant Configuration
-         * 參照 map_editor.html 的配置方式，使用直接呼叫 API 模式
-         */
+        // --- 設定常數 ---
         const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
-        const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; // 植栽手冊雲端資料庫
-        const DRIVE_FOLDER_ID = '1KyolmR0PGxRTbMzo8eicyMrO2jNOVYU5'; // 沿用圖資編輯工具的圖庫，或替換為植栽專屬 Folder ID
+        const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; 
+        const DRIVE_FOLDER_ID = '1KyolmR0PGxRTbMzo8eicyMrO2jNOVYU5'; 
         const SHEET_NAME = '工作表1';
+
+        // --- 監視器與拖曳邏輯 ---
+        const sysLog = (msg, type = 'info') => {
+            const logBox = document.getElementById('debug-log');
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${msg}`);
+        };
+
+        const toggleDebug = () => {
+            const win = document.getElementById('debug-terminal');
+            win.style.display = win.style.display === 'none' || win.style.display === '' ? 'flex' : 'none';
+        };
+
+        // 監視器拖曳
+        const dragHeader = document.getElementById("debug-header");
+        const dragWin = document.getElementById("debug-terminal");
+        let isDragging = false, startX, startY, transX = 0, transY = 0;
+
+        dragHeader.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - transX;
+            startY = e.clientY - transY;
+            dragHeader.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            transX = e.clientX - startX;
+            transY = e.clientY - startY;
+            dragWin.style.transform = `translate(${transX}px, ${transY}px)`;
+        });
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragHeader.style.cursor = 'move';
+        });
 
         // --- 共用工具模組 ---
         class Utility {
@@ -220,13 +280,14 @@
             static showLoading(msg) {
                 document.getElementById('loading-text').innerText = msg;
                 document.getElementById('loading-overlay').style.display = 'flex';
+                sysLog(msg, 'info');
             }
             static hideLoading() {
                 document.getElementById('loading-overlay').style.display = 'none';
             }
         }
 
-        // --- 甘特圖拖拉控制器 (封裝) ---
+        // --- 甘特圖拖拉控制器 ---
         class GanttController {
             constructor(containerId, startInputId, endInputId, activeClass) {
                 this.container = document.getElementById(containerId);
@@ -294,7 +355,7 @@
                 this.imageElement = document.getElementById('cropperImage');
                 this.fileInput = document.getElementById('fileInput');
                 this.cropper = null;
-                this.pendingBlob = null; // 暫存要上傳的 Blob
+                this.pendingBlob = null; 
 
                 this.fileInput.addEventListener('change', (e) => this.handleFile(e));
             }
@@ -302,6 +363,7 @@
             handleFile(e) {
                 const file = e.target.files[0];
                 if (file) {
+                    sysLog("讀取圖片準備裁切...", "info");
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         this.imageElement.src = event.target.result;
@@ -326,22 +388,17 @@
             cropAndPrepare() {
                 if(this.cropper) {
                     const canvas = this.cropper.getCroppedCanvas({ width: 800, height: 600 });
-                    
-                    // 顯示預覽
                     document.getElementById('v_img_preview').src = canvas.toDataURL('image/jpeg', 0.8);
                     document.getElementById('v_img_preview').style.display = 'block';
                     document.getElementById('v_img_text').style.display = 'none';
-                    
-                    // 轉為 Blob 暫存等待寫入時上傳
-                    canvas.toBlob((blob) => { this.pendingBlob = blob; }, 'image/jpeg', 0.8);
-                    
+                    canvas.toBlob((blob) => { this.pendingBlob = blob; sysLog("圖片裁切完成，暫存於記憶體。", "success"); }, 'image/jpeg', 0.8);
                     this.closeModal();
                 }
             }
 
-            // 直傳 Google Drive 邏輯 (參照 map_editor.html)
             async uploadToDrive(fileName, accessToken) {
                 if (!this.pendingBlob) return null;
+                sysLog(`開始上傳圖片至 Drive: ${fileName}`, 'info');
                 
                 const metadata = { name: fileName, parents: [DRIVE_FOLDER_ID] };
                 const form = new FormData();
@@ -355,10 +412,11 @@
                         body: form
                     });
                     const data = await res.json();
-                    this.pendingBlob = null; // 清除暫存
+                    this.pendingBlob = null; 
+                    sysLog(`上傳成功，取得 URL: ${data.webViewLink}`, 'success');
                     return data.webViewLink;
                 } catch(e) {
-                    console.error("Drive Upload Error:", e);
+                    sysLog(`Drive 上傳失敗: ${e.message}`, 'error');
                     throw e;
                 }
             }
@@ -376,8 +434,8 @@
                 this.colorGantt = new GanttController('ganttColor', 'v_color_start', 'v_color_end', 'active-color');
             }
 
-            // [OAuth] 初始化 GSI
             initGoogleAuth() {
+                sysLog("初始化 Google OAuth 2.0 (GSI)...");
                 this.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
@@ -387,21 +445,19 @@
                         banner.className = 'authorized';
                         banner.innerHTML = '🟢 授權成功：已解鎖植栽資料寫入與照片上傳功能';
                         document.getElementById('btn-save').disabled = false;
-                        console.log("OAuth 2.0 授權完成");
+                        sysLog("✅ OAuth 2.0 授權完成", "success");
                     }
                 });
             }
 
             triggerAuth() { if (!this.accessToken) this.tokenClient.requestAccessToken(); }
 
-            // [Read] 透過 Gviz 讀取
             loadSheetData() {
                 Utility.showLoading("載入雲端植栽資料庫...");
                 window.gvizCallback = (json) => {
                     if (json && json.table) {
                         this.headerRow = json.table.cols.map(c => c.label || "");
                         
-                        // 動態映射欄位索引 (容錯處理)
                         const getIdx = (name) => this.headerRow.findIndex(h => h.includes(name));
                         this.colMap = {
                             id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
@@ -417,11 +473,11 @@
                         }).filter(p => p.id);
 
                         this.renderCatalog();
+                        sysLog(`成功載入 ${this.dataStore.length} 筆植栽資料`, "success");
                     }
                     Utility.hideLoading();
                 };
                 
-                // 插入 Gviz script
                 const oldScript = document.getElementById('gvizScript');
                 if(oldScript) oldScript.remove();
                 const s = document.createElement('script');
@@ -430,7 +486,6 @@
                 document.body.appendChild(s);
             }
 
-            // [Write] 寫入 Google Sheet
             async saveToGoogleSheet() {
                 if (!this.accessToken) { this.triggerAuth(); return; }
                 const nameInput = document.getElementById('v_name').value.trim();
@@ -438,7 +493,6 @@
 
                 Utility.showLoading("正在同步資料至雲端...");
                 try {
-                    // 1. 處理圖片上傳
                     let finalImgUrl = document.getElementById('v_image_url').value;
                     if(cropperSvc.pendingBlob) {
                         Utility.showLoading("上傳圖片至 Google Drive...");
@@ -446,19 +500,17 @@
                         if(uploadUrl) finalImgUrl = uploadUrl;
                     }
 
-                    // 2. 準備列資料
+                    Utility.showLoading("寫入 Google Sheets...");
                     let plantId = document.getElementById('v_id').value.trim() || Utility.generateID(document.getElementById('v_category').value);
-                    
-                    // 取得最新 Sheets 狀態找 Row Index
+                    sysLog(`準備寫入資料 ID: ${plantId}`, "info");
+
                     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:Z`, { 
                         headers: { 'Authorization': `Bearer ${this.accessToken}` } 
                     });
                     const data = await res.json();
                     const rows = data.values || [];
                     
-                    // 如果原本表單沒有 header，以我們讀取到的為主
                     if(rows.length === 0) rows.push(this.headerRow);
-                    
                     let targetRowIdx = rows.findIndex(r => String(r[this.colMap.id]).trim() === plantId);
                     
                     let newRowData = targetRowIdx > -1 ? [...rows[targetRowIdx]] : new Array(this.headerRow.length).fill("");
@@ -481,10 +533,12 @@
                     setV('colorE', document.getElementById('v_color_end').value);
                     setV('tags', Utility.formatTags(document.getElementById('v_tags').value));
                     setV('url', finalImgUrl);
-                    setV('meta', Utility.getUserStamp());
+                    
+                    const timeStamp = Utility.getUserStamp();
+                    setV('meta', timeStamp);
 
                     if (targetRowIdx > -1) {
-                        // Update (PUT)
+                        sysLog("執行 PUT 更新既有資料列", "info");
                         const range = `${SHEET_NAME}!A${targetRowIdx + 1}`;
                         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`, {
                             method: 'PUT',
@@ -492,7 +546,7 @@
                             body: JSON.stringify({ values: [newRowData] })
                         });
                     } else {
-                        // Append (POST)
+                        sysLog("執行 POST 新增資料列", "info");
                         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:append?valueInputOption=USER_ENTERED`, {
                             method: 'POST',
                             headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
@@ -500,20 +554,25 @@
                         });
                     }
 
-                    alert(`✅ 植栽 [${nameInput}] 儲存成功！`);
-                    this.clearForm();
-                    this.loadSheetData(); // 重新讀取刷新目錄
+                    // 更新 UI 而不清空表單，實現「防呆與連續編輯」
+                    document.getElementById('v_id').value = plantId;
+                    document.getElementById('v_meta').innerText = `最後更新：剛才 (${timeStamp})`;
+                    
+                    sysLog(`✅ 植栽 [${nameInput}] 儲存成功！`, "success");
+                    alert(`✅ 植栽 [${nameInput}] 儲存成功！\n資料已保留於表單，可繼續編輯。若需建立新項目，請點擊「清空/新增」。`);
+                    
+                    this.loadSheetData(); // 重新讀取刷新右側目錄
 
                 } catch (error) {
-                    console.error("Save Error:", error);
+                    sysLog(`❌ 儲存失敗: ${error.message}`, "error");
                     alert("❌ 儲存失敗: " + error.message);
                 } finally {
                     Utility.hideLoading();
                 }
             }
 
-            // 將選取的植栽載入編輯面板
             editPlant(id) {
+                sysLog(`點選讀取植栽 ID: ${id}`, "info");
                 const plant = this.dataStore.find(p => p.id === id);
                 if(!plant) return;
                 const r = plant._raw;
@@ -549,6 +608,7 @@
             }
 
             clearForm() {
+                sysLog("執行清空表單，準備新增資料。", "info");
                 document.getElementById('v_id').value = '';
                 document.getElementById('v_name').value = '';
                 document.getElementById('v_scientific').value = '';
@@ -595,6 +655,7 @@
                     card.className = 'card';
                     card.onclick = () => this.editPlant(plant.id);
                     card.innerHTML = `
+                        <div class="click-hint">✏️ 點擊編輯</div>
                         <img src="${imgSrc}" alt="Plant">
                         <div style="padding: 5px 0; flex: 1;">
                             <div style="font-size:0.8em; color:#888;">${plant.id} | ${r[this.colMap.category] || '未分類'}</div>
@@ -617,6 +678,7 @@
         const app = new AppCore();
 
         window.onload = () => {
+            sysLog("植栽編輯系統啟動程序開始...", "info");
             app.initGoogleAuth();
             app.loadSheetData();
         };
