@@ -99,7 +99,7 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2>🌿 植栽設計與編輯系統 (Pro+ 穩定版)</h2>
+        <h2>🌿 植栽設計與編輯系統 (Pro+ 照片修復版)</h2>
         <div style="display: flex; gap: 10px;">
             <button class="info" onclick="toggleDebug()">⚙️ 開啟監視器</button>
             <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
@@ -221,8 +221,8 @@
     <script>
         // --- 設定常數 ---
         const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
-        const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; 
-        const DRIVE_FOLDER_ID = '1sESiquxxLxQEBBD0xBqN72F8hqroJTrx'; // 更新為新資料夾 ID
+        let SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; // 預設值，稍後會被 manifest 覆蓋
+        const DRIVE_FOLDER_ID = '1sESiquxxLxQEBBD0xBqN72F8hqroJTrx'; 
         const SHEET_NAME = '工作表1';
 
         // --- 監視器與拖曳邏輯 ---
@@ -283,6 +283,31 @@
             }
             static hideLoading() {
                 document.getElementById('loading-overlay').style.display = 'none';
+            }
+            
+            /**
+             * 🌟 核心修復：參照 map.html 的 URL 清洗與 JSON 陣列解析邏輯
+             * 確保完全支援 Google Drive 各種連結格式，並帶入 authuser=0
+             */
+            static cleanDriveUrl(url) {
+                if (!url) return "";
+                let parsedUrl = String(url).trim();
+                
+                if (parsedUrl.includes('drive.google.com')) {
+                    // 嘗試解析 JSON 陣列格式 (容錯處理)
+                    try { 
+                        if(parsedUrl.startsWith('[')) {
+                            parsedUrl = JSON.parse(parsedUrl)[0]; 
+                        }
+                    } catch(e){ sysLog("URL JSON 解析忽略", "warn"); }
+                    
+                    // 正則提取 25 位以上的唯一 ID (排除 view, usp 等雜訊干擾)
+                    const match = parsedUrl.match(/[-\w]{25,}/);
+                    if (match) {
+                        return `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${match[0]}`;
+                    }
+                }
+                return parsedUrl;
             }
         }
 
@@ -456,11 +481,9 @@
                 Utility.showLoading("載入雲端植栽資料庫...");
                 window.gvizCallback = (json) => {
                     if (json && json.table) {
-                        // 1. 取得標頭 (優先用 label，若無則從第一個 row 抓取)
                         let rawHeaders = json.table.cols.map(c => c.label || "");
                         const firstRow = json.table.rows[0] ? json.table.rows[0].c.map(cell => cell ? (cell.f || cell.v || "") : "") : [];
                         
-                        // 修正：如果 Gviz 遺失標籤，強制使用首列
                         if (rawHeaders.every(h => h === "")) {
                             rawHeaders = firstRow;
                             sysLog("⚠️ 偵測到標頭標籤遺失，已手動從首列資料校正。", "warn");
@@ -485,7 +508,7 @@
                         this.dataStore = json.table.rows.map(r => {
                             const vals = this.headerRow.map((_, i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "");
                             return { id: String(vals[this.colMap.id] || "").trim(), _raw: vals };
-                        }).filter(p => p.id && p.id !== '植栽編號'); // 過濾掉標頭列本身
+                        }).filter(p => p.id && p.id !== '植栽編號');
 
                         this.renderCatalog();
                         sysLog(`成功載入 ${this.dataStore.length} 筆植栽資料`, "success");
@@ -525,7 +548,7 @@
                     });
                     const sheetData = await res.json();
                     
-                    if (!res.ok) throw new Error(sheetData.error.message); // 嚴格攔截讀取錯誤
+                    if (!res.ok) throw new Error(sheetData.error.message);
                     
                     const rows = sheetData.values || [];
                     if(rows.length === 0) {
@@ -536,7 +559,6 @@
                     let targetRowIdx = rows.findIndex(r => String(r[this.colMap.id]).trim() === plantId);
                     let newRowData = targetRowIdx > -1 ? [...rows[targetRowIdx]] : new Array(this.headerRow.length).fill("");
                     
-                    // 確保陣列長度足夠塞入所有資料
                     while(newRowData.length < this.headerRow.length) newRowData.push("");
 
                     const setV = (keyMapName, val) => { 
@@ -580,7 +602,7 @@
 
                     if (!writeRes.ok) {
                         const err = await writeRes.json();
-                        throw new Error(err.error.message); // 嚴格攔截寫入錯誤
+                        throw new Error(err.error.message);
                     }
 
                     document.getElementById('v_id').value = plantId;
@@ -621,21 +643,14 @@
                 
                 document.getElementById('v_meta').innerText = `最後更新：${r[this.colMap.meta] || '無'}`;
                 
-                // --- 照片顯示邏輯修正 ---
-                let imgUrl = r[this.colMap.url] || "";
-                document.getElementById('v_image_url').value = imgUrl;
-
-                if (imgUrl && imgUrl.includes('drive.google.com')) {
-                   // 擷取 file ID
-                   const fileIdMatch = imgUrl.match(/[-\w]{25,}/);
-                   if (fileIdMatch) {
-                       // 將 Google Drive 連結轉換為可用於 src 的縮圖連結
-                       imgUrl = `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${fileIdMatch[0]}`;
-                   }
-                }
-
-                if(imgUrl && imgUrl.startsWith('http')) {
-                    document.getElementById('v_img_preview').src = imgUrl;
+                // 🌟 核心修復：使用統一的 cleanDriveUrl 解析編輯預覽圖
+                const rawUrl = r[this.colMap.url] || "";
+                document.getElementById('v_image_url').value = rawUrl; // 保留原始網址供存檔
+                
+                const cleanImg = Utility.cleanDriveUrl(rawUrl);
+                
+                if(cleanImg && cleanImg.startsWith('http')) {
+                    document.getElementById('v_img_preview').src = cleanImg;
                     document.getElementById('v_img_preview').style.display = 'block';
                     document.getElementById('v_img_text').style.display = 'none';
                 } else {
@@ -687,18 +702,10 @@
                     let altClass = alt === '高海拔' ? 'high-alt' : 'low-alt';
                     let nativeTag = (String(r[this.colMap.native]).toUpperCase() === 'TRUE') ? `<span class="badge" style="background:#e65100">#原生種</span>` : '';
 
-                    let url = r[this.colMap.url] || "";
-                    let imgSrc = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect fill="%23eeeeee" width="400" height="300"/%3E%3Ctext fill="%23999999" font-family="sans-serif" font-size="20" font-weight="bold" x="50%" y="50%" text-anchor="middle"%3E無照片%3C/text%3E%3C/svg%3E';
-                    
-                     if (url && url.includes('drive.google.com')) {
-                       const fileIdMatch = url.match(/[-\w]{25,}/);
-                       if (fileIdMatch) {
-                           imgSrc = `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${fileIdMatch[0]}`;
-                       }
-                    } else if (url && url.startsWith('http')) {
-                        imgSrc = url;
-                    }
-
+                    // 🌟 核心修復：卡片縮圖使用統一清洗邏輯
+                    const rawUrl = r[this.colMap.url] || "";
+                    const cleanImg = Utility.cleanDriveUrl(rawUrl);
+                    const imgSrc = cleanImg ? cleanImg : 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect fill="%23eeeeee" width="400" height="300"/%3E%3Ctext fill="%23999999" font-family="sans-serif" font-size="20" font-weight="bold" x="50%" y="50%" text-anchor="middle"%3E無照片%3C/text%3E%3C/svg%3E';
 
                     const card = document.createElement('div');
                     card.className = 'card';
@@ -725,8 +732,21 @@
         const cropperSvc = new ImageCropperService();
         const app = new AppCore();
 
-        window.onload = () => {
+        // 🌟 核心修復：環境變數動態讀取 (Fallback 機制)
+        window.onload = async () => {
             sysLog("植栽編輯系統啟動程序開始...", "info");
+            
+            try {
+                const resp = await fetch('../../manifest.json');
+                const manifest = await resp.json();
+                if (manifest && manifest.ai_lab_config && manifest.ai_lab_config.env && manifest.ai_lab_config.env.SHEET_PLANTING) {
+                    SHEET_ID = manifest.ai_lab_config.env.SHEET_PLANTING;
+                    sysLog(`環境變數載入成功: ${SHEET_ID}`, "success");
+                }
+            } catch (e) {
+                sysLog("未讀取到 manifest.json，使用預設 SHEET_ID", "warn");
+            }
+            
             app.initGoogleAuth();
             app.loadSheetData();
         };
