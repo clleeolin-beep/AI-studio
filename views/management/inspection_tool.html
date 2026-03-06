@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>監造表單生成工具 (V2.11 合併與註腳完美版)</title>
+    <title>監造表單生成工具 (V2.12 長表單自適應版)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -68,16 +68,16 @@
         
         .preview-content { flex: 1; overflow-y: auto; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
 
-        /* A4 紙張樣式 */
+        /* A4 紙張樣式 (無限制高度，自動適應內容) */
         .page-a4-portrait { 
             width: 21cm; min-height: 29.7cm; background: #fff; padding: 2cm; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
-            font-family: "標楷體", serif; position: relative; 
+            font-family: "標楷體", serif; position: relative; height: auto;
         }
         .page-a4-landscape { 
             width: 29.7cm; min-height: 21cm; background: #fff; padding: 2cm; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
-            font-family: "標楷體", serif; position: relative; 
+            font-family: "標楷體", serif; position: relative; height: auto;
         }
 
         /* 內容與表格樣式 */
@@ -107,7 +107,7 @@
 
 <div class="header">
     <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
-        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.11 合併與註腳完美版</span>
+        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.12 長表單自適應版</span>
     </h3>
     <div class="btn-group">
         <button id="btnAuth" class="btn btn-auth" onclick="handleAuthClick()">🔑 登入 Google 授權</button>
@@ -242,6 +242,10 @@
     let rawData = [];
     let state = { projName: "中和區錦和運動公園整體規劃改善工程", selectedMinors: [] };
     let currentTab = 'flow';
+    
+    // 設定補齊的最小列數，以維持表格大小一致
+    const MIN_STD_ROWS = 15;
+    const MIN_REC_ROWS = 12;
 
     document.addEventListener("DOMContentLoaded", () => {
         const scriptGis = document.createElement('script'); scriptGis.src = "https://accounts.google.com/gsi/client"; scriptGis.onload = gisLoaded; document.body.appendChild(scriptGis);
@@ -353,7 +357,7 @@
 
     /**
      * ==========================================
-     * @Core 預覽與 Word 匯出 (包含動態合併儲存格計算)
+     * @Core 預覽與 Word 匯出 (支援自動分頁表頭與補齊空白)
      * ==========================================
      */
     function switchTab(tab, el) { currentTab = tab; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); renderPreview(); }
@@ -432,30 +436,41 @@
             html += `<div class="page-a4-portrait">
                         <h2 class="doc-title">表 7.1 施工抽查標準一覽表</h2>
                         <table class="doc-table">
-                            <tr><th width="15%">項次</th><th>施工抽查標準項目</th><th width="20%">備註</th></tr>`;
+                            <thead>
+                                <tr><th width="15%">項次</th><th>施工抽查標準項目</th><th width="20%">備註</th></tr>
+                            </thead>
+                            <tbody>`;
             activeMinors.forEach((m, idx) => { html += `<tr><td align="center">${idx+1}</td><td>${m.minorName}施工抽查標準</td><td></td></tr>`; });
-            html += `   </table>
+            html += `       </tbody>
+                        </table>
                      </div>`;
 
-            // 第2頁起：各分項工程標準表 (橫式 + Rowspan)
+            // 第2頁起：各分項工程標準表 (橫式)
             activeMinors.forEach(m => {
                 let itemsFlat = buildFlatItemsWithRowspan(m.nodes);
+                
+                // 計算需要補齊的空白列數量
+                let padCount = MIN_STD_ROWS - itemsFlat.length;
+                if(padCount < 0) padCount = 0;
 
                 html += `<div class="page-a4-landscape">
                             <h2 class="doc-title">表 7.2 ${m.minorName}施工抽查標準</h2>
                             <div class="doc-subtitle">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</div>
                             <table class="doc-table">
-                                <tr>
-                                    <th colspan="2" width="18%">施工流程</th>
-                                    <th width="15%">管理項目(A)</th>
-                                    <th width="18%">抽查標準(B)</th>
-                                    <th width="9%">抽查<br>時機</th>
-                                    <th width="8%">抽查<br>方法</th>
-                                    <th width="8%">抽查<br>頻率</th>
-                                    <th width="10%">不符合之<br>處置方法</th>
-                                    <th width="8%">管理紀錄</th>
-                                    <th width="6%">備註</th>
-                                </tr>`;
+                                <thead>
+                                    <tr>
+                                        <th colspan="2" width="18%">施工流程</th>
+                                        <th width="15%">管理項目(A)</th>
+                                        <th width="18%">抽查標準(B)</th>
+                                        <th width="9%">抽查<br>時機</th>
+                                        <th width="8%">抽查<br>方法</th>
+                                        <th width="8%">抽查<br>頻率</th>
+                                        <th width="10%">不符合之<br>處置方法</th>
+                                        <th width="8%">管理紀錄</th>
+                                        <th width="6%">備註</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
                 
                 itemsFlat.forEach(r => {
                     const isHP = r.item.includes('*'); 
@@ -476,12 +491,18 @@
                                 <td></td>
                              </tr>`;
                 });
+                
+                // 補齊空白列 (共 10 欄)
+                for(let i=0; i<padCount; i++){
+                    html += `<tr><td style="height:32px;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                }
 
                 html += `       <tr>
                                     <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold;">
                                         ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
                                     </td>
                                 </tr>
+                                </tbody>
                             </table>
                          </div>`;
             });
@@ -495,6 +516,10 @@
                     const itemsInPhase = phases[phaseName];
                     if (itemsInPhase.length === 0) return; 
                     
+                    // 計算需要補齊的空白列數量
+                    let padCount = MIN_REC_ROWS - itemsInPhase.length;
+                    if(padCount < 0) padCount = 0;
+                    
                     let flowCheckStr = '';
                     if (phaseName === '施工前') flowCheckStr = '■施工前　　□施工中檢查　　□施工完成檢查';
                     else if (phaseName === '施工中') flowCheckStr = '□施工前　　■施工中檢查　　□施工完成檢查';
@@ -506,53 +531,64 @@
                                 <div style="text-align:right; font-family:標楷體; margin-bottom:5px;">編號：_________________</div>
                                 
                                 <table class="doc-table" style="margin-bottom:0;">
-                                    <tr>
-                                        <td width="20%" align="center">工程名稱</td>
-                                        <td colspan="3">${state.projName}</td>
-                                    </tr>
-                                    <tr>
-                                        <td align="center">分項工程名稱</td>
-                                        <td colspan="3">${m.minorName}</td>
-                                    </tr>
-                                    <tr>
-                                        <td align="center">檢查位置</td>
-                                        <td width="30%"></td>
-                                        <td width="20%" align="center">檢查日期</td>
-                                        <td width="30%">　　年　　月　　日</td>
-                                    </tr>
-                                    <tr>
-                                        <td align="center">施工流程</td>
-                                        <td colspan="3" style="font-weight:bold; font-size:12pt;">
-                                            ${flowCheckStr}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td align="center">檢查結果</td>
-                                        <td colspan="3">○檢查合格　　╳有缺失需改正　　／無此檢查項目</td>
-                                    </tr>
-                                    <tr style="background:#f2f2f2;">
-                                        <th width="25%">管理項目</th>
-                                        <th width="35%">抽查標準(定量定性)</th>
-                                        <th width="25%">實際抽查情形<br>(敘述抽查值)</th>
-                                        <th width="15%">抽查結果</th>
-                                    </tr>`;
+                                    <thead>
+                                        <tr>
+                                            <td width="20%" align="center">工程名稱</td>
+                                            <td colspan="3">${state.projName}</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">分項工程名稱</td>
+                                            <td colspan="3">${m.minorName}</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">檢查位置</td>
+                                            <td width="30%"></td>
+                                            <td width="20%" align="center">檢查日期</td>
+                                            <td width="30%">　　年　　月　　日</td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">施工流程</td>
+                                            <td colspan="3" style="font-weight:bold; font-size:12pt;">
+                                                ${flowCheckStr}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td align="center">檢查結果</td>
+                                            <td colspan="3">○檢查合格　　╳有缺失需改正　　／無此檢查項目</td>
+                                        </tr>
+                                        <tr style="background:#f2f2f2;">
+                                            <th width="25%">管理項目</th>
+                                            <th width="35%">抽查標準(定量定性)</th>
+                                            <th width="25%">實際抽查情形<br>(敘述抽查值)</th>
+                                            <th width="15%">抽查結果</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
                     
                     itemsInPhase.forEach(r => {
+                        const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
                         html += `<tr>
-                                    <td>${r.item}</td>
+                                    <td ${style}>${r.item}</td>
                                     <td>${r.std.replace(/\n/g, '<br>')}</td>
                                     <td></td><td></td>
                                  </tr>`;
                     });
 
-                    html += `       <tr>
-                                        <td colspan="4" style="padding: 10px; line-height: 1.6;">
-                                            缺失複查結果：<br>
-                                            □ 已完成改善 (檢附改善前中後照片)<br>
-                                            □ 未完成改善，填至「不合格追蹤管制表第_________項」進行追蹤改善<br>
-                                            複查日期：______年______月______日　　　複查人員職稱：_________________　簽名：_________________
-                                        </td>
-                                    </tr>
+                    // 補齊空白列 (共 4 欄)
+                    for(let i=0; i<padCount; i++){
+                        html += `<tr><td style="height:35px;"></td><td></td><td></td><td></td></tr>`;
+                    }
+
+                    // 表尾整合入表格的 tbody 結尾
+                    html += `           <tr>
+                                            <td colspan="4" style="padding: 10px; line-height: 1.6;">
+                                                缺失複查結果：<br>
+                                                □ 已完成改善 (檢附改善前中後照片)<br>
+                                                □ 未完成改善，填至「不合格追蹤管制表第_________項」進行追蹤改善<br>
+                                                複查日期：______年______月______日　　　複查人員職稱：_________________　簽名：_________________
+                                            </td>
+                                        </tr>
+                                    </tbody>
                                 </table>
                                 
                                 <div style="font-size: 10pt; margin-top: 10px; line-height: 1.5;">
@@ -578,7 +614,7 @@
         return `<div class="flow-row"><div class="node-col"><div class="node-wrapper">${!isStart ? '<div class="arrow-head"></div>' : ''}<div class="node-box ${shape}">${txt}</div></div></div><div class="detail-col">${detailHtml}</div></div>`;
     }
 
-    // --- 匯出引擎 (完美生成 Word) ---
+    // --- 匯出引擎 (自動分頁表頭與空白補齊生成 Word) ---
     async function exportFlow() {
         alert("流程圖建議透過畫面截圖或獨立列印功能處理。系統支援匯出 Word 表單。");
     }
@@ -591,9 +627,13 @@
             <div class="Section1">
                 <h2 align="center" style="font-size:18pt;">表 7.1 施工抽查標準一覽表</h2>
                 <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:12pt;">
-                    <tr style="background:#f2f2f2;"><th width="15%">項次</th><th>施工抽查標準項目</th><th width="20%">備註</th></tr>`;
+                    <thead>
+                        <tr style="background:#f2f2f2;"><th width="15%">項次</th><th>施工抽查標準項目</th><th width="20%">備註</th></tr>
+                    </thead>
+                    <tbody>`;
         activeMinors.forEach((m, idx) => { bodyHtml += `<tr><td align="center">${idx+1}</td><td>${m.minorName}施工抽查標準</td><td></td></tr>`; });
-        bodyHtml += `   </table>
+        bodyHtml += `       </tbody>
+                </table>
             </div>`;
 
         bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always;mso-break-type:section-break'>`;
@@ -603,21 +643,26 @@
             if (idx > 0) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
             
             let itemsFlat = buildFlatItemsWithRowspan(m.nodes);
+            let padCount = MIN_STD_ROWS - itemsFlat.length;
+            if(padCount < 0) padCount = 0;
 
             bodyHtml += `<h2 align="center" style="margin-bottom:0; font-size:16pt;">表 7.2 ${m.minorName}施工抽查標準</h2>
                          <p align="center" style="font-size:11pt; margin-top:5px;">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</p>
                          <table border="1" cellpadding="4" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt;">
-                             <tr style="background:#f2f2f2;">
-                                 <th colspan="2" width="18%">施工流程</th>
-                                 <th width="15%">管理項目(A)</th>
-                                 <th width="18%">抽查標準(B)</th>
-                                 <th width="9%">抽查<br>時機</th>
-                                 <th width="8%">抽查<br>方法</th>
-                                 <th width="8%">抽查<br>頻率</th>
-                                 <th width="10%">不符合之<br>處置方法</th>
-                                 <th width="8%">管理紀錄</th>
-                                 <th width="6%">備註</th>
-                             </tr>`;
+                             <thead>
+                                 <tr style="background:#f2f2f2;">
+                                     <th colspan="2" width="18%">施工流程</th>
+                                     <th width="15%">管理項目(A)</th>
+                                     <th width="18%">抽查標準(B)</th>
+                                     <th width="9%">抽查<br>時機</th>
+                                     <th width="8%">抽查<br>方法</th>
+                                     <th width="8%">抽查<br>頻率</th>
+                                     <th width="10%">不符合之<br>處置方法</th>
+                                     <th width="8%">管理紀錄</th>
+                                     <th width="6%">備註</th>
+                                 </tr>
+                             </thead>
+                             <tbody>`;
             
             itemsFlat.forEach(r => {
                 const isHP = r.item.includes('*'); 
@@ -638,11 +683,18 @@
                                 <td></td>
                              </tr>`;
             });
-            bodyHtml += `   <tr>
-                                <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold;">
-                                    ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
-                                </td>
-                            </tr>
+            
+            // 補齊空白列
+            for(let i=0; i<padCount; i++){
+                bodyHtml += `<tr><td style="height:32px;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
+
+            bodyHtml += `       <tr>
+                                    <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold;">
+                                        ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
+                                    </td>
+                                </tr>
+                             </tbody>
                          </table>`;
         });
         bodyHtml += `</div>`;
@@ -671,6 +723,9 @@
             ['施工前', '施工中', '施工後'].forEach(phaseName => {
                 const itemsInPhase = phases[phaseName];
                 if (itemsInPhase.length === 0) return;
+                
+                let padCount = MIN_REC_ROWS - itemsInPhase.length;
+                if(padCount < 0) padCount = 0;
 
                 if (!isFirst) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
                 isFirst = false;
@@ -686,54 +741,64 @@
                     <p align="center" style="font-size:11pt; margin-top:5px;">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</p>
                     
                     <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt;">
-                        <tr>
-                            <td width="20%" align="center">工程名稱</td>
-                            <td colspan="3">${state.projName}</td>
-                        </tr>
-                        <tr>
-                            <td align="center">分項工程名稱</td>
-                            <td colspan="3">${m.minorName}</td>
-                        </tr>
-                        <tr>
-                            <td align="center">檢查位置</td>
-                            <td width="30%"></td>
-                            <td width="20%" align="center">檢查日期</td>
-                            <td width="30%">　　年　　月　　日</td>
-                        </tr>
-                        <tr>
-                            <td align="center">施工流程</td>
-                            <td colspan="3" style="font-weight:bold; font-size:12pt;">
-                                ${flowCheckStr}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td align="center">檢查結果</td>
-                            <td colspan="3">○檢查合格　　╳有缺失需改正　　／無此檢查項目</td>
-                        </tr>
-                        <tr style="background:#f2f2f2;">
-                            <th width="25%">管理項目</th>
-                            <th width="35%">抽查標準(定量定性)</th>
-                            <th width="25%">實際抽查情形<br>(敘述抽查值)</th>
-                            <th width="15%">抽查結果</th>
-                        </tr>`;
+                        <thead>
+                            <tr>
+                                <td width="20%" align="center">工程名稱</td>
+                                <td colspan="3">${state.projName}</td>
+                            </tr>
+                            <tr>
+                                <td align="center">分項工程名稱</td>
+                                <td colspan="3">${m.minorName}</td>
+                            </tr>
+                            <tr>
+                                <td align="center">檢查位置</td>
+                                <td width="30%"></td>
+                                <td width="20%" align="center">檢查日期</td>
+                                <td width="30%">　　年　　月　　日</td>
+                            </tr>
+                            <tr>
+                                <td align="center">施工流程</td>
+                                <td colspan="3" style="font-weight:bold; font-size:12pt;">
+                                    ${flowCheckStr}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center">檢查結果</td>
+                                <td colspan="3">○檢查合格　　╳有缺失需改正　　／無此檢查項目</td>
+                            </tr>
+                            <tr style="background:#f2f2f2;">
+                                <th width="25%">管理項目</th>
+                                <th width="35%">抽查標準(定量定性)</th>
+                                <th width="25%">實際抽查情形<br>(敘述抽查值)</th>
+                                <th width="15%">抽查結果</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
                 
                 itemsInPhase.forEach(r => {
+                    const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
                     bodyHtml += `<tr>
-                                    <td>${r.item}</td>
+                                    <td ${style}>${r.item}</td>
                                     <td>${r.std.replace(/\n/g, '<br>')}</td>
                                     <td></td><td></td>
                                  </tr>`;
                 });
+                
+                // 補齊空白列
+                for(let i=0; i<padCount; i++){
+                    bodyHtml += `<tr><td style="height:35px;"></td><td></td><td></td><td></td></tr>`;
+                }
 
                 bodyHtml += `
-                        <tr>
-                            <td colspan="4" style="padding: 10px; line-height: 1.6;">
-                                缺失複查結果：<br>
-                                □ 已完成改善 (檢附改善前中後照片)<br>
-                                □ 未完成改善，填至「不合格追蹤管制表第_________項」進行追蹤改善<br>
-                                複查日期：______年______月______日　　　複查人員職稱：_________________　簽名：_________________
-                            </td>
-                        </tr>
+                            <tr>
+                                <td colspan="4" style="padding: 10px; line-height: 1.6;">
+                                    缺失複查結果：<br>
+                                    □ 已完成改善 (檢附改善前中後照片)<br>
+                                    □ 未完成改善，填至「不合格追蹤管制表第_________項」進行追蹤改善<br>
+                                    複查日期：______年______月______日　　　複查人員職稱：_________________　簽名：_________________
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                     
                     <div style="font-size: 10pt; margin-top: 10px; line-height: 1.5;">
