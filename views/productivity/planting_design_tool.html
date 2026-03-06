@@ -49,12 +49,16 @@
 
         /* Dual Image Box */
         .dual-img-container { display: flex; gap: 15px; margin-bottom: 10px; }
-        .img-col { flex: 1; display: flex; flex-direction: column; }
+        .img-col { flex: 1; display: flex; flex-direction: column; position: relative; }
         .img-col label { font-size: 0.85em; margin-bottom: 5px; text-align: center; color: #555; }
         .img-preview-box { width: 100%; height: 160px; background: #eee; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; border-radius: 6px; transition: 0.2s; }
         .img-preview-box:hover { border-color: var(--primary); background: #e8f5e9; }
         .img-preview-box img { max-width: 100%; max-height: 100%; object-fit: cover; }
         .img-preview-box span { font-size: 0.8em; color: #777; text-align: center; padding: 10px; }
+        
+        /* Delete Image Button */
+        .btn-delete-img { position: absolute; top: 5px; right: 5px; background: rgba(211, 47, 47, 0.85); color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: 0.2s; z-index: 10; }
+        .btn-delete-img:hover { background: rgba(183, 28, 28, 1); transform: scale(1.1); box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 
         /* Cropper Modal */
         #cropperModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
@@ -68,6 +72,8 @@
         button.danger:hover { background: #b71c1c; }
         button.info { background: #0288d1; }
         button.info:hover { background: #01579b; }
+        button.success { background: #2e7d32; }
+        button.success:hover { background: #1b5e20; }
 
         /* Loading Overlay */
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
@@ -195,6 +201,7 @@
                     <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputReal').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
                         <img id="preview_real" src="" style="display:none;">
                         <span id="text_real">點擊上傳真實照片<br>(4:3 裁切)</span>
+                        <button id="btn_del_real" class="btn-delete-img" onclick="app.deleteImage(event, 'real')" style="display:none;" title="刪除真實照片">🗑️</button>
                     </div>
                 </div>
                 <div class="img-col">
@@ -202,6 +209,7 @@
                     <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputSim').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
                         <img id="preview_sim" src="" style="display:none;">
                         <span id="text_sim">點擊上傳 AI 模擬圖<br>(4:3 裁切)</span>
+                        <button id="btn_del_sim" class="btn-delete-img" onclick="app.deleteImage(event, 'sim')" style="display:none;" title="刪除模擬圖">🗑️</button>
                     </div>
                 </div>
             </div>
@@ -210,14 +218,17 @@
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button id="btn-save" onclick="app.saveToGoogleSheet()" style="flex: 2;" disabled>💾 儲存寫入 Google Sheets</button>
-                <button onclick="app.clearForm()" class="danger" style="flex: 1;" title="清空目前輸入，準備建立全新的一筆資料">✨ 清空/新增</button>
+                <button onclick="app.clearForm()" class="danger" style="flex: 1;" title="清空目前輸入，準備建立全新的一筆資料">🧹 清空表單</button>
             </div>
         </div>
 
         <div class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--secondary); padding-bottom: 5px;">
                 <h3 style="margin:0;">📚 雲端植栽資料庫</h3>
-                <input type="text" id="searchInput" placeholder="🔍 搜尋名稱、編號或 #標籤..." oninput="app.renderCatalog()" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; width: 200px;">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="searchInput" placeholder="🔍 搜尋名稱、編號或 #標籤..." oninput="app.renderCatalog()" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; width: 200px;">
+                    <button class="success" onclick="app.clearForm()">➕ 新增植栽</button>
+                </div>
             </div>
             <div class="catalog-grid" id="catalogGrid">
                 </div>
@@ -412,11 +423,13 @@
                         document.getElementById('preview_real').src = dataUrl;
                         document.getElementById('preview_real').style.display = 'block';
                         document.getElementById('text_real').style.display = 'none';
+                        document.getElementById('btn_del_real').style.display = 'flex';
                         canvas.toBlob((blob) => { this.pendingRealBlob = blob; sysLog("真實照片裁切暫存", "success"); }, 'image/jpeg', 0.8);
                     } else {
                         document.getElementById('preview_sim').src = dataUrl;
                         document.getElementById('preview_sim').style.display = 'block';
                         document.getElementById('text_sim').style.display = 'none';
+                        document.getElementById('btn_del_sim').style.display = 'flex';
                         canvas.toBlob((blob) => { this.pendingSimBlob = blob; sysLog("模擬圖裁切暫存", "success"); }, 'image/jpeg', 0.8);
                     }
                     this.closeModal();
@@ -623,6 +636,28 @@
                 }
             }
 
+            // 🌟 刪除照片邏輯
+            deleteImage(event, type) {
+                event.stopPropagation(); // 防止觸發外層的上傳點擊事件
+                if (type === 'real') {
+                    document.getElementById('v_url_real').value = '';
+                    document.getElementById('preview_real').src = '';
+                    document.getElementById('preview_real').style.display = 'none';
+                    document.getElementById('text_real').style.display = 'block';
+                    document.getElementById('btn_del_real').style.display = 'none';
+                    cropperSvc.pendingRealBlob = null;
+                    sysLog("已清空真實照片 (尚未儲存至雲端)", "warn");
+                } else if (type === 'sim') {
+                    document.getElementById('v_url_sim').value = '';
+                    document.getElementById('preview_sim').src = '';
+                    document.getElementById('preview_sim').style.display = 'none';
+                    document.getElementById('text_sim').style.display = 'block';
+                    document.getElementById('btn_del_sim').style.display = 'none';
+                    cropperSvc.pendingSimBlob = null;
+                    sysLog("已清空模擬照片 (尚未儲存至雲端)", "warn");
+                }
+            }
+
             editPlant(id) {
                 sysLog(`點選讀取植栽 ID: ${id}`, "info");
                 const plant = this.dataStore.find(p => p.id === id);
@@ -641,8 +676,8 @@
                 this.colorGantt.setData(r[this.colMap.colorS], r[this.colMap.colorE]);
                 document.getElementById('v_meta').innerText = `最後更新：${r[this.colMap.meta] || '無'}`;
                 
-                // 🌟 核心修復：雙預覽圖邏輯
-                const setPreview = (urlKey, imgId, textId, inputId) => {
+                // 🌟 核心修復：雙預覽圖邏輯與刪除按鈕顯示
+                const setPreview = (urlKey, imgId, textId, inputId, delBtnId) => {
                     const rawUrl = r[this.colMap[urlKey]] || "";
                     document.getElementById(inputId).value = rawUrl; 
                     const cleanImg = Utility.cleanDriveUrl(rawUrl);
@@ -650,20 +685,22 @@
                         document.getElementById(imgId).src = cleanImg;
                         document.getElementById(imgId).style.display = 'block';
                         document.getElementById(textId).style.display = 'none';
+                        document.getElementById(delBtnId).style.display = 'flex';
                     } else {
                         document.getElementById(imgId).style.display = 'none';
                         document.getElementById(textId).style.display = 'block';
+                        document.getElementById(delBtnId).style.display = 'none';
                     }
                 };
 
-                setPreview('urlReal', 'preview_real', 'text_real', 'v_url_real');
-                setPreview('urlSim', 'preview_sim', 'text_sim', 'v_url_sim');
+                setPreview('urlReal', 'preview_real', 'text_real', 'v_url_real', 'btn_del_real');
+                setPreview('urlSim', 'preview_sim', 'text_sim', 'v_url_sim', 'btn_del_sim');
 
                 this.renderTagsPreview();
             }
 
             clearForm() {
-                sysLog("執行清空表單", "info");
+                sysLog("執行清空表單，準備新增", "info");
                 document.getElementById('v_id').value = '';
                 document.getElementById('v_name').value = '';
                 document.getElementById('v_scientific').value = '';
@@ -674,10 +711,12 @@
                 
                 document.getElementById('preview_real').style.display = 'none';
                 document.getElementById('text_real').style.display = 'block';
+                document.getElementById('btn_del_real').style.display = 'none';
                 document.getElementById('v_url_real').value = '';
                 
                 document.getElementById('preview_sim').style.display = 'none';
                 document.getElementById('text_sim').style.display = 'block';
+                document.getElementById('btn_del_sim').style.display = 'none';
                 document.getElementById('v_url_sim').value = '';
 
                 document.getElementById('v_meta').innerText = '最後更新：無';
