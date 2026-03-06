@@ -68,25 +68,25 @@
         
         .preview-content { flex: 1; overflow-y: auto; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
 
-        /* A4 紙張樣式 (嚴格尺寸與 Flex 佈局) */
+        /* A4 紙張樣式 (絕對尺寸鎖定，防止變形) */
         .page-a4-portrait { 
-            width: 210mm; height: 297mm; background: #fff; padding: 20mm; 
+            width: 210mm; min-height: 297mm; height: 297mm; max-height: 297mm;
+            background: #fff; padding: 15mm 20mm; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
             font-family: "標楷體", serif; position: relative; overflow: hidden;
-            display: flex; flex-direction: column; flex-shrink: 0; margin-bottom: 30px;
+            display: flex; flex-direction: column; flex-shrink: 0;
         }
         .page-a4-landscape { 
-            width: 297mm; height: 210mm; background: #fff; padding: 20mm; 
+            width: 297mm; min-height: 210mm; height: 210mm; max-height: 210mm;
+            background: #fff; padding: 15mm 20mm; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
             font-family: "標楷體", serif; position: relative; overflow: hidden;
-            display: flex; flex-direction: column; flex-shrink: 0; margin-bottom: 30px;
+            display: flex; flex-direction: column; flex-shrink: 0;
         }
-        
-        .footer-bottom { margin-top: auto; width: 100%; }
 
         /* 內容與表格樣式 */
-        .doc-title { text-align: center; margin-top: 0; margin-bottom: 15px; font-size: 16pt; font-weight: bold; flex-shrink: 0; }
-        .doc-subtitle { text-align: center; margin-top: -10px; margin-bottom: 10px; font-size: 11pt; flex-shrink: 0; }
+        .doc-title { text-align: center; margin-top: 0; margin-bottom: 10px; font-size: 16pt; font-weight: bold; flex-shrink: 0; }
+        .doc-subtitle { text-align: center; margin-top: -5px; margin-bottom: 10px; font-size: 11pt; flex-shrink: 0; }
         
         .doc-table { width: 100%; border-collapse: collapse; font-size: 11pt; margin-bottom: 0; }
         .doc-table th, .doc-table td { border: 1px solid black; padding: 6px; text-align: left; vertical-align: middle; }
@@ -247,9 +247,9 @@
     let state = { projName: "中和區錦和運動公園整體規劃改善工程", selectedMinors: [] };
     let currentTab = 'flow';
 
-    // 嚴格分塊分頁參數設定 (完美符合 A4 高度)
-    const PAGE_STD_ROWS = 12; // 標準表每頁嚴格容納 12 行
-    const PAGE_REC_ROWS = 11; // 紀錄表每頁嚴格容納 11 行
+    // 保守分塊分頁參數設定 (完美符合 A4 高度，預防字串換行撐開)
+    const PAGE_STD_ROWS = 8; // 標準表每頁嚴格容納 8 行
+    const PAGE_REC_ROWS = 7; // 紀錄表每頁嚴格容納 7 行
 
     document.addEventListener("DOMContentLoaded", () => {
         const scriptGis = document.createElement('script'); scriptGis.src = "https://accounts.google.com/gsi/client"; scriptGis.onload = gisLoaded; document.body.appendChild(scriptGis);
@@ -361,7 +361,7 @@
 
     /**
      * ==========================================
-     * @Core 預覽與 Word 匯出引擎 (強制分頁與補齊算法)
+     * @Core 預覽與 Word 匯出引擎 (強制分頁、鎖死高度、補齊算法)
      * ==========================================
      */
     function switchTab(tab, el) { currentTab = tab; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); renderPreview(); }
@@ -417,7 +417,7 @@
 
         if (currentTab === 'flow') {
             activeMinors.forEach(m => {
-                html += `<div class="page-a4-portrait">
+                html += `<div class="page-a4-portrait" style="height:auto; max-height:none;">
                             <div class="flow-line-bg"></div>
                             <h2 class="doc-title">${m.minorName} 流程圖</h2>
                             <div style="flex:1;">`;
@@ -477,7 +477,7 @@
                     itemsWithRs.forEach(r => {
                         const isHP = r.item.includes('*'); const cleanItem = r.item.replace(/\*/g, '').trim();
                         const timingStr = isHP ? `<span style="color:red; font-weight:bold;">* </span>${r.timing}` : r.timing;
-                        html += `<tr style="height:28pt;">`;
+                        html += `<tr>`;
                         if (r.rowspanStage) html += `<td rowspan="${r.rowspanStage}" align="center">${r.stage}</td>`;
                         if (r.rowspanNode) html += `<td rowspan="${r.rowspanNode}" align="center">${r.nodeName}</td>`;
                         html += `   <td>${cleanItem}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${timingStr}</td>
@@ -487,13 +487,13 @@
                     
                     // 填入高度固定的空白列確保表格底部齊平
                     for(let i=0; i<padCount; i++) {
-                        html += `<tr style="height:28pt;"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                        html += `<tr style="height:35px;"><td style="height:35px;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
                     }
                     
                     html += `           </tbody>
                                     </table>
                                 </div>
-                                <div class="footer-bottom" style="text-align: left; padding: 5px; font-weight: bold; font-size:11pt;">
+                                <div style="text-align: left; padding: 5px; font-weight: bold; font-size:11pt;">
                                     ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
                                 </div>
                              </div>`;
@@ -537,11 +537,11 @@
                         
                         chunk.forEach(r => {
                             const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                            html += `<tr style="height:35pt;"><td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td></tr>`;
+                            html += `<tr><td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td></tr>`;
                         });
                         
                         // 填入高度固定的空白列確保表格底部齊平
-                        for(let i=0; i<padCount; i++){ html += `<tr style="height:35pt;"><td></td><td></td><td></td><td></td></tr>`; }
+                        for(let i=0; i<padCount; i++){ html += `<tr style="height:45px;"><td style="height:45px;"></td><td></td><td></td><td></td></tr>`; }
 
                         html += `               <tr>
                                                     <td colspan="4" style="padding: 10px; line-height: 1.6;">
@@ -552,7 +552,7 @@
                                         </table>
                                     </div>
                                     
-                                    <div class="footer-bottom">
+                                    <div>
                                         <div style="font-size: 10pt; margin-top: 10px; line-height: 1.5;">
                                             備註：<br>1. 抽查標準及實際檢查情形應具體明確(例：磚砌完成後須不透光)或量化尺寸(例：磚縫7mm~10mm)。<br>2. 抽查結果合格者註明「○」，不合格者註明「╳」，如無需檢查之項目則打「／」。<br>3. 本表由監造現場人員實地檢查後覈實記載簽認。
                                         </div>
@@ -585,7 +585,7 @@
                         <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:12pt;">
                         <thead><tr style="background:#f2f2f2;"><th width="15%">項次</th><th>施工抽查標準項目</th><th width="20%">備註</th></tr></thead>
                         <tbody>`;
-        activeMinors.forEach((m, idx) => { bodyHtml += `<tr style="height:30pt;"><td align="center">${idx+1}</td><td>${m.minorName}施工抽查標準</td><td></td></tr>`; });
+        activeMinors.forEach((m, idx) => { bodyHtml += `<tr style="height:35pt;"><td style="height:35pt;" align="center">${idx+1}</td><td>${m.minorName}施工抽查標準</td><td></td></tr>`; });
         bodyHtml += `</tbody></table></div><br clear=all style='mso-special-character:line-break;page-break-before:always;mso-break-type:section-break'>`;
         
         bodyHtml += `<div class="Section2">`;
@@ -621,7 +621,7 @@
                 itemsWithRs.forEach(r => {
                     const isHP = r.item.includes('*'); const cleanItem = r.item.replace(/\*/g, '').trim();
                     const timingStr = isHP ? `* ${r.timing}` : r.timing;
-                    bodyHtml += `<tr style="height:28pt;">`;
+                    bodyHtml += `<tr>`;
                     if (r.rowspanStage) bodyHtml += `<td rowspan="${r.rowspanStage}" align="center">${r.stage}</td>`;
                     if (r.rowspanNode) bodyHtml += `<td rowspan="${r.rowspanNode}" align="center">${r.nodeName}</td>`;
                     bodyHtml += `   <td>${cleanItem}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${timingStr}</td>
@@ -629,9 +629,15 @@
                                     <td align="center">施工抽查紀錄</td><td></td></tr>`;
                 });
                 
-                for(let i=0; i<padCount; i++){ bodyHtml += `<tr style="height:28pt;"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`; }
-                bodyHtml += `    </tbody></table>
-                             <div style="text-align: left; padding-top: 5px; font-weight: bold; font-size:11pt;">＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）</div>`;
+                for(let i=0; i<padCount; i++){ bodyHtml += `<tr style="height:35pt;"><td style="height:35pt;"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`; }
+                
+                bodyHtml += `        <tr>
+                                         <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold; border-top: 1px solid black; border-bottom: none; border-left: none; border-right: none;">
+                                             ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
+                                         </td>
+                                     </tr>
+                                 </tbody>
+                             </table>`;
             });
         });
         bodyHtml += `</div>`;
@@ -684,10 +690,10 @@
                     
                     chunk.forEach(r => {
                         const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                        bodyHtml += `<tr style="height:35pt;"><td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td></tr>`;
+                        bodyHtml += `<tr><td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td></tr>`;
                     });
                     
-                    for(let i=0; i<padCount; i++){ bodyHtml += `<tr style="height:35pt;"><td></td><td></td><td></td><td></td></tr>`; }
+                    for(let i=0; i<padCount; i++){ bodyHtml += `<tr style="height:40pt;"><td style="height:40pt;"></td><td></td><td></td><td></td></tr>`; }
 
                     bodyHtml += `       <tr>
                                             <td colspan="4" style="padding: 10px; line-height: 1.6;">
@@ -697,14 +703,14 @@
                                     </tbody>
                                 </table>
                                 
-                        <div style="font-size: 10pt; margin-top: 10px; line-height: 1.5;">
-                            備註：<br>1. 抽查標準及實際檢查情形應具體明確(例：磚砌完成後須不透光)或量化尺寸(例：磚縫7mm~10mm)。<br>2. 抽查結果合格者註明「○」，不合格者註明「╳」，如無需檢查之項目則打「／」。<br>3. 本表由監造現場人員實地檢查後覈實記載簽認。
-                        </div>
-                        <div style="margin-top: 30px; width: 100%;">
-                            <table style="width: 100%; border: none; font-size:12pt; font-weight:bold;">
-                                <tr><td style="border: none; width: 50%;">監造現場人員簽名：___________________</td><td style="border: none; width: 50%; text-align: right;">監造工地負責(授權)人：___________________</td></tr>
-                            </table>
-                        </div>`;
+                                <div style="font-size: 10pt; margin-top: 10px; line-height: 1.5;">
+                                    備註：<br>1. 抽查標準及實際檢查情形應具體明確(例：磚砌完成後須不透光)或量化尺寸(例：磚縫7mm~10mm)。<br>2. 抽查結果合格者註明「○」，不合格者註明「╳」，如無需檢查之項目則打「／」。<br>3. 本表由監造現場人員實地檢查後覈實記載簽認。
+                                </div>
+                                <div style="margin-top: 30px; width: 100%;">
+                                    <table style="width: 100%; border: none; font-size:12pt; font-weight:bold;">
+                                        <tr><td style="border: none; width: 50%;">監造現場人員簽名：___________________</td><td style="border: none; width: 50%; text-align: right;">監造工地負責(授權)人：___________________</td></tr>
+                                    </table>
+                                </div>`;
                 });
             });
         });
