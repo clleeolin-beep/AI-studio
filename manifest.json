@@ -64,7 +64,7 @@
       { "id": "GreenTool", "name": "植栽選取工具", "icon": "🌿", "path": "views/productivity/green.html", "category": "生產力" },
       { "id": "TreeNav", "name": "數據階層導覽", "icon": "🌳", "path": "views/productivity/tree.html", "category": "生產力" },
       { "id": "GanttManager", "name": "專案進度管理", "icon": "📊", "path": "views/management/Gantt.html", "category": "管理決策" },
-      { "id": "InspectionTool", "name": "現場會勘記錄", "icon": "📸", "path": "views/management/inspection_tool.html", "category": "現場採集" },
+      { "id": "InspectionTool", "name": "監造表單生成工具", "icon": "📋", "path": "views/management/inspection_tool.html", "category": "監造管理" },
       { "id": "AdminConsole", "name": "系統後台管理", "icon": "⚙️", "path": "views/management/admin_console.html", "category": "管理決策" },
       { "id": "NasSync", "name": "NAS 架構說明", "icon": "🔗", "path": "views/knowledge/AI_NAS.html", "category": "知識架構" },
       { "id": "Tutorial", "name": "操作教學指南", "icon": "📖", "path": "views/knowledge/tutorial.html", "category": "知識架構" },
