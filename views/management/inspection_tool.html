@@ -2,15 +2,17 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>監造表單生成工具 (V2.5 全能編輯版)</title>
+    <title>監造表單生成工具 (V2.6 格式嚴謹與雲端同步版)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <style>
-        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; --border: #ddd; --danger: #e74c3c; }
+        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; --border: #ddd; --danger: #e74c3c; --auth: #8e44ad; }
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
         /* 頭部區塊 */
@@ -22,6 +24,7 @@
         .btn-green { background: var(--accent); }
         .btn-orange { background: var(--orange); }
         .btn-dark { background: var(--primary); }
+        .btn-auth { background: var(--auth); }
         .btn-danger { background: var(--danger); }
         
         /* 佈局區塊 */
@@ -58,18 +61,23 @@
         .add-btn:hover { background: #e0e0e0; }
 
         /* 右側預覽面板 */
-        .preview-panel { flex: 1; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
+        .preview-panel { flex: 1; background: #95a5a6; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
         .preview-tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid var(--border); }
         .tab-btn { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #666; cursor: pointer; transition: 0.3s; }
         .tab-btn:hover { background: #e9ecef; }
         .tab-btn.active { background: #fff; color: var(--blue); border-bottom: 3px solid var(--blue); }
-        .preview-content { flex: 1; overflow: auto; padding: 30px; background: #95a5a6; display: flex; justify-content: center; align-items: flex-start; }
+        .preview-content { flex: 1; overflow: auto; padding: 30px; display: flex; justify-content: center; align-items: flex-start; }
 
-        /* --- 流程圖畫布核心 --- */
-        #all-flowcharts-wrapper { background: #fff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.2); width: 100%; max-width: 20cm; box-sizing: border-box; }
-        .flowchart-container { width: 100%; display: flex; flex-direction: column; position: relative; font-family: "DFKai-SB", "標楷體", serif; margin: 0 auto 40px auto; padding-bottom: 20px; border-bottom: 2px dashed #ccc; }
-        .flowchart-container:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .flowchart-container::before { content: ""; position: absolute; left: 75px; top: 30px; bottom: 30px; width: 1.5px; background: #000; z-index: 1; }
+        /* --- 流程圖畫布核心 (嚴格依照 V44) --- */
+        #all-flowcharts-wrapper { background: transparent; width: 100%; max-width: 20cm; display: flex; flex-direction: column; gap: 40px; }
+        .flowchart-container { 
+            width: 17.5cm; background: #fff; padding: 50px 40px; box-sizing: border-box; 
+            display: flex; flex-direction: column; position: relative;
+            font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2); margin: 0 auto;
+        }
+        .flowchart-container::before {
+            content: ""; position: absolute; left: calc(40px + 75px); top: 80px; bottom: 80px; width: 1.5px; background: #000; z-index: 1;
+        }
         .flow-row { display: flex; width: 100%; align-items: center; position: relative; z-index: 2; min-height: 85px; }
         .node-col { width: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; flex-shrink: 0; }
         .node-wrapper { display: flex; flex-direction: column; align-items: center; background: #fff; padding: 5px 0; }
@@ -80,16 +88,15 @@
         .h-line { width: 35px; border-top: 1.5px dashed #000; flex-shrink: 0; margin-right: -1px; }
         .detail-box { border: 1.5px dashed #000; padding: 10px 15px; font-size: 14pt; background: #fff; line-height: 1.5; display: inline-block; max-width: 100%; word-break: break-all; text-align: left; }
         
-        /* 表格預覽樣式 */
-        .table-preview { width: 100%; max-width: 25cm; background: #fff; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); font-family: "標楷體", serif; box-sizing: border-box; margin-bottom: 20px; }
-        .table-preview table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .table-preview th, .table-preview td { border: 1px solid #000; padding: 6px; font-size: 11pt; text-align: left; }
-        .table-preview th { text-align: center; background: #f2f2f2; }
+        /* 表格預覽樣式 (嚴格依照 V44) */
+        .table-preview { width: 100%; max-width: 25cm; background: #fff; padding: 30px; box-shadow: 0 0 20px rgba(0,0,0,0.2); font-family: "標楷體", serif; box-sizing: border-box; margin-bottom: 40px; }
+        .table-preview h2 { text-align: center; margin-top: 0; margin-bottom: 20px; }
+        .table-preview table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .table-preview th, .table-preview td { border: 1px solid black; padding: 4px; font-size: 11pt; text-align: left; }
+        .table-preview th { font-weight: bold; text-align: center; }
         
-        /* 模態框樣式 */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 800px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px; }
-        .modal-content textarea { width: 100%; height: 400px; font-family: monospace; font-size: 12px; padding: 10px; box-sizing: border-box; }
+        .page-break-indicator { border-top: 2px dashed red; margin: 20px 0 40px 0; text-align: center; color: red; font-size: 12px; font-family: sans-serif; position: relative;}
+        .page-break-indicator::after { content: "--- 分頁線 (列印時自動換頁) ---"; background: #95a5a6; padding: 0 10px; position: relative; top: -8px; color: #fff;}
         
         #fileInput { display: none; }
     </style>
@@ -98,14 +105,18 @@
 
 <div class="header">
     <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
-        🏗️ 監造表單生成工具 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.5 全能編輯版</span>
+        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.6 嚴謹格式版</span>
     </h3>
     <div class="btn-group">
+        <button id="btnAuth" class="btn btn-auth" onclick="handleAuthClick()">🔑 登入 Google 授權</button>
+        <button id="btnSync" class="btn btn-danger" style="display:none;" onclick="syncToCloud()">☁️ 追加修改回存</button>
+        <div style="width:1px; background:#ddd; margin:0 5px;"></div>
+        
         <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)">
         <button class="btn btn-dark" onclick="document.getElementById('fileInput').click()">📂 匯入 JSON</button>
         <button class="btn btn-dark" onclick="exportJSON()">💾 存檔 JSON</button>
-        <button class="btn btn-danger" onclick="authRawData()">🔒 修改原始資料</button>
         <div style="width:1px; background:#ddd; margin:0 5px;"></div>
+        
         <button class="btn btn-blue" onclick="exportFlow()">📥 匯出流程圖</button>
         <button class="btn btn-green" onclick="exportStandard()">📋 匯出標準表</button>
         <button class="btn btn-orange" onclick="exportRecord()">📝 匯出紀錄表</button>
@@ -115,7 +126,7 @@
 <div class="main">
     <div class="form-panel">
         <div class="input-group">
-            <label>案名案號選擇 (手動輸入或由清單選擇)：</label>
+            <label>工程名稱：</label>
             <input type="text" id="projName" list="projectList" value="中和區錦和運動公園整體規劃改善工程" onchange="updateState()">
             <datalist id="projectList"></datalist>
         </div>
@@ -142,7 +153,7 @@
         
         <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
         <div style="font-size: 12px; color: #e67e22; margin-bottom: 15px; font-weight: bold;">
-            💡 提示：點擊綠色/灰色標題列可【展開/收合】。綠色標題列可上下拖曳調整「分項工程」順序。
+            💡 提示：點擊標題列可【展開/收合】。綠色標題列可拖曳排序。
         </div>
         
         <div id="formContainer" style="flex:1; overflow-y:auto; padding-right:5px;">
@@ -160,23 +171,104 @@
     </div>
 </div>
 
-<div id="rawEditorModal" class="modal">
-    <div class="modal-content">
-        <h3>🔒 原始基礎資料庫修改 (CSV 格式)</h3>
-        <p style="font-size:12px; color:#666;">您可以在此臨時修改底層資料，點擊儲存後將生效於目前的記憶體中，方便生成特例表單。</p>
-        <textarea id="rawCsvData"></textarea>
-        <div style="display:flex; justify-content: flex-end; gap:10px;">
-            <button class="btn btn-dark" onclick="document.getElementById('rawEditorModal').style.display='none'">取消</button>
-            <button class="btn btn-danger" onclick="saveRawData()">儲存覆蓋 (僅限本次作業)</button>
-        </div>
-    </div>
-</div>
-
 <script>
     /**
-     * @Core 狀態管理與核心資料
+     * ==========================================
+     * @Core Google Sheets API 二次授權機制設定
+     * ==========================================
      */
+    const CLIENT_ID = '請在此填入您的_CLIENT_ID'; 
+    const API_KEY = '請在此填入您的_API_KEY'; 
+    const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+    const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
     const SS_ID = "1YmRd6S6JY1NpXXc6Ix4qAtXiKQO6-RAjZ-gi_6-9q4g";
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    // GAPI 初始化
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+    }
+    async function initializeGapiClient() {
+        try {
+            await gapi.client.init({ apiKey: API_KEY, discoveryDocs: [DISCOVERY_DOC] });
+            gapiInited = true;
+        } catch (e) {
+            console.warn("GAPI 初始化失敗，若僅需讀取可忽略:", e);
+        }
+    }
+    // GIS 初始化
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '', // 會在 requestAccessToken 時動態定義
+        });
+        gisInited = true;
+    }
+    
+    function handleAuthClick() {
+        if (!gapiInited || !gisInited) { alert("API 尚未載入完成或未設定正確金鑰。"); return; }
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) { throw (resp); }
+            document.getElementById('btnAuth').style.display = 'none';
+            document.getElementById('btnSync').style.display = 'flex';
+            alert("Google 授權成功！現在您可以將修改後的表單追加寫回資料庫。");
+        };
+        if (gapi.client.getToken() === null) {
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+            tokenClient.requestAccessToken({prompt: ''});
+        }
+    }
+
+    /**
+     * 追加修改回存 (Append API)
+     * 將當前畫面上打勾的項目直接以 Append 方式寫入 Google Sheets 底部
+     */
+    async function syncToCloud() {
+        if (!confirm("確定要將目前畫面上勾選的項目，做為【追加/修改】寫入雲端資料庫嗎？\n這將會在資料庫最下方新增這些資料。")) return;
+        
+        let appendData = [];
+        state.selectedMinors.forEach(m => {
+            m.nodes.forEach(n => {
+                n.items.filter(i => i.checked).forEach(it => {
+                    // 還原星號與純文字
+                    let isHP = it.item.includes('*') ? 'HP' : '';
+                    let cleanItem = it.item.replace('* ', '').replace('*', '');
+                    // 對應欄位: A:大工項(暫無對應填入), B:小工項(minorName), C:檢驗停留點(hp), D:階段, E:流程, F:項目, G:標準, H:時機, I:方法, J:頻率, K:不合格處理, L:紀錄
+                    appendData.push([
+                        "", m.minorName, isHP, it.stage, n.nodeName, cleanItem,
+                        it.std, it.timing, it.method, it.freq, it.failProc, "施工抽查紀錄"
+                    ]);
+                });
+            });
+        });
+
+        if (appendData.length === 0) { alert("沒有勾選任何項目可寫入。"); return; }
+
+        try {
+            const response = await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: SS_ID,
+                range: '工作表1!A:L',
+                valueInputOption: 'USER_ENTERED',
+                resource: { values: appendData }
+            });
+            alert(`成功將 ${appendData.length} 筆資料寫入資料庫！`);
+        } catch (err) {
+            console.error(err);
+            alert("寫入失敗，請確認您是否有該表單的編輯權限。");
+        }
+    }
+
+
+    /**
+     * ==========================================
+     * @Core 狀態管理與核心資料讀取
+     * ==========================================
+     */
     let rawData = [];
     let state = {
         projName: "中和區錦和運動公園整體規劃改善工程",
@@ -184,54 +276,40 @@
     };
     let currentTab = 'flow';
 
-    // 1. 資料初始化
     document.addEventListener("DOMContentLoaded", () => {
-        // 載入 Google Sheets 標準資料庫
+        // 載入 API 腳本
+        const scriptGapi = document.createElement('script'); scriptGapi.src = "https://apis.google.com/js/api.js"; scriptGapi.onload = gapiLoaded; document.body.appendChild(scriptGapi);
+        const scriptGis = document.createElement('script'); scriptGis.src = "https://accounts.google.com/gsi/client"; scriptGis.onload = gisLoaded; document.body.appendChild(scriptGis);
+
+        // 公開讀取 Google Sheets (透過 gviz)
         window.loader = (json) => {
             if (!json.table) return;
             rawData = json.table.rows.map(r => ({
-                minor: r.c[1]?.v || "", 
-                hp: r.c[2]?.v || "", 
-                stage: r.c[3]?.v || "", 
-                node: r.c[4]?.v || "",
-                item: r.c[5]?.v || "", 
-                std: r.c[6]?.v || "", 
-                timing: r.c[7]?.v || "",
-                method: r.c[8]?.v || "", 
-                freq: r.c[9]?.v || "", 
-                failProc: r.c[10]?.v || ""
+                minor: r.c[1]?.v || "", hp: r.c[2]?.v || "", stage: r.c[3]?.v || "", node: r.c[4]?.v || "",
+                item: r.c[5]?.v || "", std: r.c[6]?.v || "", timing: r.c[7]?.v || "", method: r.c[8]?.v || "", 
+                freq: r.c[9]?.v || "", failProc: r.c[10]?.v || ""
             })).filter(r => r.node && r.node !== "施工流程" && r.item);
             
-            updateMinorDropdown();
+            const minors = [...new Set(rawData.map(r => r.minor))];
+            document.getElementById('minorSelect').innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
         };
         const s = document.createElement('script');
         s.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:loader`;
         document.body.appendChild(s);
 
-        // 嘗試非同步載入案件地圖 CSV
+        // 讀取案件地圖 CSV
         fetch('公司案例地圖彙整 - 公司已結案案件.csv')
             .then(res => res.text())
             .then(csv => {
                 const parsed = Papa.parse(csv, { header: true });
                 const datalist = document.getElementById('projectList');
                 parsed.data.forEach(row => {
-                    if (row['案件簡稱']) {
-                        const option = document.createElement('option');
-                        option.value = `[${row['案號'] || '無'}] ${row['案件簡稱']} - ${row['契約案名'] || ''}`;
-                        datalist.appendChild(option);
-                    }
+                    if (row['案件簡稱']) datalist.appendChild(new Option(`[${row['案號'] || '無'}] ${row['案件簡稱']} - ${row['契約案名'] || ''}`));
                 });
-            })
-            .catch(err => console.log('未找到案件 CSV 檔案，採手動輸入模式。'));
+            }).catch(() => {});
     });
 
-    function updateMinorDropdown() {
-        const minors = [...new Set(rawData.map(r => r.minor))];
-        const select = document.getElementById('minorSelect');
-        select.innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
-    }
-
-    // 2. 核心增刪改查邏輯
+    // --- 增刪改查與風琴UI邏輯 (保持 V2.5 優點) ---
     function addSelectedMinor(minorNameOverride = null) {
         const minorName = minorNameOverride || document.getElementById('minorSelect').value;
         if(!minorName) return;
@@ -242,109 +320,34 @@
             let itemName = r.item;
             if (r.hp && r.hp.trim() !== "") itemName = "* " + itemName;
 
-            grouped[r.node].push({ 
-                ...r, 
-                item: itemName,
-                checked: true, 
-                id: 'item_' + Math.random().toString(36).substr(2, 9) 
-            });
+            grouped[r.node].push({ ...r, item: itemName, checked: true, id: 'item_' + Math.random().toString(36).substr(2, 9) });
         });
 
-        const newMinor = {
-            id: 'm_' + Math.random().toString(36).substr(2, 9),
-            minorName: minorName,
-            collapsed: false,
+        state.selectedMinors.push({
+            id: 'm_' + Math.random().toString(36).substr(2, 9), minorName: minorName, collapsed: false,
             nodes: Object.keys(grouped).map(nodeName => ({
-                id: 'node_' + Math.random().toString(36).substr(2, 9),
-                nodeName: nodeName,
-                collapsed: false,
-                items: grouped[nodeName]
+                id: 'node_' + Math.random().toString(36).substr(2, 9), nodeName: nodeName, collapsed: false, items: grouped[nodeName]
             }))
-        };
-
-        state.selectedMinors.push(newMinor);
-        renderLeftPanel();
-    }
-
-    function removeMinor(minorId, e) {
-        e.stopPropagation();
-        state.selectedMinors = state.selectedMinors.filter(m => m.id !== minorId);
-        renderLeftPanel();
-    }
-
-    function addNode(minorId, e) {
-        e.stopPropagation();
-        const nodeName = prompt("請輸入新流程(大工項)名稱：");
-        if(!nodeName) return;
-        const minor = state.selectedMinors.find(m => m.id === minorId);
-        minor.nodes.push({
-            id: 'node_' + Math.random().toString(36).substr(2, 9),
-            nodeName: nodeName,
-            collapsed: false,
-            items: []
         });
-        minor.collapsed = false;
         renderLeftPanel();
     }
 
-    function removeNode(minorId, nodeId, e) {
-        e.stopPropagation();
-        const minor = state.selectedMinors.find(m => m.id === minorId);
-        minor.nodes = minor.nodes.filter(n => n.id !== nodeId);
-        renderLeftPanel();
-    }
+    function removeMinor(minorId, e) { e.stopPropagation(); state.selectedMinors = state.selectedMinors.filter(m => m.id !== minorId); renderLeftPanel(); }
+    function addNode(minorId, e) { e.stopPropagation(); const nodeName = prompt("請輸入新流程名稱："); if(!nodeName) return; const minor = state.selectedMinors.find(m => m.id === minorId); minor.nodes.push({ id: 'node_' + Math.random().toString(36).substr(2, 9), nodeName: nodeName, collapsed: false, items: [] }); minor.collapsed = false; renderLeftPanel(); }
+    function removeNode(minorId, nodeId, e) { e.stopPropagation(); const minor = state.selectedMinors.find(m => m.id === minorId); minor.nodes = minor.nodes.filter(n => n.id !== nodeId); renderLeftPanel(); }
+    function addItem(minorId, nodeId, e) { e.stopPropagation(); const minor = state.selectedMinors.find(m => m.id === minorId); const node = minor.nodes.find(n => n.id === nodeId); node.items.push({ id: 'item_' + Math.random().toString(36).substr(2, 9), checked: true, stage: "施工中", minor: minor.minorName, node: node.nodeName, item: "新增檢驗項目", std: "目視無異常", timing: "施工中", method: "目視", freq: "每次", failProc: "改善" }); node.collapsed = false; renderLeftPanel(); }
+    function removeItem(minorId, nodeId, itemId) { const minor = state.selectedMinors.find(m => m.id === minorId); const node = minor.nodes.find(n => n.id === nodeId); node.items = node.items.filter(i => i.id !== itemId); renderLeftPanel(); }
+    function toggleCollapse(type, id1, id2 = null) { if(type === 'minor') { const m = state.selectedMinors.find(m => m.id === id1); m.collapsed = !m.collapsed; } else { const m = state.selectedMinors.find(m => m.id === id1); const n = m.nodes.find(n => n.id === id2); n.collapsed = !n.collapsed; } renderLeftPanel(); }
 
-    function addItem(minorId, nodeId, e) {
-        e.stopPropagation();
-        const minor = state.selectedMinors.find(m => m.id === minorId);
-        const node = minor.nodes.find(n => n.id === nodeId);
-        node.items.push({
-            id: 'item_' + Math.random().toString(36).substr(2, 9),
-            checked: true, stage: "施工中", minor: minor.minorName, node: node.nodeName,
-            item: "新增檢驗項目", std: "目視無異常", timing: "施工中", method: "目視", freq: "每次", failProc: "改善"
-        });
-        node.collapsed = false;
-        renderLeftPanel();
-    }
-
-    function removeItem(minorId, nodeId, itemId) {
-        const minor = state.selectedMinors.find(m => m.id === minorId);
-        const node = minor.nodes.find(n => n.id === nodeId);
-        node.items = node.items.filter(i => i.id !== itemId);
-        renderLeftPanel();
-    }
-
-    // 風琴收縮邏輯
-    function toggleCollapse(type, id1, id2 = null) {
-        if(type === 'minor') {
-            const m = state.selectedMinors.find(m => m.id === id1);
-            m.collapsed = !m.collapsed;
-        } else if(type === 'node') {
-            const m = state.selectedMinors.find(m => m.id === id1);
-            const n = m.nodes.find(n => n.id === id2);
-            n.collapsed = !n.collapsed;
-        }
-        renderLeftPanel();
-    }
-
-    // 情境快選
     function applyPreset() {
-        const val = document.getElementById('presetSelect').value;
-        if(!val) return;
-        
-        let presets = [];
-        if(val === 'hill') presets = ["拆除工程", "整地工程", "銲接鋼線網", "擋土牆工程", "排水工程", "混凝土工程"];
-        if(val === 'park') presets = ["整地工程", "排水工程", "高壓混凝土地磚", "景觀裝修工程", "喬木植栽施工"];
-        
-        if(confirm(`即將套用預設情境，這將會保留現有項目並附加：\n${presets.join(', ')}\n是否繼續？`)) {
-            presets.forEach(minor => addSelectedMinor(minor));
-        }
+        const val = document.getElementById('presetSelect').value; if(!val) return;
+        let presets = val === 'hill' ? ["拆除工程", "整地工程", "銲接鋼線網", "擋土牆工程", "排水工程", "混凝土工程"] : ["整地工程", "排水工程", "高壓混凝土地磚", "景觀裝修工程", "喬木植栽施工"];
+        if(confirm(`即將依序套用情境：\n${presets.join(' -> ')}\n是否繼續？`)) presets.forEach(minor => addSelectedMinor(minor));
     }
 
-    // 3. 渲染左側可拖曳編輯選單 (支援新增/刪除/收合)
     function renderLeftPanel() {
         const container = document.getElementById('formContainer');
-        container.innerHTML = state.selectedMinors.map((m, mIdx) => `
+        container.innerHTML = state.selectedMinors.map((m) => `
             <div class="minor-group" data-id="${m.id}">
                 <div class="minor-header" onclick="toggleCollapse('minor', '${m.id}')">
                     <span>${m.collapsed ? '➕' : '➖'} ≡ ${m.minorName}</span>
@@ -365,7 +368,7 @@
                             <div class="node-body ${n.collapsed ? 'collapsed' : ''}">
                                 ${n.items.map(it => `
                                     <div class="item-row">
-                                        <button class="action-btn" onclick="removeItem('${m.id}', '${n.id}', '${it.id}')" style="position:absolute; right:5px; top:5px; color:var(--danger);" title="刪除此項目">✖</button>
+                                        <button class="action-btn" onclick="removeItem('${m.id}', '${n.id}', '${it.id}')" style="position:absolute; right:5px; top:5px; color:var(--danger);">✖</button>
                                         <label class="item-header" style="padding-right:20px;">
                                             <input type="checkbox" ${it.checked ? 'checked' : ''} onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'checked', this.checked)">
                                             <input type="text" value="${it.item}" onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'item', this.value)" style="flex:1; border:none; border-bottom:1px dashed #ccc; background:transparent; font-weight:bold; color: ${it.item.includes('*') ? '#e74c3c' : '#333'}">
@@ -385,82 +388,26 @@
             </div>
         `).join('');
 
-        new Sortable(container, {
-            handle: '.minor-header',
-            animation: 150,
-            onEnd: function (evt) {
-                const movedItem = state.selectedMinors.splice(evt.oldIndex, 1)[0];
-                state.selectedMinors.splice(evt.newIndex, 0, movedItem);
-                renderPreview();
-            }
-        });
-
+        new Sortable(container, { handle: '.minor-header', animation: 150, onEnd: function (evt) { const movedItem = state.selectedMinors.splice(evt.oldIndex, 1)[0]; state.selectedMinors.splice(evt.newIndex, 0, movedItem); renderPreview(); } });
         renderPreview();
     }
 
-    // 更新狀態
     function updateState() { state.projName = document.getElementById('projName').value; renderPreview(); }
-    function updateNodeName(minorId, nodeId, val) {
-        const node = state.selectedMinors.find(m => m.id === minorId).nodes.find(n => n.id === nodeId);
-        node.nodeName = val;
-        renderPreview();
-    }
-    function updateItemState(minorId, nodeId, itemId, field, value) {
-        const item = state.selectedMinors.find(m => m.id === minorId).nodes.find(n => n.id === nodeId).items.find(i => i.id === itemId);
-        item[field] = value;
-        renderPreview();
-    }
+    function updateNodeName(minorId, nodeId, val) { state.selectedMinors.find(m => m.id === minorId).nodes.find(n => n.id === nodeId).nodeName = val; renderPreview(); }
+    function updateItemState(minorId, nodeId, itemId, field, value) { state.selectedMinors.find(m => m.id === minorId).nodes.find(n => n.id === nodeId).items.find(i => i.id === itemId)[field] = value; renderPreview(); }
+    
+    function exportJSON() { const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2)); const a = document.createElement('a'); a.href = dataStr; a.download = `表單設定_${state.projName}.json`; document.body.appendChild(a); a.click(); a.remove(); }
+    function importJSON(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { try { const loaded = JSON.parse(e.target.result); if(loaded.selectedMinors) { state = loaded; document.getElementById('projName').value = state.projName; renderLeftPanel(); alert("JSON 載入成功！"); } } catch(err) { alert("檔案解析失敗"); } }; reader.readAsText(file); }
 
-    // JSON 存取
-    function exportJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
-        const a = document.createElement('a'); a.href = dataStr; a.download = `表單設定_${state.projName}.json`;
-        document.body.appendChild(a); a.click(); a.remove();
-    }
-
-    function importJSON(event) {
-        const file = event.target.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const loaded = JSON.parse(e.target.result);
-                if(loaded.selectedMinors) { state = loaded; document.getElementById('projName').value = state.projName; renderLeftPanel(); alert("JSON 載入成功！"); }
-            } catch(err) { alert("檔案解析失敗"); }
-        };
-        reader.readAsText(file);
-    }
-
-    // 授權修改基礎資料庫
-    function authRawData() {
-        const pwd = prompt("請輸入系統授權碼解鎖原始資料編輯：\n(提示：預設為 admin)");
-        if(pwd === "admin") {
-            const csv = Papa.unparse(rawData);
-            document.getElementById('rawCsvData').value = csv;
-            document.getElementById('rawEditorModal').style.display = 'block';
-        } else {
-            alert("密碼錯誤，拒絕存取。");
-        }
-    }
-    function saveRawData() {
-        const csvStr = document.getElementById('rawCsvData').value;
-        const parsed = Papa.parse(csvStr, { header: true });
-        rawData = parsed.data;
-        updateMinorDropdown();
-        document.getElementById('rawEditorModal').style.display = 'none';
-        alert("原始資料已更新至記憶體，請透過左側選單重新加入分項。");
-    }
-
-    // 預覽與 Word 匯出
-    function switchTab(tab, el) {
-        currentTab = tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        el.classList.add('active');
-        renderPreview();
-    }
+    /**
+     * ==========================================
+     * @Core 預覽與 Word 匯出 (嚴格遵循 V44 原始排版)
+     * ==========================================
+     */
+    function switchTab(tab, el) { currentTab = tab; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); renderPreview(); }
 
     function renderPreview() {
-        const container = document.getElementById('previewContainer');
-        container.innerHTML = '';
+        const container = document.getElementById('previewContainer'); container.innerHTML = '';
         if (state.selectedMinors.length === 0) { container.innerHTML = '<div style="margin-top:50px; color:#fff; font-size: 16px;">請從左側點擊「加入表單」以產生預覽</div>'; return; }
 
         if (currentTab === 'flow') {
@@ -468,8 +415,7 @@
             state.selectedMinors.forEach(m => {
                 const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
                 if(activeNodes.length === 0) return;
-                html += `<h2 style="text-align:center; color:#2c3e50; margin: 10px 0 20px 0;">${m.minorName} 流程圖</h2>`;
-                html += `<div class="flowchart-container">`;
+                html += `<div class="flowchart-container"><h2 style="text-align:center; margin-top:0;">${m.minorName} 流程圖</h2>`;
                 html += generateFlowRow("準備", [], "oval", true);
                 activeNodes.forEach(n => { html += generateFlowRow(n.nodeName, n.items.filter(i => i.checked).map(i => i.item), "rect"); });
                 html += generateFlowRow("完成", [], "oval");
@@ -482,28 +428,25 @@
                 const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
                 if(activeNodes.length === 0) return;
 
-                // 表頭標籤，代表一個分項工程的開始
-                html += `<div class="table-preview"><h2 align="center">${currentTab==='std' ? '標準表' : '施工抽查紀錄表'} - ${m.minorName}</h2>`;
+                html += `<div class="table-preview"><h2 align="center">${currentTab==='std' ? m.minorName + ' 施工抽查程序及標準表' : '施工抽查紀錄表'}</h2>`;
                 if (currentTab === 'rec') html += `<table style="margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${m.minorName}</td></tr></table>`;
                 
-                activeNodes.forEach((n) => {
-                    html += `<h3 style="margin: 15px 0 5px 0; font-size: 14pt; color: #333;">▶ 流程：${n.nodeName}</h3>`;
-                    html += `<table><tr style="font-weight:bold;">`;
-                    if (currentTab === 'std') html += `<th>階段</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
-                    else html += `<th colspan="2">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
-                    html += `</tr>`;
+                html += `<table><tr style="font-weight:bold;">`;
+                if (currentTab === 'std') html += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th>`;
+                else html += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
+                html += `</tr>`;
 
+                activeNodes.forEach((n) => {
                     n.items.filter(i => i.checked).forEach((r) => {
                         const isHP = r.item.includes('*');
                         const itemStyle = isHP ? `style="color:red; font-weight:bold;"` : ``;
                         html += `<tr>`;
-                        if (currentTab === 'std') html += `<td align="center" width="10%">${r.stage}</td><td ${itemStyle} width="20%">${r.item}</td><td width="20%">${r.std.replace(/\n/g, '<br>')}</td><td align="center" width="10%">${r.timing}</td><td align="center" width="10%">${r.method}</td><td align="center" width="10%">${r.freq}</td><td align="center" width="10%">${r.failProc}</td><td align="center" width="10%">抽查紀錄</td>`;
-                        else html += `<td align="center" width="10%">${r.stage}</td><td ${itemStyle} width="25%">${r.item}</td><td width="30%">${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                        if (currentTab === 'std') html += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">施工抽查紀錄</td><td></td>`;
+                        else html += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
                         html += `</tr>`;
                     });
-                    html += `</table>`;
                 });
-                html += `</div>`;
+                html += `</table></div>`;
                 if (mIdx !== state.selectedMinors.length - 1) html += `<div class="page-break-indicator"></div>`;
             });
             container.innerHTML = html;
@@ -533,30 +476,29 @@
             const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
             if(activeNodes.length === 0) return;
 
-            // 改良：分頁符號位於分項工程的開頭 (確保同一分項內的各流程表格不會被強迫切斷)
+            // 以分項工程做自動分頁
             if (!isFirst) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
             isFirst = false;
             
-            bodyHtml += `<h2 align="center">${isRecord ? '施工抽查紀錄表' : '標準表'} - ${m.minorName}</h2>`;
-            if (isRecord) bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${m.minorName}</td></tr></table>`;
+            bodyHtml += `<h2 align="center">${isRecord ? '施工抽查紀錄表' : m.minorName + ' 施工抽查程序及標準表'}</h2>`;
+            if (isRecord) bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td padding-left="5px">${state.projName}</td></tr><tr><td align="center">分項工程</td><td padding-left="5px">${m.minorName}</td></tr></table>`;
+
+            bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse;"><tr style="font-weight:bold; background-color:#f2f2f2;">`;
+            if (!isRecord) bodyHtml += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th>`;
+            else bodyHtml += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
+            bodyHtml += `</tr>`;
 
             activeNodes.forEach((n) => {
-                bodyHtml += `<h3 style="margin: 15px 0 5px 0; font-family: 標楷體; font-size: 14pt;">▶ 流程：${n.nodeName}</h3>`;
-                bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse;"><tr style="font-weight:bold; background-color:#f2f2f2;">`;
-                if (!isRecord) bodyHtml += `<th>階段</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
-                else bodyHtml += `<th colspan="2">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
-                bodyHtml += `</tr>`;
-
                 n.items.filter(i => i.checked).forEach((r) => {
                     const isHP = r.item.includes('*');
                     const itemStyle = isHP ? `style="color:red; font-weight:bold;"` : ``;
                     bodyHtml += `<tr>`;
-                    if (!isRecord) bodyHtml += `<td align="center" width="10%">${r.stage}</td><td ${itemStyle} width="20%">${r.item}</td><td width="20%">${r.std.replace(/\n/g, '<br>')}</td><td align="center" width="10%">${r.timing}</td><td align="center" width="10%">${r.method}</td><td align="center" width="10%">${r.freq}</td><td align="center" width="10%">${r.failProc}</td><td align="center" width="10%">抽查紀錄</td>`;
-                    else bodyHtml += `<td align="center" width="10%">${r.stage}</td><td ${itemStyle} width="25%">${r.item}</td><td width="30%">${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                    if (!isRecord) bodyHtml += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">施工抽查紀錄</td><td></td>`;
+                    else bodyHtml += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
                     bodyHtml += `</tr>`;
                 });
-                bodyHtml += `</table>`;
             });
+            bodyHtml += `</table>`;
         });
 
         const style = isRecord ? `body { font-family: "標楷體"; } table { font-size: 11pt; }` : `@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { font-size: 10pt; }`;
