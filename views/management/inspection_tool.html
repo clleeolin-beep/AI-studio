@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>監造表單生成工具 (V2.3 動態互動版)</title>
+    <title>監造表單生成工具 (V2.4 多工項組合版)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -31,13 +31,14 @@
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--primary); font-size: 14px; }
         .input-group input[type="text"], .input-group select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
         
-        /* 拖曳節點樣式 */
-        .node-group { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px; background: #fafafa; }
-        .node-header { padding: 10px 15px; background: #eee; border-bottom: 1px solid var(--border); cursor: grab; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-radius: 6px 6px 0 0; }
-        .node-header:active { cursor: grabbing; }
-        .node-body { padding: 10px; }
+        /* 拖曳節點樣式 (分項工程層級) */
+        .minor-group { border: 2px solid var(--accent); border-radius: 8px; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .minor-header { padding: 10px 15px; background: #e8f5e9; border-bottom: 2px solid var(--accent); cursor: grab; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-radius: 6px 6px 0 0; color: #2e7d32; }
+        .minor-header:active { cursor: grabbing; }
+        .minor-body { padding: 10px; background: #fafafa; }
         
         /* 單一項目編輯區 */
+        .node-section { margin-bottom: 15px; border-left: 3px solid #ccc; padding-left: 10px; }
         .item-row { background: #fff; border: 1px solid #e0e0e0; padding: 10px; margin-bottom: 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; }
         .item-header { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 13px; }
         .item-header input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
@@ -54,13 +55,14 @@
         .preview-content { flex: 1; overflow: auto; padding: 30px; background: #95a5a6; display: flex; justify-content: center; align-items: flex-start; }
 
         /* --- 流程圖畫布核心 --- */
+        #all-flowcharts-wrapper { background: #fff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.2); width: 100%; max-width: 20cm; box-sizing: border-box; }
         .flowchart-container { 
-            width: 17.5cm; background: #fff; padding: 50px 40px; box-sizing: border-box; 
-            display: flex; flex-direction: column; position: relative;
-            font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2); margin: 0 auto;
+            width: 100%; display: flex; flex-direction: column; position: relative;
+            font-family: "DFKai-SB", "標楷體", serif; margin: 0 auto 40px auto; padding-bottom: 20px; border-bottom: 2px dashed #ccc;
         }
+        .flowchart-container:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         .flowchart-container::before {
-            content: ""; position: absolute; left: calc(40px + 75px); top: 80px; bottom: 80px; width: 1.5px; background: #000; z-index: 1;
+            content: ""; position: absolute; left: 75px; top: 30px; bottom: 30px; width: 1.5px; background: #000; z-index: 1;
         }
         .flow-row { display: flex; width: 100%; align-items: center; position: relative; z-index: 2; min-height: 85px; }
         .node-col { width: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; flex-shrink: 0; }
@@ -73,12 +75,12 @@
         .detail-box { border: 1.5px dashed #000; padding: 10px 15px; font-size: 14pt; background: #fff; line-height: 1.5; display: inline-block; max-width: 100%; word-break: break-all; text-align: left; }
         
         /* 表格預覽樣式 */
-        .table-preview { width: 100%; max-width: 25cm; background: #fff; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); font-family: "標楷體", serif; box-sizing: border-box; }
+        .table-preview { width: 100%; max-width: 25cm; background: #fff; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); font-family: "標楷體", serif; box-sizing: border-box; margin-bottom: 20px; }
         .table-preview table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .table-preview th, .table-preview td { border: 1px solid #000; padding: 6px; font-size: 11pt; text-align: left; }
         .table-preview th { text-align: center; background: #f2f2f2; }
-        .page-break-indicator { border-top: 2px dashed red; margin: 20px 0; text-align: center; color: red; font-size: 12px; font-family: sans-serif; position: relative;}
-        .page-break-indicator::after { content: "--- 分頁線 ---"; background: #95a5a6; padding: 0 10px; position: relative; top: -8px; }
+        .page-break-indicator { border-top: 2px dashed red; margin: 20px 0 40px 0; text-align: center; color: red; font-size: 12px; font-family: sans-serif; position: relative;}
+        .page-break-indicator::after { content: "--- 分頁線 (匯出時自動換頁) ---"; background: #95a5a6; padding: 0 10px; position: relative; top: -8px; color: #fff;}
         
         #fileInput { display: none; }
     </style>
@@ -87,7 +89,7 @@
 
 <div class="header">
     <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
-        🏗️ 監造表單生成工具 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.3</span>
+        🏗️ 監造表單生成工具 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.4 多工項組合版</span>
     </h3>
     <div class="btn-group">
         <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)">
@@ -106,12 +108,19 @@
             <label>工程名稱：</label>
             <input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程" onchange="updateState()">
         </div>
-        <div class="input-group">
-            <label>分項工程選擇 (讀取試算表)：</label>
-            <select id="minorSelect" onchange="handleMinorChange()"><option>載入中...</option></select>
+        
+        <div class="input-group" style="display:flex; gap:10px; align-items: flex-end; background: #f0f7fa; padding: 15px; border-radius: 8px; border: 1px solid #b3d4fc;">
+            <div style="flex:1;">
+                <label>選擇分項工程加入：</label>
+                <select id="minorSelect"><option>載入中...</option></select>
+            </div>
+            <button class="btn btn-blue" onclick="addSelectedMinor()">➕ 加入表單</button>
         </div>
+        
         <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
-        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">💡 提示：可拖曳灰色標題條調整大工項順序，展開可修改細部文字。</div>
+        <div style="font-size: 12px; color: #e67e22; margin-bottom: 15px; font-weight: bold;">
+            💡 提示：按住綠色標題列可上下拖曳調整「分項工程」順序。帶有「*」號表示檢驗停留點。
+        </div>
         
         <div id="formContainer" style="flex:1; overflow-y:auto; padding-right:5px;">
             </div>
@@ -136,8 +145,7 @@
     let rawData = [];
     let state = {
         projName: "中和區錦和運動公園整體規劃改善工程",
-        selMinor: "",
-        nodes: [] // { nodeName: "開挖", id: "n_1", items: [{ id: "i_1", checked: true, stage, item, std... }] }
+        selectedMinors: [] // 支援多重分項工程陣列
     };
     let currentTab = 'flow';
 
@@ -145,80 +153,111 @@
     document.addEventListener("DOMContentLoaded", () => {
         window.loader = (json) => {
             if (!json.table) return;
-            // 讀取 Google Sheets (依據欄位設定，A=0, B=1)
+            // 讀取 Google Sheets，增加對 C 欄 (檢驗停留點) 的讀取
             rawData = json.table.rows.map(r => ({
-                minor: r.c[1]?.v || "", stage: r.c[3]?.v || "", node: r.c[4]?.v || "",
-                item: r.c[5]?.v || "", std: r.c[6]?.v || "", timing: r.c[7]?.v || "",
-                method: r.c[8]?.v || "", freq: r.c[9]?.v || "", failProc: r.c[10]?.v || ""
+                minor: r.c[1]?.v || "", 
+                hp: r.c[2]?.v || "", // 檢驗停留點
+                stage: r.c[3]?.v || "", 
+                node: r.c[4]?.v || "",
+                item: r.c[5]?.v || "", 
+                std: r.c[6]?.v || "", 
+                timing: r.c[7]?.v || "",
+                method: r.c[8]?.v || "", 
+                freq: r.c[9]?.v || "", 
+                failProc: r.c[10]?.v || ""
             })).filter(r => r.node && r.node !== "施工流程" && r.item);
             
             const minors = [...new Set(rawData.map(r => r.minor))];
             const select = document.getElementById('minorSelect');
             select.innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
-            
-            if(minors.length > 0) {
-                handleMinorChange();
-            }
         };
         const s = document.createElement('script');
         s.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:loader`;
         document.body.appendChild(s);
     });
 
-    // 2. 切換分項工程時，重建 State
-    function handleMinorChange() {
-        state.selMinor = document.getElementById('minorSelect').value;
-        state.projName = document.getElementById('projName').value;
-        
-        // 依照 node (大工項/流程) 群組化
+    // 2. 加入選定的分項工程
+    function addSelectedMinor() {
+        const minorName = document.getElementById('minorSelect').value;
+        if(!minorName) return;
+
         const grouped = {};
-        rawData.filter(r => r.minor === state.selMinor).forEach(r => {
+        rawData.filter(r => r.minor === minorName).forEach(r => {
             if (!grouped[r.node]) grouped[r.node] = [];
-            grouped[r.node].push({ ...r, checked: true, id: 'item_' + Math.random().toString(36).substr(2, 9) });
+            
+            // 自動標記停留檢驗點：如果有值，加上星號
+            let itemName = r.item;
+            if (r.hp && r.hp.trim() !== "") {
+                itemName = "* " + itemName;
+            }
+
+            grouped[r.node].push({ 
+                ...r, 
+                item: itemName, // 使用加上星號的名稱
+                checked: true, 
+                id: 'item_' + Math.random().toString(36).substr(2, 9) 
+            });
         });
 
-        state.nodes = Object.keys(grouped).map(nodeName => ({
-            id: 'node_' + Math.random().toString(36).substr(2, 9),
-            nodeName: nodeName,
-            items: grouped[nodeName]
-        }));
+        const newMinor = {
+            id: 'm_' + Math.random().toString(36).substr(2, 9),
+            minorName: minorName,
+            nodes: Object.keys(grouped).map(nodeName => ({
+                id: 'node_' + Math.random().toString(36).substr(2, 9),
+                nodeName: nodeName,
+                items: grouped[nodeName]
+            }))
+        };
 
+        state.selectedMinors.push(newMinor);
         renderLeftPanel();
     }
 
-    // 3. 渲染左側可拖曳編輯選單
+    // 移除分項工程
+    function removeMinor(minorId) {
+        state.selectedMinors = state.selectedMinors.filter(m => m.id !== minorId);
+        renderLeftPanel();
+    }
+
+    // 3. 渲染左側可拖曳編輯選單 (分項工程層級)
     function renderLeftPanel() {
         const container = document.getElementById('formContainer');
-        container.innerHTML = state.nodes.map((n, nIdx) => `
-            <div class="node-group" data-id="${n.id}">
-                <div class="node-header">
-                    <span>≡ ${n.nodeName} (大工項)</span>
+        container.innerHTML = state.selectedMinors.map((m, mIdx) => `
+            <div class="minor-group" data-id="${m.id}">
+                <div class="minor-header">
+                    <span>≡ ${m.minorName}</span>
+                    <button onclick="removeMinor('${m.id}')" style="color:#d32f2f; border:none; background:none; cursor:pointer; font-size:16px;" title="移除此分項">✖</button>
                 </div>
-                <div class="node-body">
-                    ${n.items.map((it, iIdx) => `
-                        <div class="item-row">
-                            <label class="item-header">
-                                <input type="checkbox" ${it.checked ? 'checked' : ''} onchange="updateItemState('${n.id}', '${it.id}', 'checked', this.checked)">
-                                <input type="text" value="${it.item}" onchange="updateItemState('${n.id}', '${it.id}', 'item', this.value)" style="flex:1; border:none; border-bottom:1px dashed #ccc; background:transparent; font-weight:bold;">
-                            </label>
-                            <div class="item-edit-grid">
-                                <input type="text" class="item-edit-full" title="抽查標準" placeholder="抽查標準" value="${it.std}" onchange="updateItemState('${n.id}', '${it.id}', 'std', this.value)">
-                                <input type="text" title="抽查時機" placeholder="抽查時機" value="${it.timing}" onchange="updateItemState('${n.id}', '${it.id}', 'timing', this.value)">
-                                <input type="text" title="抽查方法" placeholder="抽查方法" value="${it.method}" onchange="updateItemState('${n.id}', '${it.id}', 'method', this.value)">
-                            </div>
+                <div class="minor-body">
+                    ${m.nodes.map(n => `
+                        <div class="node-section">
+                            <div style="font-weight:bold; margin-bottom: 8px; color: #555;">📋 流程：${n.nodeName}</div>
+                            ${n.items.map(it => `
+                                <div class="item-row">
+                                    <label class="item-header">
+                                        <input type="checkbox" ${it.checked ? 'checked' : ''} onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'checked', this.checked)">
+                                        <input type="text" value="${it.item}" onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'item', this.value)" style="flex:1; border:none; border-bottom:1px dashed #ccc; background:transparent; font-weight:bold; color: ${it.item.includes('*') ? '#e74c3c' : '#333'}">
+                                    </label>
+                                    <div class="item-edit-grid">
+                                        <input type="text" class="item-edit-full" title="抽查標準" placeholder="抽查標準" value="${it.std}" onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'std', this.value)">
+                                        <input type="text" title="抽查時機" placeholder="抽查時機" value="${it.timing}" onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'timing', this.value)">
+                                        <input type="text" title="抽查方法" placeholder="抽查方法" value="${it.method}" onchange="updateItemState('${m.id}', '${n.id}', '${it.id}', 'method', this.value)">
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     `).join('')}
                 </div>
             </div>
         `).join('');
 
-        // 啟用拖曳排序
+        // 針對大層級 (minor-group) 啟用拖曳排序
         new Sortable(container, {
-            handle: '.node-header',
+            handle: '.minor-header',
             animation: 150,
             onEnd: function (evt) {
-                const movedItem = state.nodes.splice(evt.oldIndex, 1)[0];
-                state.nodes.splice(evt.newIndex, 0, movedItem);
+                const movedItem = state.selectedMinors.splice(evt.oldIndex, 1)[0];
+                state.selectedMinors.splice(evt.newIndex, 0, movedItem);
                 renderPreview();
             }
         });
@@ -232,23 +271,26 @@
         renderPreview();
     }
 
-    function updateItemState(nodeId, itemId, field, value) {
-        const node = state.nodes.find(n => n.id === nodeId);
-        if(node) {
-            const item = node.items.find(i => i.id === itemId);
-            if(item) {
-                item[field] = value;
-                renderPreview();
+    function updateItemState(minorId, nodeId, itemId, field, value) {
+        const minor = state.selectedMinors.find(m => m.id === minorId);
+        if(minor) {
+            const node = minor.nodes.find(n => n.id === nodeId);
+            if(node) {
+                const item = node.items.find(i => i.id === itemId);
+                if(item) {
+                    item[field] = value;
+                    renderPreview();
+                }
             }
         }
     }
 
-    // 5. JSON 存取功能
+    // 5. JSON 存取功能 (相容新資料結構)
     function exportJSON() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
         const downloadAnchorNode = document.createElement('a');
         downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `表單設定_${state.selMinor}.json`);
+        downloadAnchorNode.setAttribute("download", `表單設定_${state.projName}.json`);
         document.body.appendChild(downloadAnchorNode);
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
@@ -260,11 +302,15 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
-                state = JSON.parse(e.target.result);
-                document.getElementById('projName').value = state.projName;
-                document.getElementById('minorSelect').value = state.selMinor;
-                renderLeftPanel();
-                alert("JSON 設定載入成功！");
+                const loadedState = JSON.parse(e.target.result);
+                if(loadedState.selectedMinors) {
+                    state = loadedState;
+                    document.getElementById('projName').value = state.projName;
+                    renderLeftPanel();
+                    alert("JSON 設定載入成功！");
+                } else {
+                    alert("設定檔格式不符 (可能為舊版設定檔)。");
+                }
             } catch(err) {
                 alert("檔案解析失敗，請確認是否為正確的設定檔。");
             }
@@ -284,64 +330,83 @@
         const container = document.getElementById('previewContainer');
         container.innerHTML = '';
         
-        // 提取已勾選的有效資料
-        const activeFlow = [];
-        state.nodes.forEach(n => {
-            const checkedItems = n.items.filter(i => i.checked);
-            if(checkedItems.length > 0) {
-                activeFlow.push({ nodeName: n.nodeName, items: checkedItems });
-            }
-        });
-
-        if (activeFlow.length === 0) {
-            container.innerHTML = '<div style="margin-top:50px; color:#fff;">請勾選左側項目以產生預覽</div>';
+        if (state.selectedMinors.length === 0) {
+            container.innerHTML = '<div style="margin-top:50px; color:#fff; font-size: 16px;">請從左側點擊「加入表單」以產生預覽</div>';
             return;
         }
 
         if (currentTab === 'flow') {
-            let html = `<div id="flowchart-canvas" class="flowchart-container">`;
-            html += generateFlowRow("準備", [], "oval", true);
-            activeFlow.forEach(flow => {
-                html += generateFlowRow(flow.nodeName, flow.items.map(i => i.item), "rect");
+            let html = `<div id="all-flowcharts-wrapper">`;
+            state.selectedMinors.forEach(m => {
+                const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
+                if(activeNodes.length === 0) return;
+
+                html += `<h2 style="text-align:center; color:#2c3e50; margin: 10px 0 20px 0;">${m.minorName} 流程圖</h2>`;
+                html += `<div class="flowchart-container">`;
+                html += generateFlowRow("準備", [], "oval", true);
+                activeNodes.forEach(n => {
+                    const items = n.items.filter(i => i.checked).map(i => i.item);
+                    html += generateFlowRow(n.nodeName, items, "rect");
+                });
+                html += generateFlowRow("完成", [], "oval");
+                html += `</div>`;
             });
-            html += generateFlowRow("完成", [], "oval");
             html += `</div>`;
             container.innerHTML = html;
         } 
         else if (currentTab === 'std' || currentTab === 'rec') {
-            let html = `<div class="table-preview"><h2 align="center">${currentTab==='std' ? state.selMinor+' 標準表' : '施工抽查紀錄表'}</h2>`;
+            let html = '';
             
-            if (currentTab === 'rec') {
-                html += `<table style="margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${state.selMinor}</td></tr></table>`;
-            }
+            state.selectedMinors.forEach((m, mIdx) => {
+                const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
+                
+                activeNodes.forEach((n, nIdx) => {
+                    html += `<div class="table-preview"><h2 align="center">${currentTab==='std' ? '標準表' : '施工抽查紀錄表'} - ${m.minorName} (${n.nodeName})</h2>`;
+                    
+                    if (currentTab === 'rec') {
+                        html += `<table style="margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${m.minorName}</td></tr></table>`;
+                    }
 
-            html += `<table><tr style="font-weight:bold;">`;
-            if (currentTab === 'std') {
-                html += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
-            } else {
-                html += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
-            }
-            html += `</tr>`;
-
-            // 依大工項分頁渲染邏輯
-            activeFlow.forEach((flow, fIdx) => {
-                flow.items.forEach((r) => {
-                    html += `<tr>`;
+                    html += `<table><tr style="font-weight:bold;">`;
                     if (currentTab === 'std') {
-                        html += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                        html += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
                     } else {
-                        html += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                        html += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
                     }
                     html += `</tr>`;
+
+                    n.items.filter(i => i.checked).forEach((r) => {
+                        // 若為 HP 項目，在表格中自動套用紅色字體強調
+                        const isHP = r.item.includes('*');
+                        const itemStyle = isHP ? `style="color:red; font-weight:bold;"` : ``;
+
+                        html += `<tr>`;
+                        if (currentTab === 'std') {
+                            html += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                        } else {
+                            html += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                        }
+                        html += `</tr>`;
+                    });
+                    html += `</table></div>`;
+                    
+                    // 分頁標示線 (最後一個不用畫)
+                    if (!(mIdx === state.selectedMinors.length - 1 && nIdx === activeNodes.length - 1)) {
+                        html += `<div class="page-break-indicator"></div>`;
+                    }
                 });
             });
-            html += `</table></div>`;
             container.innerHTML = html;
         }
     }
 
     function generateFlowRow(txt, itemStrings, shape, isStart = false) {
-        let detailHtml = itemStrings.length ? `<div class="h-line"></div><div class="detail-box">${itemStrings.map((it, i) => `${i + 1}.${it}`).join('<br>')}</div>` : '';
+        // 若文字包含星號，自動套用紅色強調
+        const styledItems = itemStrings.map((it, i) => {
+            return it.includes('*') ? `<span style="color:red; font-weight:bold;">${i + 1}.${it}</span>` : `${i + 1}.${it}`;
+        });
+        
+        let detailHtml = styledItems.length ? `<div class="h-line"></div><div class="detail-box">${styledItems.join('<br>')}</div>` : '';
         return `
             <div class="flow-row">
                 <div class="node-col">
@@ -354,55 +419,64 @@
             </div>`;
     }
 
-    // 7. 匯出 Word 引擎 (含分頁邏輯)
+    // 7. 匯出 Word 引擎 (含動態多重分頁邏輯)
     async function exportFlow() {
-        // 先切換到流程圖並渲染
         const originalTab = currentTab;
         if(currentTab !== 'flow') { switchTab('flow', document.querySelectorAll('.tab-btn')[0]); }
         
-        const canvas = document.getElementById('flowchart-canvas');
-        const img = await html2canvas(canvas, { scale: 3, useCORS: true });
-        const html = `<html><body style="font-family:標楷體; text-align:center;"><h2>施工流程圖</h2><img src="${img.toDataURL()}" width="590"></body></html>`;
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_流程圖.doc`);
+        // 抓取包含所有分項工程的總 Wrapper
+        const wrapper = document.getElementById('all-flowcharts-wrapper');
+        if(!wrapper) return;
+
+        const img = await html2canvas(wrapper, { scale: 3, useCORS: true });
+        const html = `<html><body style="font-family:標楷體; text-align:center;"><img src="${img.toDataURL()}" style="width:100%; max-width: 590px;"></body></html>`;
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `綜合流程圖.doc`);
         
         if(originalTab !== 'flow') { switchTab(originalTab, document.querySelectorAll('.tab-btn')[originalTab === 'std'?1:2]); }
     }
 
-    function generateWordHTML(title, isRecord) {
-        let activeFlow = state.nodes.filter(n => n.items.some(i => i.checked));
+    function generateWordHTML(isRecord) {
         let bodyHtml = '';
+        let isFirst = true;
 
-        activeFlow.forEach((flow, fIdx) => {
-            // 分頁邏輯：每個大工項前加上 Word 識別的分頁符號 (除了第一個)
-            if (fIdx > 0) {
-                bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
-            }
-            
-            bodyHtml += `<h2 align="center">${title} - ${flow.nodeName}</h2>`;
-            
-            if (isRecord) {
-                bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${state.selMinor}</td></tr></table>`;
-            }
+        state.selectedMinors.forEach(m => {
+            const activeNodes = m.nodes.filter(n => n.items.some(i => i.checked));
 
-            bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse;"><tr style="font-weight:bold; background-color:#f2f2f2;">`;
-            
-            if (!isRecord) {
-                bodyHtml += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
-            } else {
-                bodyHtml += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
-            }
-            bodyHtml += `</tr>`;
+            activeNodes.forEach((n) => {
+                if (!isFirst) {
+                    bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
+                }
+                isFirst = false;
+                
+                bodyHtml += `<h2 align="center">${isRecord ? '施工抽查紀錄表' : '標準表'} - ${m.minorName} (${n.nodeName})</h2>`;
+                
+                if (isRecord) {
+                    bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${m.minorName}</td></tr></table>`;
+                }
 
-            flow.items.filter(i => i.checked).forEach((r) => {
-                bodyHtml += `<tr>`;
+                bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse;"><tr style="font-weight:bold; background-color:#f2f2f2;">`;
+                
                 if (!isRecord) {
-                    bodyHtml += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                    bodyHtml += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
                 } else {
-                    bodyHtml += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                    bodyHtml += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
                 }
                 bodyHtml += `</tr>`;
+
+                n.items.filter(i => i.checked).forEach((r) => {
+                    const isHP = r.item.includes('*');
+                    const itemStyle = isHP ? `style="color:red; font-weight:bold;"` : ``;
+
+                    bodyHtml += `<tr>`;
+                    if (!isRecord) {
+                        bodyHtml += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                    } else {
+                        bodyHtml += `<td align="center">${r.stage}</td><td align="center">${n.nodeName}</td><td ${itemStyle}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                    }
+                    bodyHtml += `</tr>`;
+                });
+                bodyHtml += `</table>`;
             });
-            bodyHtml += `</table>`;
         });
 
         const style = isRecord ? 
@@ -413,13 +487,13 @@
     }
 
     function exportStandard() {
-        const html = generateWordHTML(`${state.selMinor} 標準表`, false);
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_標準表.doc`);
+        const html = generateWordHTML(false);
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `綜合標準表.doc`);
     }
 
     function exportRecord() {
-        const html = generateWordHTML(`施工抽查紀錄表`, true);
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_紀錄表.doc`);
+        const html = generateWordHTML(true);
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `綜合抽查紀錄表.doc`);
     }
 </script>
 
