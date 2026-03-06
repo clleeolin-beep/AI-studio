@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - Pro 進階植栽設計與編輯系統</title>
+    <title>AI Studio - Pro 進階植栽設計與編輯系統 (雙圖架構版)</title>
     
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
@@ -19,7 +19,7 @@
         .scientific { font-family: 'Times New Roman', serif; font-style: italic; }
         
         /* Layout Grid */
-        .app-container { display: grid; grid-template-columns: 450px 1fr; gap: 20px; flex: 1; min-height: 0; }
+        .app-container { display: grid; grid-template-columns: 500px 1fr; gap: 20px; flex: 1; min-height: 0; }
         .panel { background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 20px; display: flex; flex-direction: column; overflow-y: auto; }
         
         /* Auth Banner */
@@ -47,9 +47,16 @@
         .gantt-cell.active-bloom { background: #ff4081; color: white; font-weight: bold; }
         .gantt-cell.active-color { background: #ffb300; color: white; font-weight: bold; }
 
-        /* Image Box & Cropper */
-        .img-preview-box { width: 100%; height: 200px; background: #eee; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; border-radius: 6px; }
+        /* Dual Image Box */
+        .dual-img-container { display: flex; gap: 15px; margin-bottom: 10px; }
+        .img-col { flex: 1; display: flex; flex-direction: column; }
+        .img-col label { font-size: 0.85em; margin-bottom: 5px; text-align: center; color: #555; }
+        .img-preview-box { width: 100%; height: 160px; background: #eee; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; border-radius: 6px; transition: 0.2s; }
+        .img-preview-box:hover { border-color: var(--primary); background: #e8f5e9; }
         .img-preview-box img { max-width: 100%; max-height: 100%; object-fit: cover; }
+        .img-preview-box span { font-size: 0.8em; color: #777; text-align: center; padding: 10px; }
+
+        /* Cropper Modal */
         #cropperModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
         .cropper-wrapper { width: 80%; max-width: 800px; height: 70%; background: white; padding: 20px; border-radius: 8px; display: flex; flex-direction: column; }
 
@@ -69,7 +76,7 @@
         .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
         .card { border: 1px solid #e0e0e0; border-radius: 6px; padding: 10px; cursor: pointer; transition: 0.2s; background: white; display: flex; flex-direction: column; position: relative; }
         .card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(46,125,50,0.2); border-color: var(--primary); }
-        .card img { width: 100%; height: 140px; object-fit: cover; border-radius: 4px; background: #eee; margin-bottom: 8px; }
+        .card img { width: 100%; height: 160px; object-fit: cover; border-radius: 4px; background: #f9f9f9; margin-bottom: 8px; border: 1px solid #eee; }
         .card .click-hint { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; opacity: 0; transition: 0.2s; }
         .card:hover .click-hint { opacity: 1; }
 
@@ -99,7 +106,7 @@
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        <h2>🌿 植栽設計與編輯系統 (Pro+ 照片修復版)</h2>
+        <h2>🌿 植栽設計與編輯系統 (Pro+ 雙圖重構版)</h2>
         <div style="display: flex; gap: 10px;">
             <button class="info" onclick="toggleDebug()">⚙️ 開啟監視器</button>
             <button onclick="app.loadSheetData()">🔄 重新整理雲端資料</button>
@@ -117,7 +124,7 @@
             <div style="display: flex; gap: 10px;">
                 <div class="form-group" style="flex:1;">
                     <label>系統編號 (留白自動生成)</label>
-                    <input type="text" id="v_id" placeholder="如：T001" readonly title="新增時留白，系統會自動編號">
+                    <input type="text" id="v_id" placeholder="如：T0000001" readonly title="新增時留白，系統會自動編號">
                 </div>
                 <div class="form-group" style="flex:2;">
                     <label>中文名稱 *</label>
@@ -177,17 +184,29 @@
                 <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
             </div>
 
-            <div class="form-group">
-                <label>植栽照片 (將上傳至 Google Drive)</label>
-                <input type="file" id="fileInput" accept="image/*" style="display:none;">
-                <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInput').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
-                    <img id="v_img_preview" src="" alt="圖片預覽" style="display:none;">
-                    <span id="v_img_text">📷 點擊上傳照片 (自動 4:3 裁切)</span>
+            <input type="file" id="fileInputReal" accept="image/*" style="display:none;">
+            <input type="file" id="fileInputSim" accept="image/*" style="display:none;">
+            <input type="hidden" id="v_url_real">
+            <input type="hidden" id="v_url_sim">
+
+            <div class="dual-img-container">
+                <div class="img-col">
+                    <label>📷 真實照片 (-01)</label>
+                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputReal').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
+                        <img id="preview_real" src="" style="display:none;">
+                        <span id="text_real">點擊上傳真實照片<br>(4:3 裁切)</span>
+                    </div>
                 </div>
-                <input type="hidden" id="v_image_url">
+                <div class="img-col">
+                    <label>✨ 優型模擬圖 (-02)</label>
+                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputSim').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
+                        <img id="preview_sim" src="" style="display:none;">
+                        <span id="text_sim">點擊上傳 AI 模擬圖<br>(4:3 裁切)</span>
+                    </div>
+                </div>
             </div>
 
-            <div style="font-size: 0.8em; color: #888; margin-top: 10px;" id="v_meta">最後更新：無</div>
+            <div style="font-size: 0.8em; color: #888; margin-top: 5px;" id="v_meta">最後更新：無</div>
             
             <div style="margin-top: 15px; display: flex; gap: 10px;">
                 <button id="btn-save" onclick="app.saveToGoogleSheet()" style="flex: 2;" disabled>💾 儲存寫入 Google Sheets</button>
@@ -221,7 +240,7 @@
     <script>
         // --- 設定常數 ---
         const CLIENT_ID = '615427641075-7g7ikac4oc4s46897ch39av7174n4pmn.apps.googleusercontent.com';
-        let SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; // 預設值，稍後會被 manifest 覆蓋
+        let SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; 
         const DRIVE_FOLDER_ID = '1sESiquxxLxQEBBD0xBqN72F8hqroJTrx'; 
         const SHEET_NAME = '工作表1';
 
@@ -266,7 +285,7 @@
         class Utility {
             static generateID(category) {
                 const prefix = category === '喬木' ? 'T' : category === '灌木' ? 'S' : category === '地被草花' ? 'G' : 'A';
-                return prefix + Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+                return prefix + Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
             }
             static getUserStamp() {
                 const d = new Date();
@@ -285,23 +304,11 @@
                 document.getElementById('loading-overlay').style.display = 'none';
             }
             
-            /**
-             * 🌟 核心修復：參照 map.html 的 URL 清洗與 JSON 陣列解析邏輯
-             * 確保完全支援 Google Drive 各種連結格式，並帶入 authuser=0
-             */
             static cleanDriveUrl(url) {
                 if (!url) return "";
                 let parsedUrl = String(url).trim();
-                
                 if (parsedUrl.includes('drive.google.com')) {
-                    // 嘗試解析 JSON 陣列格式 (容錯處理)
-                    try { 
-                        if(parsedUrl.startsWith('[')) {
-                            parsedUrl = JSON.parse(parsedUrl)[0]; 
-                        }
-                    } catch(e){ sysLog("URL JSON 解析忽略", "warn"); }
-                    
-                    // 正則提取 25 位以上的唯一 ID (排除 view, usp 等雜訊干擾)
+                    try { if(parsedUrl.startsWith('[')) parsedUrl = JSON.parse(parsedUrl)[0]; } catch(e){}
                     const match = parsedUrl.match(/[-\w]{25,}/);
                     if (match) {
                         return `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${match[0]}`;
@@ -330,64 +337,50 @@
                     cell.className = 'gantt-cell';
                     cell.innerText = i;
                     cell.dataset.month = i;
-                    
                     cell.onmousedown = (e) => this.startDrag(i);
                     cell.onmouseenter = (e) => this.dragEnter(i);
                     cell.onmouseup = (e) => this.endDrag();
-                    
                     this.container.appendChild(cell);
                 }
                 this.container.onmouseleave = () => this.endDrag();
             }
-
-            startDrag(month) {
-                this.isDragging = true;
-                this.tempStart = month;
-                this.updateVisuals(month, month);
-            }
-
-            dragEnter(month) {
-                if(this.isDragging) {
-                    const s = Math.min(this.tempStart, month);
-                    const e = Math.max(this.tempStart, month);
-                    this.updateVisuals(s, e);
-                }
-            }
-
+            startDrag(month) { this.isDragging = true; this.tempStart = month; this.updateVisuals(month, month); }
+            dragEnter(month) { if(this.isDragging) { this.updateVisuals(Math.min(this.tempStart, month), Math.max(this.tempStart, month)); } }
             endDrag() { this.isDragging = false; }
-
             updateVisuals(start, end) {
-                this.startInput.value = start;
-                this.endInput.value = end;
+                this.startInput.value = start; this.endInput.value = end;
                 Array.from(this.container.children).forEach(cell => {
                     const m = parseInt(cell.dataset.month);
-                    if(m >= start && m <= end) cell.classList.add(this.activeClass);
-                    else cell.classList.remove(this.activeClass);
+                    if(m >= start && m <= end) cell.classList.add(this.activeClass); else cell.classList.remove(this.activeClass);
                 });
             }
-
             setData(start, end) {
                 if(start && end) this.updateVisuals(parseInt(start), parseInt(end));
                 else { this.updateVisuals(0, 0); this.startInput.value = ''; this.endInput.value = ''; }
             }
         }
 
-        // --- 照片裁切與上傳服務 ---
+        // --- 照片裁切與上傳服務 (雙軌制) ---
         class ImageCropperService {
             constructor() {
                 this.modal = document.getElementById('cropperModal');
                 this.imageElement = document.getElementById('cropperImage');
-                this.fileInput = document.getElementById('fileInput');
                 this.cropper = null;
-                this.pendingBlob = null; 
+                
+                // 區分暫存
+                this.pendingRealBlob = null; 
+                this.pendingSimBlob = null;
+                this.currentCropTarget = null; // 紀錄當前在裁切哪個框
 
-                this.fileInput.addEventListener('change', (e) => this.handleFile(e));
+                document.getElementById('fileInputReal').addEventListener('change', (e) => this.handleFile(e, 'real'));
+                document.getElementById('fileInputSim').addEventListener('change', (e) => this.handleFile(e, 'sim'));
             }
 
-            handleFile(e) {
+            handleFile(e, target) {
                 const file = e.target.files[0];
                 if (file) {
-                    sysLog("讀取圖片準備裁切...", "info");
+                    this.currentCropTarget = target;
+                    sysLog(`讀取圖片 (${target}) 準備裁切...`, "info");
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         this.imageElement.src = event.target.result;
@@ -406,28 +399,38 @@
             closeModal() {
                 this.modal.style.display = 'none';
                 if(this.cropper) this.cropper.destroy();
-                this.fileInput.value = '';
+                document.getElementById('fileInputReal').value = '';
+                document.getElementById('fileInputSim').value = '';
             }
 
             cropAndPrepare() {
-                if(this.cropper) {
+                if(this.cropper && this.currentCropTarget) {
                     const canvas = this.cropper.getCroppedCanvas({ width: 800, height: 600 });
-                    document.getElementById('v_img_preview').src = canvas.toDataURL('image/jpeg', 0.8);
-                    document.getElementById('v_img_preview').style.display = 'block';
-                    document.getElementById('v_img_text').style.display = 'none';
-                    canvas.toBlob((blob) => { this.pendingBlob = blob; sysLog("圖片裁切完成，暫存於記憶體。", "success"); }, 'image/jpeg', 0.8);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    if (this.currentCropTarget === 'real') {
+                        document.getElementById('preview_real').src = dataUrl;
+                        document.getElementById('preview_real').style.display = 'block';
+                        document.getElementById('text_real').style.display = 'none';
+                        canvas.toBlob((blob) => { this.pendingRealBlob = blob; sysLog("真實照片裁切暫存", "success"); }, 'image/jpeg', 0.8);
+                    } else {
+                        document.getElementById('preview_sim').src = dataUrl;
+                        document.getElementById('preview_sim').style.display = 'block';
+                        document.getElementById('text_sim').style.display = 'none';
+                        canvas.toBlob((blob) => { this.pendingSimBlob = blob; sysLog("模擬圖裁切暫存", "success"); }, 'image/jpeg', 0.8);
+                    }
                     this.closeModal();
                 }
             }
 
-            async uploadToDrive(fileName, accessToken) {
-                if (!this.pendingBlob) return null;
+            async uploadToDrive(blob, fileName, accessToken) {
+                if (!blob) return null;
                 sysLog(`開始上傳圖片至 Drive: ${fileName}`, 'info');
                 
                 const metadata = { name: fileName, parents: [DRIVE_FOLDER_ID] };
                 const form = new FormData();
                 form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-                form.append('file', this.pendingBlob);
+                form.append('file', blob);
 
                 try {
                     const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
@@ -437,8 +440,7 @@
                     });
                     const data = await res.json();
                     if(!res.ok) throw new Error(data.error.message);
-                    this.pendingBlob = null; 
-                    sysLog(`上傳成功，取得 URL: ${data.webViewLink}`, 'success');
+                    sysLog(`上傳成功: ${fileName}`, 'success');
                     return data.webViewLink;
                 } catch(e) {
                     sysLog(`Drive 上傳失敗: ${e.message}`, 'error');
@@ -460,17 +462,15 @@
             }
 
             initGoogleAuth() {
-                sysLog("初始化 Google OAuth 2.0 (GSI)...");
                 this.tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
                     callback: (resp) => { 
                         this.accessToken = resp.access_token; 
-                        const banner = document.getElementById('auth-banner');
-                        banner.className = 'authorized';
-                        banner.innerHTML = '🟢 授權成功：已解鎖植栽資料寫入與照片上傳功能';
+                        document.getElementById('auth-banner').className = 'authorized';
+                        document.getElementById('auth-banner').innerHTML = '🟢 授權成功：已開啟編輯與上傳功能';
                         document.getElementById('btn-save').disabled = false;
-                        sysLog("✅ OAuth 2.0 授權完成", "success");
+                        sysLog("OAuth 2.0 授權完成", "success");
                     }
                 });
             }
@@ -483,26 +483,27 @@
                     if (json && json.table) {
                         let rawHeaders = json.table.cols.map(c => c.label || "");
                         const firstRow = json.table.rows[0] ? json.table.rows[0].c.map(cell => cell ? (cell.f || cell.v || "") : "") : [];
-                        
-                        if (rawHeaders.every(h => h === "")) {
-                            rawHeaders = firstRow;
-                            sysLog("⚠️ 偵測到標頭標籤遺失，已手動從首列資料校正。", "warn");
-                        }
+                        if (rawHeaders.every(h => h === "")) { rawHeaders = firstRow; }
                         this.headerRow = rawHeaders;
 
-                        const getIdx = (name) => this.headerRow.findIndex(h => String(h).trim().includes(name));
+                        const getIdx = (name) => this.headerRow.findIndex(h => String(h).trim() === name);
+                        
+                        // 🌟 核心修復：欄位映射更新，區分雙網址
                         this.colMap = {
                             id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
                             category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
                             native: getIdx('原生種'), bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
                             colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
-                            tags: getIdx('景觀特性標籤'), url: getIdx('照片網址'), meta: getIdx('維護訊息')
+                            tags: getIdx('景觀特性標籤'), 
+                            urlReal: getIdx('真實照片網址'), 
+                            urlSim: getIdx('優型模擬網址'), 
+                            meta: getIdx('維護訊息')
                         };
 
-                        if (this.colMap.id === -1 || this.colMap.name === -1) {
-                            sysLog("❌ 欄位映射失敗！請檢查 Google Sheet 第一列標題是否正確。", "error");
+                        if (this.colMap.id === -1 || this.colMap.urlReal === -1) {
+                            sysLog("❌ 欄位映射異常，請確認 Google Sheet 是否包含『真實照片網址』與『優型模擬網址』", "error");
                         } else {
-                            sysLog(`✅ 欄位映射成功 (名稱位置: ${this.colMap.name})`, "success");
+                            sysLog(`✅ 欄位映射成功 (雙圖架構)`, "success");
                         }
 
                         this.dataStore = json.table.rows.map(r => {
@@ -528,37 +529,37 @@
                 if (!this.accessToken) { this.triggerAuth(); return; }
                 const nameInput = document.getElementById('v_name').value.trim();
                 if (!nameInput) { alert("請填寫中文名稱！"); return; }
-                if (this.colMap.name === -1) { alert("系統尚未正確識別表單欄位，請重新載入頁面或確認表單標題。"); return; }
+                if (this.colMap.name === -1) { alert("系統尚未正確識別表單欄位。"); return; }
 
-                Utility.showLoading("正在同步資料至雲端...");
+                Utility.showLoading("正在同步資料與圖片至雲端...");
                 try {
-                    let finalImgUrl = document.getElementById('v_image_url').value;
-                    if(cropperSvc.pendingBlob) {
-                        Utility.showLoading("上傳圖片至 Google Drive...");
-                        const uploadUrl = await cropperSvc.uploadToDrive(`Plant-${Date.now()}.jpg`, this.accessToken);
-                        if(uploadUrl) finalImgUrl = uploadUrl;
+                    let plantId = document.getElementById('v_id').value.trim() || Utility.generateID(document.getElementById('v_category').value);
+                    
+                    // 🌟 核心修復：精準檔名上傳邏輯
+                    let finalUrlReal = document.getElementById('v_url_real').value;
+                    let finalUrlSim = document.getElementById('v_url_sim').value;
+
+                    if(cropperSvc.pendingRealBlob) {
+                        const uploadUrl = await cropperSvc.uploadToDrive(cropperSvc.pendingRealBlob, `${plantId}-01.jpg`, this.accessToken);
+                        if(uploadUrl) finalUrlReal = uploadUrl;
+                    }
+                    if(cropperSvc.pendingSimBlob) {
+                        const uploadUrl = await cropperSvc.uploadToDrive(cropperSvc.pendingSimBlob, `${plantId}-02.jpg`, this.accessToken);
+                        if(uploadUrl) finalUrlSim = uploadUrl;
                     }
 
                     Utility.showLoading("寫入 Google Sheets...");
-                    let plantId = document.getElementById('v_id').value.trim() || Utility.generateID(document.getElementById('v_category').value);
-                    sysLog(`準備寫入資料 ID: ${plantId}`, "info");
-
                     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:Z`, { 
                         headers: { 'Authorization': `Bearer ${this.accessToken}` } 
                     });
                     const sheetData = await res.json();
-                    
                     if (!res.ok) throw new Error(sheetData.error.message);
                     
                     const rows = sheetData.values || [];
-                    if(rows.length === 0) {
-                        if(this.headerRow.length === 0) throw new Error("表單完全空白且無法解析結構");
-                        rows.push(this.headerRow); 
-                    }
+                    if(rows.length === 0) rows.push(this.headerRow); 
                     
                     let targetRowIdx = rows.findIndex(r => String(r[this.colMap.id]).trim() === plantId);
                     let newRowData = targetRowIdx > -1 ? [...rows[targetRowIdx]] : new Array(this.headerRow.length).fill("");
-                    
                     while(newRowData.length < this.headerRow.length) newRowData.push("");
 
                     const setV = (keyMapName, val) => { 
@@ -577,7 +578,10 @@
                     setV('colorS', document.getElementById('v_color_start').value);
                     setV('colorE', document.getElementById('v_color_end').value);
                     setV('tags', Utility.formatTags(document.getElementById('v_tags').value));
-                    setV('url', finalImgUrl);
+                    
+                    // 寫入雙網址
+                    setV('urlReal', finalUrlReal);
+                    setV('urlSim', finalUrlSim);
                     
                     const timeStamp = Utility.getUserStamp();
                     setV('meta', timeStamp);
@@ -587,35 +591,33 @@
                         sysLog("執行 PUT 更新既有資料列", "info");
                         const range = `${SHEET_NAME}!A${targetRowIdx + 1}`;
                         writeRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}?valueInputOption=USER_ENTERED`, {
-                            method: 'PUT',
-                            headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+                            method: 'PUT', headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ values: [newRowData] })
                         });
                     } else {
                         sysLog("執行 POST 新增資料列", "info");
                         writeRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}!A1:append?valueInputOption=USER_ENTERED`, {
-                            method: 'POST',
-                            headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+                            method: 'POST', headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
                             body: JSON.stringify({ values: [newRowData] })
                         });
                     }
 
-                    if (!writeRes.ok) {
-                        const err = await writeRes.json();
-                        throw new Error(err.error.message);
-                    }
+                    if (!writeRes.ok) throw new Error((await writeRes.json()).error.message);
 
                     document.getElementById('v_id').value = plantId;
                     document.getElementById('v_meta').innerText = `最後更新：剛才 (${timeStamp})`;
                     
-                    sysLog(`✅ 植栽 [${nameInput}] 儲存成功！`, "success");
-                    alert(`✅ 植栽 [${nameInput}] 儲存成功！\n資料已保留於表單，可繼續編輯。若需建立新項目，請點擊「清空/新增」。`);
-                    
+                    // 清空 blob 以免重複上傳
+                    cropperSvc.pendingRealBlob = null;
+                    cropperSvc.pendingSimBlob = null;
+
+                    sysLog(`✅ 儲存成功！`, "success");
+                    alert(`✅ 植栽 [${nameInput}] 儲存成功！`);
                     this.loadSheetData(); 
 
                 } catch (error) {
                     sysLog(`❌ 儲存失敗: ${error.message}`, "error");
-                    alert(`❌ 儲存失敗！\n\n系統訊息：${error.message}\n\n請打開右下角監視器查看詳細資訊。`);
+                    alert(`❌ 儲存失敗！系統訊息：${error.message}`);
                 } finally {
                     Utility.hideLoading();
                 }
@@ -630,39 +632,38 @@
                 document.getElementById('v_id').value = r[this.colMap.id] || "";
                 document.getElementById('v_name').value = r[this.colMap.name] || "";
                 document.getElementById('v_scientific').value = r[this.colMap.scientific] || "";
-                
-                if(r[this.colMap.category]) document.getElementById('v_category').value = r[this.colMap.category];
-                if(r[this.colMap.env]) document.getElementById('v_env').value = r[this.colMap.env];
-                if(r[this.colMap.alt]) document.getElementById('v_alt').value = r[this.colMap.alt];
-                
+                document.getElementById('v_category').value = r[this.colMap.category] || "喬木";
+                document.getElementById('v_env').value = r[this.colMap.env] || "全日照";
+                document.getElementById('v_alt').value = r[this.colMap.alt] || "低海拔";
                 document.getElementById('v_native').checked = (String(r[this.colMap.native]).toUpperCase() === 'TRUE');
                 document.getElementById('v_tags').value = r[this.colMap.tags] || "";
-                
                 this.bloomGantt.setData(r[this.colMap.bloomS], r[this.colMap.bloomE]);
                 this.colorGantt.setData(r[this.colMap.colorS], r[this.colMap.colorE]);
-                
                 document.getElementById('v_meta').innerText = `最後更新：${r[this.colMap.meta] || '無'}`;
                 
-                // 🌟 核心修復：使用統一的 cleanDriveUrl 解析編輯預覽圖
-                const rawUrl = r[this.colMap.url] || "";
-                document.getElementById('v_image_url').value = rawUrl; // 保留原始網址供存檔
-                
-                const cleanImg = Utility.cleanDriveUrl(rawUrl);
-                
-                if(cleanImg && cleanImg.startsWith('http')) {
-                    document.getElementById('v_img_preview').src = cleanImg;
-                    document.getElementById('v_img_preview').style.display = 'block';
-                    document.getElementById('v_img_text').style.display = 'none';
-                } else {
-                    document.getElementById('v_img_preview').style.display = 'none';
-                    document.getElementById('v_img_text').style.display = 'block';
-                }
+                // 🌟 核心修復：雙預覽圖邏輯
+                const setPreview = (urlKey, imgId, textId, inputId) => {
+                    const rawUrl = r[this.colMap[urlKey]] || "";
+                    document.getElementById(inputId).value = rawUrl; 
+                    const cleanImg = Utility.cleanDriveUrl(rawUrl);
+                    if(cleanImg && cleanImg.startsWith('http')) {
+                        document.getElementById(imgId).src = cleanImg;
+                        document.getElementById(imgId).style.display = 'block';
+                        document.getElementById(textId).style.display = 'none';
+                    } else {
+                        document.getElementById(imgId).style.display = 'none';
+                        document.getElementById(textId).style.display = 'block';
+                    }
+                };
+
+                setPreview('urlReal', 'preview_real', 'text_real', 'v_url_real');
+                setPreview('urlSim', 'preview_sim', 'text_sim', 'v_url_sim');
 
                 this.renderTagsPreview();
             }
 
             clearForm() {
-                sysLog("執行清空表單，準備新增資料。", "info");
+                sysLog("執行清空表單", "info");
                 document.getElementById('v_id').value = '';
                 document.getElementById('v_name').value = '';
                 document.getElementById('v_scientific').value = '';
@@ -670,20 +671,26 @@
                 document.getElementById('v_native').checked = false;
                 this.bloomGantt.setData(0,0);
                 this.colorGantt.setData(0,0);
-                document.getElementById('v_img_preview').style.display = 'none';
-                document.getElementById('v_img_text').style.display = 'block';
-                document.getElementById('v_image_url').value = '';
+                
+                document.getElementById('preview_real').style.display = 'none';
+                document.getElementById('text_real').style.display = 'block';
+                document.getElementById('v_url_real').value = '';
+                
+                document.getElementById('preview_sim').style.display = 'none';
+                document.getElementById('text_sim').style.display = 'block';
+                document.getElementById('v_url_sim').value = '';
+
                 document.getElementById('v_meta').innerText = '最後更新：無';
-                cropperSvc.pendingBlob = null;
+                cropperSvc.pendingRealBlob = null;
+                cropperSvc.pendingSimBlob = null;
                 this.renderTagsPreview();
             }
 
             renderTagsPreview() {
                 const raw = document.getElementById('v_tags').value;
-                const formatted = Utility.formatTags(raw);
                 const container = document.getElementById('tagPreview');
                 container.innerHTML = '';
-                formatted.split(' ').filter(t=>t).forEach(tag => container.innerHTML += `<span class="badge">${tag}</span>`);
+                Utility.formatTags(raw).split(' ').filter(t=>t).forEach(tag => container.innerHTML += `<span class="badge">${tag}</span>`);
             }
 
             renderCatalog() {
@@ -702,9 +709,10 @@
                     let altClass = alt === '高海拔' ? 'high-alt' : 'low-alt';
                     let nativeTag = (String(r[this.colMap.native]).toUpperCase() === 'TRUE') ? `<span class="badge" style="background:#e65100">#原生種</span>` : '';
 
-                    // 🌟 核心修復：卡片縮圖使用統一清洗邏輯
-                    const rawUrl = r[this.colMap.url] || "";
-                    const cleanImg = Utility.cleanDriveUrl(rawUrl);
+                    // 🌟 核心修復：優先讀取模擬圖，若無則嘗試真實圖
+                    let cleanImg = Utility.cleanDriveUrl(r[this.colMap.urlSim]);
+                    if (!cleanImg) cleanImg = Utility.cleanDriveUrl(r[this.colMap.urlReal]);
+                    
                     const imgSrc = cleanImg ? cleanImg : 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect fill="%23eeeeee" width="400" height="300"/%3E%3Ctext fill="%23999999" font-family="sans-serif" font-size="20" font-weight="bold" x="50%" y="50%" text-anchor="middle"%3E無照片%3C/text%3E%3C/svg%3E';
 
                     const card = document.createElement('div');
@@ -732,10 +740,8 @@
         const cropperSvc = new ImageCropperService();
         const app = new AppCore();
 
-        // 🌟 核心修復：環境變數動態讀取 (Fallback 機制)
         window.onload = async () => {
             sysLog("植栽編輯系統啟動程序開始...", "info");
-            
             try {
                 const resp = await fetch('../../manifest.json');
                 const manifest = await resp.json();
@@ -746,7 +752,6 @@
             } catch (e) {
                 sysLog("未讀取到 manifest.json，使用預設 SHEET_ID", "warn");
             }
-            
             app.initGoogleAuth();
             app.loadSheetData();
         };
