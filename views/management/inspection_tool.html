@@ -1,426 +1,427 @@
 <!DOCTYPE html>
-
 <html lang="zh-TW">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <title>施工表單生成器 (V44 絕對貫穿版)</title>
-
+    <title>監造表單生成工具 (V2.3 動態互動版)</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
     <style>
-
-        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; }
-
+        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #27ae60; --blue: #2980b9; --orange: #e67e22; --border: #ddd; }
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-
         
-
-        .header { background: #fff; padding: 10px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-
-        .main { flex: 1; display: flex; padding: 20px; gap: 20px; overflow: hidden; }
-
-        .form-panel { width: 380px; background: #fff; padding: 20px; overflow-y: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); flex-shrink: 0; }
-
-        .preview-panel { flex: 1; background: #95a5a6; padding: 30px; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
-
-
+        /* 頭部區塊 */
+        .header { background: #fff; padding: 10px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; }
+        .btn-group { display: flex; gap: 8px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; gap: 5px; font-size: 13px; }
+        .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .btn-blue { background: var(--blue); }
+        .btn-green { background: var(--accent); }
+        .btn-orange { background: var(--orange); }
+        .btn-dark { background: var(--primary); }
+        
+        /* 佈局區塊 */
+        .main { flex: 1; display: flex; padding: 15px; gap: 15px; overflow: hidden; }
+        
+        /* 左側編輯面板 */
+        .form-panel { width: 450px; background: #fff; padding: 20px; overflow-y: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); flex-shrink: 0; display: flex; flex-direction: column; }
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--primary); font-size: 14px; }
+        .input-group input[type="text"], .input-group select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
+        
+        /* 拖曳節點樣式 */
+        .node-group { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 15px; background: #fafafa; }
+        .node-header { padding: 10px 15px; background: #eee; border-bottom: 1px solid var(--border); cursor: grab; font-weight: bold; display: flex; justify-content: space-between; align-items: center; border-radius: 6px 6px 0 0; }
+        .node-header:active { cursor: grabbing; }
+        .node-body { padding: 10px; }
+        
+        /* 單一項目編輯區 */
+        .item-row { background: #fff; border: 1px solid #e0e0e0; padding: 10px; margin-bottom: 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; }
+        .item-header { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 13px; }
+        .item-header input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+        .item-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 5px; padding-left: 24px; }
+        .item-edit-grid input { padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 12px; width: 100%; box-sizing: border-box; }
+        .item-edit-full { grid-column: span 2; }
+        
+        /* 右側預覽面板 */
+        .preview-panel { flex: 1; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
+        .preview-tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid var(--border); }
+        .tab-btn { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #666; cursor: pointer; transition: 0.3s; }
+        .tab-btn:hover { background: #e9ecef; }
+        .tab-btn.active { background: #fff; color: var(--blue); border-bottom: 3px solid var(--blue); }
+        .preview-content { flex: 1; overflow: auto; padding: 30px; background: #95a5a6; display: flex; justify-content: center; align-items: flex-start; }
 
         /* --- 流程圖畫布核心 --- */
-
         .flowchart-container { 
-
             width: 17.5cm; background: #fff; padding: 50px 40px; box-sizing: border-box; 
-
             display: flex; flex-direction: column; position: relative;
-
-            font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2);
-
+            font-family: "DFKai-SB", "標楷體", serif; box-shadow: 0 0 20px rgba(0,0,0,0.2); margin: 0 auto;
         }
-
-
-
-        /* 關鍵：畫一條貫穿整個容器的垂直實線 */
-
         .flowchart-container::before {
-
-            content: "";
-
-            position: absolute;
-
-            left: calc(40px + 75px); /* padding + node-col一半 */
-
-            top: 80px;    /* 從第一個方塊中心開始 */
-
-            bottom: 80px; /* 到最後一個方塊中心結束 */
-
-            width: 1.5px;
-
-            background: #000;
-
-            z-index: 1;
-
+            content: ""; position: absolute; left: calc(40px + 75px); top: 80px; bottom: 80px; width: 1.5px; background: #000; z-index: 1;
         }
-
-
-
-        .flow-row { 
-
-            display: flex; width: 100%; align-items: center; position: relative; 
-
-            z-index: 2; /* 確保內容在貫穿線上方 */
-
-            min-height: 85px; 
-
-        }
-
-
-
-        .node-col { 
-
-            width: 150px; display: flex; flex-direction: column; 
-
-            justify-content: center; align-items: center; flex-shrink: 0; 
-
-        }
-
-
-
-        .node-wrapper { 
-
-            display: flex; flex-direction: column; align-items: center; 
-
-            background: #fff; /* 白色背景遮住下方的貫穿線 */
-
-            padding: 5px 0;
-
-        }
-
-
-
-        /* 統一字體 14pt */
-
-        .node-box { 
-
-            width: 130px; padding: 8px 4px; border: 1.5px solid #000; 
-
-            text-align: center; background: #fff; font-weight: bold; 
-
-            font-size: 14pt; box-sizing: border-box; line-height: 1.2;
-
-        }
-
+        .flow-row { display: flex; width: 100%; align-items: center; position: relative; z-index: 2; min-height: 85px; }
+        .node-col { width: 150px; display: flex; flex-direction: column; justify-content: center; align-items: center; flex-shrink: 0; }
+        .node-wrapper { display: flex; flex-direction: column; align-items: center; background: #fff; padding: 5px 0; }
+        .node-box { width: 130px; padding: 8px 4px; border: 1.5px solid #000; text-align: center; background: #fff; font-weight: bold; font-size: 14pt; box-sizing: border-box; line-height: 1.2; }
         .node-box.oval { border-radius: 45px; }
-
-
-
-        /* 向下箭頭：精準放在方塊正上方 */
-
-        .arrow-head { 
-
-            width: 0; height: 0; 
-
-            border-left: 6px solid transparent; border-right: 6px solid transparent; 
-
-            border-top: 10px solid #000; 
-
-            margin-bottom: 2px;
-
-        }
-
-
-
+        .arrow-head { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 10px solid #000; margin-bottom: 2px; }
         .detail-col { flex: 1; display: flex; align-items: center; }
-
-
-
-        /* 水平連線：精準抵達邊緣 */
-
-        .h-line { 
-
-            width: 35px; border-top: 1.5px dashed #000; flex-shrink: 0; 
-
-            margin-right: -1px;
-
-        }
-
-
-
-        .detail-box { 
-
-            border: 1.5px dashed #000; padding: 10px 15px; font-size: 14pt; 
-
-            background: #fff; line-height: 1.5; display: inline-block; max-width: 100%; 
-
-            word-break: break-all; text-align: left; 
-
-        }
-
-
-
-        .group-item { margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-
+        .h-line { width: 35px; border-top: 1.5px dashed #000; flex-shrink: 0; margin-right: -1px; }
+        .detail-box { border: 1.5px dashed #000; padding: 10px 15px; font-size: 14pt; background: #fff; line-height: 1.5; display: inline-block; max-width: 100%; word-break: break-all; text-align: left; }
+        
+        /* 表格預覽樣式 */
+        .table-preview { width: 100%; max-width: 25cm; background: #fff; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); font-family: "標楷體", serif; box-sizing: border-box; }
+        .table-preview table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .table-preview th, .table-preview td { border: 1px solid #000; padding: 6px; font-size: 11pt; text-align: left; }
+        .table-preview th { text-align: center; background: #f2f2f2; }
+        .page-break-indicator { border-top: 2px dashed red; margin: 20px 0; text-align: center; color: red; font-size: 12px; font-family: sans-serif; position: relative;}
+        .page-break-indicator::after { content: "--- 分頁線 ---"; background: #95a5a6; padding: 0 10px; position: relative; top: -8px; }
+        
+        #fileInput { display: none; }
     </style>
-
 </head>
-
 <body>
 
-
-
 <div class="header">
-
-    <h3 style="margin:0;">🏗️ 施工表單生成器 (V44 絕對貫穿版)</h3>
-
+    <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
+        🏗️ 監造表單生成工具 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.3</span>
+    </h3>
     <div class="btn-group">
-
-        <button class="btn btn-blue" onclick="exportFlow()">📥 流程圖</button>
-
-        <button class="btn btn-green" onclick="exportStandard()">📋 標準表</button>
-
-        <button class="btn btn-orange" onclick="exportRecord()">📝 紀錄表</button>
-
+        <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)">
+        <button class="btn btn-dark" onclick="document.getElementById('fileInput').click()">📂 匯入 JSON</button>
+        <button class="btn btn-dark" onclick="exportJSON()">💾 存檔 JSON</button>
+        <div style="width:1px; background:#ddd; margin:0 5px;"></div>
+        <button class="btn btn-blue" onclick="exportFlow()">📥 匯出流程圖</button>
+        <button class="btn btn-green" onclick="exportStandard()">📋 匯出標準表</button>
+        <button class="btn btn-orange" onclick="exportRecord()">📝 匯出紀錄表</button>
     </div>
-
 </div>
 
-
-
 <div class="main">
-
     <div class="form-panel">
-
-        <div class="input-group"><label>工程名稱：</label><input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程"></div>
-
-        <div class="input-group"><label>分項工程選擇：</label><select id="minorSelect" onchange="loadForm()"></select></div>
-
-        <hr>
-
-        <div id="formContainer">載入中...</div>
-
+        <div class="input-group">
+            <label>工程名稱：</label>
+            <input type="text" id="projName" value="中和區錦和運動公園整體規劃改善工程" onchange="updateState()">
+        </div>
+        <div class="input-group">
+            <label>分項工程選擇 (讀取試算表)：</label>
+            <select id="minorSelect" onchange="handleMinorChange()"><option>載入中...</option></select>
+        </div>
+        <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">💡 提示：可拖曳灰色標題條調整大工項順序，展開可修改細部文字。</div>
+        
+        <div id="formContainer" style="flex:1; overflow-y:auto; padding-right:5px;">
+            </div>
     </div>
 
     <div class="preview-panel">
-
-        <div id="flowchart-canvas" class="flowchart-container"></div>
-
+        <div class="preview-tabs">
+            <div class="tab-btn active" onclick="switchTab('flow', this)">流程圖預覽</div>
+            <div class="tab-btn" onclick="switchTab('std', this)">標準表預覽</div>
+            <div class="tab-btn" onclick="switchTab('rec', this)">紀錄表預覽</div>
+        </div>
+        <div class="preview-content" id="previewContainer">
+            </div>
     </div>
-
 </div>
 
-
-
 <script>
-
+    /**
+     * @Core 狀態管理與核心資料
+     */
     const SS_ID = "1YmRd6S6JY1NpXXc6Ix4qAtXiKQO6-RAjZ-gi_6-9q4g";
-
     let rawData = [];
+    let state = {
+        projName: "中和區錦和運動公園整體規劃改善工程",
+        selMinor: "",
+        nodes: [] // { nodeName: "開挖", id: "n_1", items: [{ id: "i_1", checked: true, stage, item, std... }] }
+    };
+    let currentTab = 'flow';
 
-
-
-    // 資料讀取
-
+    // 1. 資料初始化
     document.addEventListener("DOMContentLoaded", () => {
-
         window.loader = (json) => {
-
             if (!json.table) return;
-
+            // 讀取 Google Sheets (依據欄位設定，A=0, B=1)
             rawData = json.table.rows.map(r => ({
-
-                stage: r.c[3]?.v || "", minor: r.c[1]?.v || "", node: r.c[4]?.v || "",
-
+                minor: r.c[1]?.v || "", stage: r.c[3]?.v || "", node: r.c[4]?.v || "",
                 item: r.c[5]?.v || "", std: r.c[6]?.v || "", timing: r.c[7]?.v || "",
-
                 method: r.c[8]?.v || "", freq: r.c[9]?.v || "", failProc: r.c[10]?.v || ""
-
-            })).filter(r => r.node && r.node !== "施工流程");
-
+            })).filter(r => r.node && r.node !== "施工流程" && r.item);
+            
             const minors = [...new Set(rawData.map(r => r.minor))];
-
-            document.getElementById('minorSelect').innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
-
-            loadForm();
-
+            const select = document.getElementById('minorSelect');
+            select.innerHTML = minors.map(m => `<option value="${m}">${m}</option>`).join('');
+            
+            if(minors.length > 0) {
+                handleMinorChange();
+            }
         };
-
         const s = document.createElement('script');
-
         s.src = `https://docs.google.com/spreadsheets/d/${SS_ID}/gviz/tq?tqx=responseHandler:loader`;
-
         document.body.appendChild(s);
-
     });
 
-
-
-    function loadForm() {
-
-        const sel = document.getElementById('minorSelect').value;
-
-        const groups = {};
-
-        rawData.filter(r => r.minor === sel).forEach(r => {
-
-            if (!groups[r.node]) groups[r.node] = [];
-
-            if (r.item) groups[r.node].push(r);
-
+    // 2. 切換分項工程時，重建 State
+    function handleMinorChange() {
+        state.selMinor = document.getElementById('minorSelect').value;
+        state.projName = document.getElementById('projName').value;
+        
+        // 依照 node (大工項/流程) 群組化
+        const grouped = {};
+        rawData.filter(r => r.minor === state.selMinor).forEach(r => {
+            if (!grouped[r.node]) grouped[r.node] = [];
+            grouped[r.node].push({ ...r, checked: true, id: 'item_' + Math.random().toString(36).substr(2, 9) });
         });
 
-        document.getElementById('formContainer').innerHTML = Object.keys(groups).map(node => `
+        state.nodes = Object.keys(grouped).map(nodeName => ({
+            id: 'node_' + Math.random().toString(36).substr(2, 9),
+            nodeName: nodeName,
+            items: grouped[nodeName]
+        }));
 
-            <div class="group-item">
+        renderLeftPanel();
+    }
 
-                <strong style="font-size:14px;">${node}</strong>
-
-                ${groups[node].map(r => `<label style="display:flex; gap:5px; font-size:12px; margin-top:4px;"><input type="checkbox" class="chk" data-info='${JSON.stringify(r).replace(/'/g, "&apos;")}' checked onchange="updatePreview()"><span>${r.item}</span></label>`).join('')}
-
+    // 3. 渲染左側可拖曳編輯選單
+    function renderLeftPanel() {
+        const container = document.getElementById('formContainer');
+        container.innerHTML = state.nodes.map((n, nIdx) => `
+            <div class="node-group" data-id="${n.id}">
+                <div class="node-header">
+                    <span>≡ ${n.nodeName} (大工項)</span>
+                </div>
+                <div class="node-body">
+                    ${n.items.map((it, iIdx) => `
+                        <div class="item-row">
+                            <label class="item-header">
+                                <input type="checkbox" ${it.checked ? 'checked' : ''} onchange="updateItemState('${n.id}', '${it.id}', 'checked', this.checked)">
+                                <input type="text" value="${it.item}" onchange="updateItemState('${n.id}', '${it.id}', 'item', this.value)" style="flex:1; border:none; border-bottom:1px dashed #ccc; background:transparent; font-weight:bold;">
+                            </label>
+                            <div class="item-edit-grid">
+                                <input type="text" class="item-edit-full" title="抽查標準" placeholder="抽查標準" value="${it.std}" onchange="updateItemState('${n.id}', '${it.id}', 'std', this.value)">
+                                <input type="text" title="抽查時機" placeholder="抽查時機" value="${it.timing}" onchange="updateItemState('${n.id}', '${it.id}', 'timing', this.value)">
+                                <input type="text" title="抽查方法" placeholder="抽查方法" value="${it.method}" onchange="updateItemState('${n.id}', '${it.id}', 'method', this.value)">
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
-
         `).join('');
 
-        updatePreview();
-
-    }
-
-
-
-    function createRow(txt, items, shape, isStart = false) {
-
-        const row = document.createElement('div'); row.className = 'flow-row';
-
-        let detailHtml = items.length ? `<div class="h-line"></div><div class="detail-box">${items.map((it, i) => `${i + 1}.${it}`).join('<br>')}</div>` : '';
-
-
-
-        row.innerHTML = `
-
-            <div class="node-col">
-
-                <div class="node-wrapper">
-
-                    ${!isStart ? '<div class="arrow-head"></div>' : ''}
-
-                    <div class="node-box ${shape}">${txt}</div>
-
-                </div>
-
-            </div>
-
-            <div class="detail-col">${detailHtml}</div>
-
-        `;
-
-        return row;
-
-    }
-
-
-
-    function updatePreview() {
-
-        const canvas = document.getElementById('flowchart-canvas'); canvas.innerHTML = '';
-
-        const chks = Array.from(document.querySelectorAll('.chk:checked'));
-
-        const flow = new Map();
-
-        chks.forEach(c => {
-
-            const data = JSON.parse(c.dataset.info);
-
-            if(!flow.has(data.node)) flow.set(data.node, []);
-
-            flow.get(data.node).push(data.item);
-
+        // 啟用拖曳排序
+        new Sortable(container, {
+            handle: '.node-header',
+            animation: 150,
+            onEnd: function (evt) {
+                const movedItem = state.nodes.splice(evt.oldIndex, 1)[0];
+                state.nodes.splice(evt.newIndex, 0, movedItem);
+                renderPreview();
+            }
         });
 
-        if(flow.size === 0) return;
-
-
-
-        canvas.appendChild(createRow("準備", [], "oval", true));
-
-        flow.forEach((items, node) => canvas.appendChild(createRow(node, items, "rect")));
-
-        canvas.appendChild(createRow("完成", [], "oval"));
-
+        renderPreview();
     }
 
+    // 4. 更新狀態邏輯
+    function updateState() {
+        state.projName = document.getElementById('projName').value;
+        renderPreview();
+    }
 
+    function updateItemState(nodeId, itemId, field, value) {
+        const node = state.nodes.find(n => n.id === nodeId);
+        if(node) {
+            const item = node.items.find(i => i.id === itemId);
+            if(item) {
+                item[field] = value;
+                renderPreview();
+            }
+        }
+    }
 
-    // 匯出功能保留完整邏輯
+    // 5. JSON 存取功能
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `表單設定_${state.selMinor}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
 
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                state = JSON.parse(e.target.result);
+                document.getElementById('projName').value = state.projName;
+                document.getElementById('minorSelect').value = state.selMinor;
+                renderLeftPanel();
+                alert("JSON 設定載入成功！");
+            } catch(err) {
+                alert("檔案解析失敗，請確認是否為正確的設定檔。");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // 6. 右側預覽切換與渲染
+    function switchTab(tab, el) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        renderPreview();
+    }
+
+    function renderPreview() {
+        const container = document.getElementById('previewContainer');
+        container.innerHTML = '';
+        
+        // 提取已勾選的有效資料
+        const activeFlow = [];
+        state.nodes.forEach(n => {
+            const checkedItems = n.items.filter(i => i.checked);
+            if(checkedItems.length > 0) {
+                activeFlow.push({ nodeName: n.nodeName, items: checkedItems });
+            }
+        });
+
+        if (activeFlow.length === 0) {
+            container.innerHTML = '<div style="margin-top:50px; color:#fff;">請勾選左側項目以產生預覽</div>';
+            return;
+        }
+
+        if (currentTab === 'flow') {
+            let html = `<div id="flowchart-canvas" class="flowchart-container">`;
+            html += generateFlowRow("準備", [], "oval", true);
+            activeFlow.forEach(flow => {
+                html += generateFlowRow(flow.nodeName, flow.items.map(i => i.item), "rect");
+            });
+            html += generateFlowRow("完成", [], "oval");
+            html += `</div>`;
+            container.innerHTML = html;
+        } 
+        else if (currentTab === 'std' || currentTab === 'rec') {
+            let html = `<div class="table-preview"><h2 align="center">${currentTab==='std' ? state.selMinor+' 標準表' : '施工抽查紀錄表'}</h2>`;
+            
+            if (currentTab === 'rec') {
+                html += `<table style="margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${state.selMinor}</td></tr></table>`;
+            }
+
+            html += `<table><tr style="font-weight:bold;">`;
+            if (currentTab === 'std') {
+                html += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
+            } else {
+                html += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
+            }
+            html += `</tr>`;
+
+            // 依大工項分頁渲染邏輯
+            activeFlow.forEach((flow, fIdx) => {
+                flow.items.forEach((r) => {
+                    html += `<tr>`;
+                    if (currentTab === 'std') {
+                        html += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                    } else {
+                        html += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                    }
+                    html += `</tr>`;
+                });
+            });
+            html += `</table></div>`;
+            container.innerHTML = html;
+        }
+    }
+
+    function generateFlowRow(txt, itemStrings, shape, isStart = false) {
+        let detailHtml = itemStrings.length ? `<div class="h-line"></div><div class="detail-box">${itemStrings.map((it, i) => `${i + 1}.${it}`).join('<br>')}</div>` : '';
+        return `
+            <div class="flow-row">
+                <div class="node-col">
+                    <div class="node-wrapper">
+                        ${!isStart ? '<div class="arrow-head"></div>' : ''}
+                        <div class="node-box ${shape}">${txt}</div>
+                    </div>
+                </div>
+                <div class="detail-col">${detailHtml}</div>
+            </div>`;
+    }
+
+    // 7. 匯出 Word 引擎 (含分頁邏輯)
     async function exportFlow() {
-
+        // 先切換到流程圖並渲染
+        const originalTab = currentTab;
+        if(currentTab !== 'flow') { switchTab('flow', document.querySelectorAll('.tab-btn')[0]); }
+        
         const canvas = document.getElementById('flowchart-canvas');
-
         const img = await html2canvas(canvas, { scale: 3, useCORS: true });
-
         const html = `<html><body style="font-family:標楷體; text-align:center;"><h2>施工流程圖</h2><img src="${img.toDataURL()}" width="590"></body></html>`;
-
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `流程圖.doc`);
-
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_流程圖.doc`);
+        
+        if(originalTab !== 'flow') { switchTab(originalTab, document.querySelectorAll('.tab-btn')[originalTab === 'std'?1:2]); }
     }
 
+    function generateWordHTML(title, isRecord) {
+        let activeFlow = state.nodes.filter(n => n.items.some(i => i.checked));
+        let bodyHtml = '';
 
+        activeFlow.forEach((flow, fIdx) => {
+            // 分頁邏輯：每個大工項前加上 Word 識別的分頁符號 (除了第一個)
+            if (fIdx > 0) {
+                bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
+            }
+            
+            bodyHtml += `<h2 align="center">${title} - ${flow.nodeName}</h2>`;
+            
+            if (isRecord) {
+                bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse; margin-bottom:10px;"><tr><td width="18%" align="center">工程名稱</td><td>${state.projName}</td></tr><tr><td align="center">分項工程</td><td>${state.selMinor}</td></tr></table>`;
+            }
+
+            bodyHtml += `<table border="1" cellpadding="4" style="width:100%; border-collapse:collapse;"><tr style="font-weight:bold; background-color:#f2f2f2;">`;
+            
+            if (!isRecord) {
+                bodyHtml += `<th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th>`;
+            } else {
+                bodyHtml += `<th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th>`;
+            }
+            bodyHtml += `</tr>`;
+
+            flow.items.filter(i => i.checked).forEach((r) => {
+                bodyHtml += `<tr>`;
+                if (!isRecord) {
+                    bodyHtml += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td align="center">${r.timing}</td><td align="center">${r.method}</td><td align="center">${r.freq}</td><td align="center">${r.failProc}</td><td align="center">抽查紀錄</td>`;
+                } else {
+                    bodyHtml += `<td align="center">${r.stage}</td><td align="center">${flow.nodeName}</td><td>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td><td></td><td></td>`;
+                }
+                bodyHtml += `</tr>`;
+            });
+            bodyHtml += `</table>`;
+        });
+
+        const style = isRecord ? 
+            `body { font-family: "標楷體"; } table { font-size: 11pt; }` : 
+            `@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { font-size: 10pt; }`;
+        
+        return `<html><head><style>${style}</style></head><body><div class="Section2">${bodyHtml}</div></body></html>`;
+    }
 
     function exportStandard() {
-
-        const selMinor = document.getElementById('minorSelect').value;
-
-        const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
-
-        let tableRows = '';
-
-        selectedItems.forEach((r) => {
-
-            tableRows += `<tr><td style="border:1px solid black; text-align:center;">${r.stage}</td><td style="border:1px solid black; text-align:center;">${r.node}</td><td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; text-align:center;">${r.timing}</td><td style="border:1px solid black; text-align:center;">${r.method}</td><td style="border:1px solid black; text-align:center;">${r.freq}</td><td style="border:1px solid black; text-align:center;">${r.failProc}</td><td style="border:1px solid black; text-align:center;">抽查紀錄</td><td style="border:1px solid black;"></td></tr>`;
-
-        });
-
-        const html = `<html><head><style>@page Section2 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 36pt; } div.Section2 { page: Section2; } body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 10pt; }</style></head><body><div class="Section2"><h2 align="center">${selMinor} 標準表</h2><table><tr style="font-weight:bold;"><th>階段</th><th>流程</th><th>項目</th><th>抽查標準</th><th>時機</th><th>方法</th><th>頻率</th><th>不合格處理</th><th>紀錄</th><th>備註</th></tr>${tableRows}</table></div></body></html>`;
-
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_標準表.doc`);
-
+        const html = generateWordHTML(`${state.selMinor} 標準表`, false);
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_標準表.doc`);
     }
-
-
 
     function exportRecord() {
-
-        const pName = document.getElementById('projName').value;
-
-        const selMinor = document.getElementById('minorSelect').value;
-
-        const selectedItems = Array.from(document.querySelectorAll('.chk:checked')).map(c => JSON.parse(c.dataset.info));
-
-        let tableRows = '';
-
-        selectedItems.forEach((r) => {
-
-            tableRows += `<tr><td style="border:1px solid black; text-align:center;">${r.stage}</td><td style="border:1px solid black; text-align:center;">${r.node}</td><td style="border:1px solid black;">${r.item}</td><td style="border:1px solid black;">${r.std.replace(/\n/g, '<br>')}</td><td style="border:1px solid black; width:80pt;"></td><td style="border:1px solid black; width:40pt;"></td></tr>`;
-
-        });
-
-        const header = `<table style="width:100%; border:1px solid black; border-collapse:collapse; margin-bottom:10px;"><tr><td style="border:1px solid black; width:18%; text-align:center;">工程名稱</td><td style="border:1px solid black; padding-left:5px;">${pName}</td></tr><tr><td style="border:1px solid black; text-align:center;">分項工程</td><td style="border:1px solid black; padding-left:5px;">${selMinor}</td></tr></table>`;
-
-        const html = `<html><head><style>body { font-family: "標楷體"; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 4px; font-size: 11pt; }</style></head><body><h2 align="center">施工抽查紀錄表</h2>${header}<table><tr style="font-weight:bold;"><th colspan="3">檢查項目</th><th>標準</th><th width="80pt">實際情形</th><th width="40pt">結果</th></tr>${tableRows}</table></body></html>`;
-
-        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${selMinor}_紀錄表.doc`);
-
+        const html = generateWordHTML(`施工抽查紀錄表`, true);
+        saveAs(new Blob(['\ufeff' + html], { type: 'application/msword' }), `${state.selMinor}_紀錄表.doc`);
     }
-
 </script>
 
 </body>
-
 </html>
-
