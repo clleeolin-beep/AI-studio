@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>監造表單生成工具 (V2.10 紀錄表去分隔線最終版)</title>
+    <title>監造表單生成工具 (V2.11 合併與註腳完美版)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -107,7 +107,7 @@
 
 <div class="header">
     <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
-        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.10 紀錄表去分隔線最終版</span>
+        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.11 合併與註腳完美版</span>
     </h3>
     <div class="btn-group">
         <button id="btnAuth" class="btn btn-auth" onclick="handleAuthClick()">🔑 登入 Google 授權</button>
@@ -353,7 +353,7 @@
 
     /**
      * ==========================================
-     * @Core 預覽與 Word 匯出 (嚴格遵循 PDF 原始排版)
+     * @Core 預覽與 Word 匯出 (包含動態合併儲存格計算)
      * ==========================================
      */
     function switchTab(tab, el) { currentTab = tab; document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); el.classList.add('active'); renderPreview(); }
@@ -367,7 +367,7 @@
         return active;
     }
 
-    // 將資料依據施工前/中/後分組，攤平所有的項目
+    // 將資料依據施工前/中/後分組
     function groupItemsByPhase(nodes) {
         let phases = { '施工前': [], '施工中': [], '施工後': [] };
         nodes.forEach(n => {
@@ -379,6 +379,34 @@
             });
         });
         return phases;
+    }
+
+    // 計算動態合併儲存格 (Rowspan) 用於標準表
+    function buildFlatItemsWithRowspan(nodes) {
+        let itemsFlat = [];
+        nodes.forEach(n => {
+            n.items.filter(i => i.checked).forEach(r => {
+                itemsFlat.push({...r, nodeName: n.nodeName});
+            });
+        });
+
+        for(let i = 0; i < itemsFlat.length; i++) {
+            if (i === 0 || itemsFlat[i].stage !== itemsFlat[i-1].stage) {
+                let rs = 1;
+                for(let j = i + 1; j < itemsFlat.length; j++) {
+                    if(itemsFlat[j].stage === itemsFlat[i].stage) rs++; else break;
+                }
+                itemsFlat[i].rowspanStage = rs;
+            }
+            if (i === 0 || itemsFlat[i].nodeName !== itemsFlat[i-1].nodeName) {
+                let rn = 1;
+                for(let j = i + 1; j < itemsFlat.length; j++) {
+                    if(itemsFlat[j].nodeName === itemsFlat[i].nodeName) rn++; else break;
+                }
+                itemsFlat[i].rowspanNode = rn;
+            }
+        }
+        return itemsFlat;
     }
 
     function renderPreview() {
@@ -409,43 +437,63 @@
             html += `   </table>
                      </div>`;
 
-            // 第2頁起：各分項工程標準表 (橫式)
+            // 第2頁起：各分項工程標準表 (橫式 + Rowspan)
             activeMinors.forEach(m => {
+                let itemsFlat = buildFlatItemsWithRowspan(m.nodes);
+
                 html += `<div class="page-a4-landscape">
                             <h2 class="doc-title">表 7.2 ${m.minorName}施工抽查標準</h2>
                             <div class="doc-subtitle">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</div>
                             <table class="doc-table">
                                 <tr>
-                                    <th width="8%">施工<br>階段</th><th width="10%">施工<br>流程</th>
-                                    <th width="15%">管理項目(A)</th><th width="20%">抽查標準(B)</th>
-                                    <th width="10%">抽查<br>時機</th><th width="8%">抽查<br>方法</th>
-                                    <th width="8%">抽查<br>頻率</th><th width="10%">不符合之<br>處置方法</th>
-                                    <th width="11%">管理紀錄</th>
+                                    <th colspan="2" width="18%">施工流程</th>
+                                    <th width="15%">管理項目(A)</th>
+                                    <th width="18%">抽查標準(B)</th>
+                                    <th width="9%">抽查<br>時機</th>
+                                    <th width="8%">抽查<br>方法</th>
+                                    <th width="8%">抽查<br>頻率</th>
+                                    <th width="10%">不符合之<br>處置方法</th>
+                                    <th width="8%">管理紀錄</th>
+                                    <th width="6%">備註</th>
                                 </tr>`;
-                m.nodes.forEach(n => {
-                    n.items.filter(i => i.checked).forEach(r => {
-                        const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                        html += `<tr>
-                                    <td align="center">${r.stage}</td><td align="center">${n.nodeName}</td>
-                                    <td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td>
-                                    <td align="center">${r.timing}</td><td align="center">${r.method}</td>
-                                    <td align="center">${r.freq}</td><td align="center">${r.failProc}</td>
-                                    <td align="center">施工抽查紀錄</td>
-                                 </tr>`;
-                    });
+                
+                itemsFlat.forEach(r => {
+                    const isHP = r.item.includes('*'); 
+                    const cleanItem = r.item.replace(/\*/g, '').trim();
+                    const timingStr = isHP ? `<span style="color:red; font-weight:bold;">* </span>${r.timing}` : r.timing;
+
+                    html += `<tr>`;
+                    if (r.rowspanStage) html += `<td rowspan="${r.rowspanStage}" align="center">${r.stage}</td>`;
+                    if (r.rowspanNode) html += `<td rowspan="${r.rowspanNode}" align="center">${r.nodeName}</td>`;
+                    
+                    html += `   <td>${cleanItem}</td>
+                                <td>${r.std.replace(/\n/g, '<br>')}</td>
+                                <td align="center">${timingStr}</td>
+                                <td align="center">${r.method}</td>
+                                <td align="center">${r.freq}</td>
+                                <td align="center">${r.failProc}</td>
+                                <td align="center">施工抽查紀錄</td>
+                                <td></td>
+                             </tr>`;
                 });
-                html += `   </table>
+
+                html += `       <tr>
+                                    <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold;">
+                                        ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
+                                    </td>
+                                </tr>
+                            </table>
                          </div>`;
             });
         } 
         else if (currentTab === 'rec') {
-            // 紀錄表 (三階段拆分表單 - 無流程分隔列)
+            // 紀錄表 (三階段拆分表單)
             activeMinors.forEach(m => {
                 const phases = groupItemsByPhase(m.nodes);
                 
                 ['施工前', '施工中', '施工後'].forEach(phaseName => {
                     const itemsInPhase = phases[phaseName];
-                    if (itemsInPhase.length === 0) return; // 若該階段沒有項目則不產生表單
+                    if (itemsInPhase.length === 0) return; 
                     
                     let flowCheckStr = '';
                     if (phaseName === '施工前') flowCheckStr = '■施工前　　□施工中檢查　　□施工完成檢查';
@@ -489,17 +537,14 @@
                                         <th width="15%">抽查結果</th>
                                     </tr>`;
                     
-                    // 直接渲染該階段所有項目，不再插入流程名稱分隔列
                     itemsInPhase.forEach(r => {
-                        const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
                         html += `<tr>
-                                    <td ${style}>${r.item}</td>
+                                    <td>${r.item}</td>
                                     <td>${r.std.replace(/\n/g, '<br>')}</td>
                                     <td></td><td></td>
                                  </tr>`;
                     });
 
-                    // 表尾整合入表格內
                     html += `       <tr>
                                         <td colspan="4" style="padding: 10px; line-height: 1.6;">
                                             缺失複查結果：<br>
@@ -556,29 +601,49 @@
         bodyHtml += `<div class="Section2">`;
         activeMinors.forEach((m, idx) => {
             if (idx > 0) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
+            
+            let itemsFlat = buildFlatItemsWithRowspan(m.nodes);
+
             bodyHtml += `<h2 align="center" style="margin-bottom:0; font-size:16pt;">表 7.2 ${m.minorName}施工抽查標準</h2>
                          <p align="center" style="font-size:11pt; margin-top:5px;">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</p>
                          <table border="1" cellpadding="4" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt;">
                              <tr style="background:#f2f2f2;">
-                                 <th width="8%">施工<br>階段</th><th width="10%">施工<br>流程</th>
-                                 <th width="15%">管理項目(A)</th><th width="20%">抽查標準(B)</th>
-                                 <th width="10%">抽查<br>時機</th><th width="8%">抽查<br>方法</th>
-                                 <th width="8%">抽查<br>頻率</th><th width="10%">不符合之<br>處置方法</th>
-                                 <th width="11%">管理紀錄</th>
+                                 <th colspan="2" width="18%">施工流程</th>
+                                 <th width="15%">管理項目(A)</th>
+                                 <th width="18%">抽查標準(B)</th>
+                                 <th width="9%">抽查<br>時機</th>
+                                 <th width="8%">抽查<br>方法</th>
+                                 <th width="8%">抽查<br>頻率</th>
+                                 <th width="10%">不符合之<br>處置方法</th>
+                                 <th width="8%">管理紀錄</th>
+                                 <th width="6%">備註</th>
                              </tr>`;
-            m.nodes.forEach(n => {
-                n.items.filter(i => i.checked).forEach(r => {
-                    const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                    bodyHtml += `<tr>
-                                    <td align="center">${r.stage}</td><td align="center">${n.nodeName}</td>
-                                    <td ${style}>${r.item}</td><td>${r.std.replace(/\n/g, '<br>')}</td>
-                                    <td align="center">${r.timing}</td><td align="center">${r.method}</td>
-                                    <td align="center">${r.freq}</td><td align="center">${r.failProc}</td>
-                                    <td align="center">施工抽查紀錄</td>
-                                 </tr>`;
-                });
+            
+            itemsFlat.forEach(r => {
+                const isHP = r.item.includes('*'); 
+                const cleanItem = r.item.replace(/\*/g, '').trim();
+                const timingStr = isHP ? `* ${r.timing}` : r.timing;
+
+                bodyHtml += `<tr>`;
+                if (r.rowspanStage) bodyHtml += `<td rowspan="${r.rowspanStage}" align="center">${r.stage}</td>`;
+                if (r.rowspanNode) bodyHtml += `<td rowspan="${r.rowspanNode}" align="center">${r.nodeName}</td>`;
+                
+                bodyHtml += `   <td>${cleanItem}</td>
+                                <td>${r.std.replace(/\n/g, '<br>')}</td>
+                                <td align="center">${timingStr}</td>
+                                <td align="center">${r.method}</td>
+                                <td align="center">${r.freq}</td>
+                                <td align="center">${r.failProc}</td>
+                                <td align="center">施工抽查紀錄</td>
+                                <td></td>
+                             </tr>`;
             });
-            bodyHtml += `</table>`;
+            bodyHtml += `   <tr>
+                                <td colspan="10" style="text-align: left; padding: 10px; font-weight: bold;">
+                                    ＊為檢驗停留點（或註明：抽查時機內除標示為「不定期」外，餘皆為檢驗停留點）
+                                </td>
+                            </tr>
+                         </table>`;
         });
         bodyHtml += `</div>`;
 
@@ -616,9 +681,9 @@
                 else flowCheckStr = '□施工前　　□施工中檢查　　■施工完成檢查';
 
                 bodyHtml += `
+                    <div style="text-align:right; font-family:標楷體; margin-bottom:5px;">編號：_________________</div>
                     <h2 align="center" style="margin-bottom:0; font-size:16pt;">表 7.3 ${m.minorName}施工抽查紀錄表</h2>
                     <p align="center" style="font-size:11pt; margin-top:5px;">(參考例，抽查標準及檢驗停留點應依各案工程契約規定調整)</p>
-                    <div style="text-align:right; font-family:標楷體; margin-bottom:5px;">編號：_________________</div>
                     
                     <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt;">
                         <tr>
@@ -652,11 +717,9 @@
                             <th width="15%">抽查結果</th>
                         </tr>`;
                 
-                // 直接輸出扁平化項目
                 itemsInPhase.forEach(r => {
-                    const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
                     bodyHtml += `<tr>
-                                    <td ${style}>${r.item}</td>
+                                    <td>${r.item}</td>
                                     <td>${r.std.replace(/\n/g, '<br>')}</td>
                                     <td></td><td></td>
                                  </tr>`;
