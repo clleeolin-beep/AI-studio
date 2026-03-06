@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>監造表單生成工具 (V2.9 紀錄表完美版)</title>
+    <title>監造表單生成工具 (V2.10 紀錄表去分隔線最終版)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -107,7 +107,7 @@
 
 <div class="header">
     <h3 style="margin:0; display:flex; align-items:center; gap:10px;">
-        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.9 紀錄表完美版</span>
+        🏗️ 施工表單生成器 <span style="font-size:12px; background:#e74c3c; color:#fff; padding:2px 6px; border-radius:4px;">V2.10 紀錄表去分隔線最終版</span>
     </h3>
     <div class="btn-group">
         <button id="btnAuth" class="btn btn-auth" onclick="handleAuthClick()">🔑 登入 Google 授權</button>
@@ -367,17 +367,15 @@
         return active;
     }
 
-    // 將資料依據施工前/中/後分組，並保留流程名稱層級
+    // 將資料依據施工前/中/後分組，攤平所有的項目
     function groupItemsByPhase(nodes) {
-        let phases = { '施工前': {}, '施工中': {}, '施工後': {} };
+        let phases = { '施工前': [], '施工中': [], '施工後': [] };
         nodes.forEach(n => {
             n.items.filter(i => i.checked).forEach(r => {
                 let p = '施工中';
                 if (r.stage.includes('前')) p = '施工前';
                 else if (r.stage.includes('後') || r.stage.includes('完成')) p = '施工後';
-                
-                if (!phases[p][n.nodeName]) phases[p][n.nodeName] = [];
-                phases[p][n.nodeName].push(r);
+                phases[p].push({ ...r, nodeName: n.nodeName });
             });
         });
         return phases;
@@ -441,13 +439,13 @@
             });
         } 
         else if (currentTab === 'rec') {
-            // 紀錄表 (三階段拆分表單)
+            // 紀錄表 (三階段拆分表單 - 無流程分隔列)
             activeMinors.forEach(m => {
                 const phases = groupItemsByPhase(m.nodes);
                 
                 ['施工前', '施工中', '施工後'].forEach(phaseName => {
-                    const nodesInPhase = phases[phaseName];
-                    if (Object.keys(nodesInPhase).length === 0) return; // 若該階段沒有項目則不產生表單
+                    const itemsInPhase = phases[phaseName];
+                    if (itemsInPhase.length === 0) return; // 若該階段沒有項目則不產生表單
                     
                     let flowCheckStr = '';
                     if (phaseName === '施工前') flowCheckStr = '■施工前　　□施工中檢查　　□施工完成檢查';
@@ -491,16 +489,14 @@
                                         <th width="15%">抽查結果</th>
                                     </tr>`;
                     
-                    Object.keys(nodesInPhase).forEach(nodeName => {
-                        html += `<tr><td colspan="4" style="background:#f9f9f9; font-weight:bold;">📍 流程：${nodeName}</td></tr>`;
-                        nodesInPhase[nodeName].forEach(r => {
-                            const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                            html += `<tr>
-                                        <td ${style}>${r.item}</td>
-                                        <td>${r.std.replace(/\n/g, '<br>')}</td>
-                                        <td></td><td></td>
-                                     </tr>`;
-                        });
+                    // 直接渲染該階段所有項目，不再插入流程名稱分隔列
+                    itemsInPhase.forEach(r => {
+                        const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
+                        html += `<tr>
+                                    <td ${style}>${r.item}</td>
+                                    <td>${r.std.replace(/\n/g, '<br>')}</td>
+                                    <td></td><td></td>
+                                 </tr>`;
                     });
 
                     // 表尾整合入表格內
@@ -608,8 +604,8 @@
             const phases = groupItemsByPhase(m.nodes);
 
             ['施工前', '施工中', '施工後'].forEach(phaseName => {
-                const nodesInPhase = phases[phaseName];
-                if (Object.keys(nodesInPhase).length === 0) return;
+                const itemsInPhase = phases[phaseName];
+                if (itemsInPhase.length === 0) return;
 
                 if (!isFirst) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
                 isFirst = false;
@@ -656,16 +652,14 @@
                             <th width="15%">抽查結果</th>
                         </tr>`;
                 
-                Object.keys(nodesInPhase).forEach(nodeName => {
-                    bodyHtml += `<tr><td colspan="4" style="background:#f9f9f9; font-weight:bold;">📍 流程：${nodeName}</td></tr>`;
-                    nodesInPhase[nodeName].forEach(r => {
-                        const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
-                        bodyHtml += `<tr>
-                                        <td ${style}>${r.item}</td>
-                                        <td>${r.std.replace(/\n/g, '<br>')}</td>
-                                        <td></td><td></td>
-                                     </tr>`;
-                    });
+                // 直接輸出扁平化項目
+                itemsInPhase.forEach(r => {
+                    const isHP = r.item.includes('*'); const style = isHP ? `style="color:red; font-weight:bold;"` : ``;
+                    bodyHtml += `<tr>
+                                    <td ${style}>${r.item}</td>
+                                    <td>${r.std.replace(/\n/g, '<br>')}</td>
+                                    <td></td><td></td>
+                                 </tr>`;
                 });
 
                 bodyHtml += `
