@@ -7,6 +7,7 @@
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.js"></script>
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.css" type="text/css" />
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     <script src="https://unpkg.com/wellknown@0.5.0/wellknown.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -50,7 +51,7 @@
 
         /* 表單樣式 */
         .form-section { background: #fff; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ddd; }
-        .form-section-title { font-size: 13px; font-weight: bold; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; }
+        .form-section-title { font-size: 13px; font-weight: bold; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .form-group { margin-bottom: 10px; }
         .form-group label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 4px; }
         .form-group .sub-label { font-size: 10px; color: #888; font-weight: normal; margin-left: 5px; }
@@ -70,12 +71,15 @@
         /* 按鈕 */
         .btn-save { background: var(--success); color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px; }
         .btn-save:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-action-small { background: #f39c12; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; transition: 0.2s; }
+        .btn-action-small:hover { filter: brightness(1.1); }
+        .btn-action-small:disabled { background: #ccc; cursor: not-allowed; }
 
         /* 地圖控制按鈕 */
         .map-style-ctrl { position: absolute; bottom: 20px; right: 20px; z-index: 50; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); backdrop-filter: blur(5px); }
         .maplibregl-ctrl-pitch { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z' fill='%23333'/%3E%3C/svg%3E"); background-size: 20px; background-repeat: no-repeat; background-position: center; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
         
         /* Debug 小蟲按鈕 */
         #debug-toggle { position: absolute; bottom: 80px; right: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 20px; border: 2px solid #555; }
@@ -126,14 +130,17 @@
             <div class="form-group"><label>工程名稱</label><input type="text" id="f-eng-name" class="form-control"></div>
             <div class="form-group"><label>業主</label><input type="text" id="f-owner" class="form-control"></div>
             <div style="display: flex; gap: 10px;">
-                <div class="form-group" style="flex: 1;"><label>所在縣市</label><input type="text" id="f-city" class="form-control"></div>
-                <div class="form-group" style="flex: 1;"><label>所在鄉鎮市區</label><input type="text" id="f-town" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>所在縣市</label><input type="text" id="f-city" class="form-control" placeholder="例如：臺中市"></div>
+                <div class="form-group" style="flex: 1;"><label>所在鄉鎮市區</label><input type="text" id="f-town" class="form-control" placeholder="例如：西屯區"></div>
             </div>
             <div class="form-group"><label>案件面積/規模</label><input type="text" id="f-scale" class="form-control"></div>
         </div>
 
         <div class="form-section" style="background: #eef2f5; border-color: #d1d8dd;">
-            <div class="form-section-title" style="color: #d35400;">📍 空間資料 (WKT)</div>
+            <div class="form-section-title" style="color: #d35400;">
+                <span>📍 空間資料 (WKT)</span>
+                <button id="btn-auto-loc" class="btn-action-small" onclick="triggerAutoLocation()">🌍 自動解析縣市鄉鎮</button>
+            </div>
             <div style="font-size:11px; color:#555; margin-bottom:8px;">支援多點、多線、多區塊。請使用「繪圖工具面板」繪製，系統將自動打包為集合。</div>
             <textarea id="f-wkt" class="form-control"></textarea>
         </div>
@@ -223,13 +230,20 @@
 </div>
 
 <script>
-    // --- 攔截 Console 輸出至 Debug 面板 ---
+    // --- 攔截 Console 輸出至 Debug 面板 (包含雜訊過濾) ---
     const debugLogEl = document.getElementById('debug-log');
     ['log', 'warn', 'error'].forEach(method => {
         const orig = console[method];
         console[method] = function(...args) {
-            orig.apply(console, args);
             const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+            
+            // 嚴格過濾地圖圖磚與樣式缺失的 404 報錯，避免洗頻
+            if (msg.includes('Failed to fetch') || msg.includes('could not be loaded') || msg.includes('styleimagemissing')) {
+                orig.apply(console, args);
+                return;
+            }
+
+            orig.apply(console, args);
             const color = method === 'error' ? '#ff4d4d' : method === 'warn' ? '#f39c12' : '#00ff00';
             const time = new Date().toLocaleTimeString();
             debugLogEl.innerHTML += `<div style="color:${color}; margin-bottom:4px; border-bottom:1px dashed #444;">[${time}] ${msg}</div>`;
@@ -249,6 +263,7 @@
     let currentLockedId = null;
     let colMap = {}; 
     let headerRow = [];
+    let locationDebounceTimer = null; // 防抖計時器
 
     // --- 靜態選單定義 ---
     const attrOptions = ['設計', '監造', '專案管理', '履約管理', '規劃', '營運'];
@@ -360,7 +375,7 @@
     // --- 1. 地圖與繪圖核心 ---
     function initMap() {
         map = new maplibregl.Map({ container: 'map', style: osmStyle, center: [121.0, 23.8], zoom: 7, pitch: 45 });
-        map.addControl(new maplibregl.NavigationControl(), 'top-left'); // 移到左邊避免跟視窗衝突
+        map.addControl(new maplibregl.NavigationControl(), 'top-left'); 
 
         setTimeout(() => {
             const navGroup = document.querySelector('.maplibregl-ctrl-group');
@@ -402,11 +417,15 @@
 
         document.getElementById('f-wkt').addEventListener('input', function() {
             try {
-                const geo = wellknown.parse(this.value.trim());
+                const geo = wellknown.parse(this.value.trim().replace(/^"|"$/g, ''));
                 if(geo) {
                     draw.deleteAll();
                     if(geo.type === "GeometryCollection") geo.geometries.forEach(g => draw.add(g));
                     else draw.add(geo);
+                    
+                    // 手動輸入時也自動啟動防抖解析
+                    clearTimeout(locationDebounceTimer);
+                    locationDebounceTimer = setTimeout(() => { resolveLocationFromGeoJSON(draw.getAll()); }, 1500);
                 }
             } catch(e) {}
         });
@@ -418,6 +437,104 @@
         map.once('style.load', () => {
             if (is3D) map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
         });
+    }
+
+    // --- 空間地理自動解析引擎 (NLSC) ---
+    async function resolveLocationFromGeoJSON(geojsonData) {
+        if (!geojsonData || geojsonData.features.length === 0) return;
+        
+        const btn = document.getElementById('btn-auto-loc');
+        if (btn) { btn.innerText = "⏳ 解析中..."; btn.disabled = true; }
+
+        let coordsToQuery = [];
+
+        geojsonData.features.forEach(f => {
+            if (f.geometry.type === 'Point') {
+                coordsToQuery.push(f.geometry.coordinates);
+            } else {
+                // 針對區塊與線段，提取中心點
+                try {
+                    const center = turf.centroid(f).geometry.coordinates;
+                    coordsToQuery.push(center);
+                } catch(e) {}
+
+                // 透過 Turf 簡化以減少 API 請求數量，並提取輪廓頂點
+                try {
+                    const simplified = turf.simplify(f, {tolerance: 0.005, highQuality: false});
+                    const coords = turf.coordAll(simplified);
+                    const step = Math.max(1, Math.floor(coords.length / 5)); // 最多取約 4-5 個均勻分佈的節點
+                    for(let i=0; i<coords.length; i+=step) {
+                        coordsToQuery.push(coords[i]);
+                    }
+                } catch(e) {}
+            }
+        });
+
+        // 座標去重 (精確到小數點後三位，約 100 公尺距離)
+        const uniqueCoords = [];
+        const seen = new Set();
+        coordsToQuery.forEach(c => {
+            const key = `${c[0].toFixed(3)},${c[1].toFixed(3)}`;
+            if (!seen.has(key)) { seen.add(key); uniqueCoords.push(c); }
+        });
+
+        if (uniqueCoords.length > 0) {
+            let cities = new Set();
+            let towns = new Set();
+            console.log(`[自動定位] 準備向 NLSC 發送 ${uniqueCoords.slice(0, 15).length} 個端點解析請求...`);
+
+            // 平行發送請求，上限 15 個點位避免限流
+            await Promise.all(uniqueCoords.slice(0, 15).map(async ([lng, lat]) => {
+                try {
+                    const res = await fetch(`https://api.nlsc.gov.tw/other/TownVillagePointQuery/${lng}/${lat}`);
+                    const text = await res.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(text, "text/xml");
+                    
+                    const ctyNameNode = xmlDoc.getElementsByTagName("ctyName")[0];
+                    const townNameNode = xmlDoc.getElementsByTagName("townName")[0];
+                    
+                    if (ctyNameNode && ctyNameNode.childNodes[0]) cities.add(ctyNameNode.childNodes[0].nodeValue);
+                    if (townNameNode && townNameNode.childNodes[0]) towns.add(townNameNode.childNodes[0].nodeValue);
+                } catch (e) {
+                    console.warn(`[自動定位] 座標 ${lng}, ${lat} 解析失敗`, e);
+                }
+            }));
+
+            const cityInput = document.getElementById('f-city');
+            const townInput = document.getElementById('f-town');
+
+            // 將 Set 轉為陣列並依照碰觸到的順序拼接
+            const cityStr = Array.from(cities).join('、');
+            const townStr = Array.from(towns).join('、');
+
+            if (cityStr && cityInput.value !== cityStr) cityInput.value = cityStr;
+            if (townStr && townInput.value !== townStr) townInput.value = townStr;
+            
+            console.log(`[自動定位] 完成。結果: 縣市(${cityStr}) / 鄉鎮市區(${townStr})`);
+        }
+
+        if (btn) { btn.innerText = "🌍 自動解析縣市鄉鎮"; btn.disabled = false; }
+    }
+
+    function triggerAutoLocation() {
+        resolveLocationFromGeoJSON(draw.getAll());
+    }
+
+    function syncDrawToWKT() {
+        const data = draw.getAll();
+        const textarea = document.getElementById('f-wkt');
+        if (data.features.length === 0) { textarea.value = ""; return; }
+        let wkt = data.features.length === 1 ? 
+            wellknown.stringify(data.features[0].geometry) : 
+            wellknown.stringify({ type: 'GeometryCollection', geometries: data.features.map(f => f.geometry) });
+        textarea.value = wkt;
+
+        // 當用戶停止拖曳/繪製時，延遲 1.5 秒自動觸發定位解析
+        clearTimeout(locationDebounceTimer);
+        locationDebounceTimer = setTimeout(() => {
+            resolveLocationFromGeoJSON(data);
+        }, 1500);
     }
 
     // --- 2. Google OAuth (Sheets + Drive) ---
@@ -530,7 +647,7 @@
     function openEditor(p) {
         currentLockedId = p.id;
         document.getElementById('editor-panel').style.display = 'flex';
-        document.getElementById('draw-panel').style.display = 'flex'; // 同步開啟繪圖工具列
+        document.getElementById('draw-panel').style.display = 'flex'; 
         document.getElementById('editor-title').innerText = `📝 案件編輯 - ${p.id}`;
         
         const r = p._raw;
@@ -569,7 +686,8 @@
         const wktStr = r[colMap.wkt] || "";
         if (wktStr.includes('(')) {
             try {
-                const geo = wellknown.parse(wktStr.trim());
+                // 強力脫殼防呆，去除前後可能夾帶的雙引號
+                const geo = wellknown.parse(wktStr.trim().replace(/^"|"$/g, ''));
                 if (geo) {
                     if (geo.type === "GeometryCollection") geo.geometries.forEach(g => draw.add(g));
                     else draw.add(geo);
@@ -593,16 +711,6 @@
         draw.deleteAll();
         document.getElementById('editor-panel').style.display = 'none';
         document.getElementById('draw-panel').style.display = 'none';
-    }
-
-    function syncDrawToWKT() {
-        const data = draw.getAll();
-        const textarea = document.getElementById('f-wkt');
-        if (data.features.length === 0) { textarea.value = ""; return; }
-        let wkt = data.features.length === 1 ? 
-            wellknown.stringify(data.features[0].geometry) : 
-            wellknown.stringify({ type: 'GeometryCollection', geometries: data.features.map(f => f.geometry) });
-        textarea.value = wkt;
     }
 
     // --- 4. Google Drive 照片上傳 ---
@@ -715,7 +823,7 @@
             setV('pm', document.getElementById('f-pm').value);
             setV('gold', document.getElementById('f-award-gold').value);
             setV('otherAward', document.getElementById('f-award-other').value);
-            setV('photo', document.getElementById('f-photo').value); // 這裡包含已上傳照片的 JSON Array
+            setV('photo', document.getElementById('f-photo').value);
             setV('memo', document.getElementById('f-memo').value);
             setV('dateStart', formatDateForSheet(document.getElementById('f-date-start').value));
             setV('dateEnd', formatDateForSheet(document.getElementById('f-date-end').value));
