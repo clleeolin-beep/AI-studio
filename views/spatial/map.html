@@ -128,7 +128,7 @@
             <button class="btn-action" style="flex:2; margin:0;" onclick="startDraw()">📐 繪製篩選區域</button>
             <button class="btn-action btn-cancel" style="flex:1; margin:0;" onclick="clearSpatialFilter()">✕ 清除</button>
         </div>
-        <select id="city-filter" onchange="handleCityFilter()"><option value="全國">--- 全國縣市跳轉 ---</option></select>
+        <select id="city-filter" onchange="handleCityFilter()"><option value="全國">--- 全國縣市遮罩篩選 ---</option></select>
         <input type="text" id="search-input" placeholder="🔍 搜尋 (例如: 01+08 -13 科技)" oninput="filterProjects()">
 
         <div class="section-title">2. 動態類別篩選</div>
@@ -181,11 +181,12 @@
     let is3D = false;
     
     // 資料儲存庫
-    let projectDict = {};       // 原始資料對照表
+    let projectDict = {};       // 原始資料對照表 (使用 unique ID)
     let masterFeatures = [];    // 拆解後的線與面 GeoJSON Feature
-    let masterMarkers = [];     // 拆解後的 DOM Marker
+    let masterPoints = [];      // 拆解後的點 GeoJSON Feature (用於聚合)
     let patternCache = {};      // Canvas Pattern 記憶體快取
     let dynamicCategories = new Set(); // 存放原始的類別全名
+    let twGeoJson = null;       // 台灣縣市邊界緩存
     
     // UI 控制狀態
     let showGeom = { point: true, line: true, polygon: true };
@@ -213,6 +214,8 @@
             const el = document.getElementById(id);
             if (el) makeDraggable(el, el.querySelector('.panel-header'));
         });
+        
+        loadTwGeoJson();
         initMap();
         await fetchManifestAndData();
     };
@@ -258,17 +261,30 @@
         map.on('load', setupMapLayers);
     }
 
+    // 取得台灣縣市邊界
+    async function loadTwGeoJson() {
+        try {
+            const res = await fetch('https://raw.githubusercontent.com/g0v/twgeojson/master/json/twCounty2010.geo.json');
+            twGeoJson = await res.json();
+        } catch(e) { console.error("縣市邊界載入失敗"); }
+    }
+
     function setupMapLayers() {
+        // [城市遮罩圖層] 放在最底層 (覆蓋在地圖上方，但被資料蓋住)
+        if (!map.getSource('city-mask')) {
+            map.addSource('city-mask', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+            map.addLayer({ id: 'mask-layer', type: 'fill', source: 'city-mask', paint: { 'fill-color': '#000000', 'fill-opacity': 0.65 } });
+        }
+
+        // [區塊與線段圖層]
         if (!map.getSource('projects-data')) {
             map.addSource('projects-data', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         }
 
-        // [關鍵修正]：主動將快取中的 Pattern 重新注入，確保切換 Style 時不會 Missing
         Object.keys(patternCache).forEach(id => {
             if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
         });
 
-        // Polygon: 面填色與邊線
         if(!map.getLayer('layer-polygon')) {
             map.addLayer({ id: 'layer-polygon', type: 'fill', source: 'projects-data', filter: ['==', '$type', 'Polygon'], 
                 paint: { 'fill-pattern': ['get', 'patternId'], 'fill-opacity': 0.8 } 
@@ -278,7 +294,6 @@
             });
         }
         
-        // Line: 主線段與軍方發光特效
         if(!map.getLayer('layer-line')) {
             map.addLayer({ id: 'layer-line-glow', type: 'line', source: 'projects-data', 
                 filter: ['all', ['==', '$type', 'LineString'], ['==', 'isMilitary', true]], 
@@ -289,12 +304,101 @@
             });
         }
 
-        // 綁定 Popup
-        const interactiveLayers = ['layer-polygon', 'layer-line'];
+        // [點位叢集與放射圖層]
+        if (!map.getSource('projects-points')) {
+            map.addSource('projects-points', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, cluster: true, clusterMaxZoom: 14, clusterRadius: 40 });
+            map.addSource('spider-legs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+            map.addSource('spider-leaves', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+
+            // 放射連線
+            map.addLayer({ id: 'spider-legs-layer', type: 'line', source: 'spider-legs', paint: { 'line-color': '#ffffff', 'line-width': 3, 'line-dasharray': [2, 2] } });
+
+            // 聚合圓圈
+            map.addLayer({ id: 'clusters', type: 'circle', source: 'projects-points', filter: ['has', 'point_count'],
+                paint: { 'circle-color': '#27AE60', 'circle-radius': ['step', ['get', 'point_count'], 18, 5, 22, 10, 26], 'circle-stroke-width': 3, 'circle-stroke-color': '#fff' }
+            });
+
+            // 聚合數字
+            map.addLayer({ id: 'cluster-count', type: 'symbol', source: 'projects-points', filter: ['has', 'point_count'],
+                layout: { 'text-field': '{point_count_abbreviated}', 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'], 'text-size': 14 },
+                paint: { 'text-color': '#ffffff' }
+            });
+
+            // 未聚合的單一點
+            map.addLayer({ id: 'unclustered-point', type: 'symbol', source: 'projects-points', filter: ['!', ['has', 'point_count']],
+                layout: { 'icon-image': ['get', 'iconId'], 'icon-allow-overlap': true, 'icon-size': 0.8 }
+            });
+
+            // 炸開後的葉子點
+            map.addLayer({ id: 'spider-leaves-layer', type: 'symbol', source: 'spider-leaves',
+                layout: { 'icon-image': ['get', 'iconId'], 'icon-allow-overlap': true, 'icon-size': 0.8 }
+            });
+        }
+
+        // 綁定 Popup 與交互
+        const interactiveLayers = ['layer-polygon', 'layer-line', 'unclustered-point', 'spider-leaves-layer'];
         interactiveLayers.forEach(layer => {
-            map.on('click', layer, (e) => showPopup(e.features[0].properties.id, e.lngLat));
+            map.on('click', layer, (e) => {
+                e.preventDefault(); 
+                showPopup(e.features[0].properties.uid, e.lngLat);
+            });
             map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+        });
+
+        // 綁定聚合點炸開邏輯
+        map.on('mouseenter', 'clusters', () => map.getCanvas().style.cursor = 'pointer');
+        map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
+        
+        map.on('click', 'clusters', (e) => {
+            const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+            const clusterId = features[0].properties.cluster_id;
+            const point_count = features[0].properties.point_count;
+            const clusterSource = map.getSource('projects-points');
+
+            clusterSource.getClusterLeaves(clusterId, point_count, 0, (err, leaves) => {
+                if (err) return;
+                
+                const centerLngLat = features[0].geometry.coordinates;
+                const centerPx = map.project(centerLngLat);
+                const legs = [];
+                const leavesExpanded = [];
+                
+                // 動態計算圓形炸開半徑 (根據數量決定大小)
+                const radiusPx = Math.min(120, Math.max(45, 25 + point_count * 5));
+                const angleStep = (Math.PI * 2) / point_count;
+
+                leaves.forEach((leaf, i) => {
+                    const angle = i * angleStep;
+                    const exPx = centerPx.x + radiusPx * Math.cos(angle);
+                    const eyPx = centerPx.y + radiusPx * Math.sin(angle);
+                    const expandedLngLat = map.unproject([exPx, eyPx]);
+                    const exCoord = [expandedLngLat.lng, expandedLngLat.lat];
+                    
+                    legs.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [centerLngLat, exCoord] } });
+                    
+                    const newLeaf = JSON.parse(JSON.stringify(leaf));
+                    newLeaf.geometry.coordinates = exCoord;
+                    leavesExpanded.push(newLeaf);
+                });
+                
+                map.getSource('spider-legs').setData({ type: 'FeatureCollection', features: legs });
+                map.getSource('spider-leaves').setData({ type: 'FeatureCollection', features: leavesExpanded });
+            });
+        });
+
+        // 點擊空白處或移動地圖時收起炸開的節點
+        map.on('click', (e) => {
+            if (!map.queryRenderedFeatures(e.point, { layers: ['clusters', 'spider-leaves-layer'] }).length) {
+                map.getSource('spider-legs').setData({ type: 'FeatureCollection', features: [] });
+                map.getSource('spider-leaves').setData({ type: 'FeatureCollection', features: [] });
+            }
+        });
+        map.on('movestart', () => {
+            if (map.getSource('spider-legs')) {
+                map.getSource('spider-legs').setData({ type: 'FeatureCollection', features: [] });
+                map.getSource('spider-leaves').setData({ type: 'FeatureCollection', features: [] });
+            }
         });
     }
 
@@ -320,7 +424,6 @@
         return { isEmpty: false, colors, isMilitary, codes };
     }
 
-    // [關鍵修正] 預先產生 Pattern，供地圖隨時取用
     function generatePattern(colors, isMilitary) {
         const id = 'pattern-' + colors.join('-') + (isMilitary ? '-mil' : '');
         if (patternCache[id]) return id;
@@ -330,14 +433,10 @@
         const ctx = canvas.getContext('2d');
 
         if (isMilitary) {
-            ctx.fillStyle = '#34495E';
-            ctx.fillRect(0, 0, 64, 64);
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 4;
+            ctx.fillStyle = '#34495E'; ctx.fillRect(0, 0, 64, 64);
+            ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 4;
             ctx.beginPath();
-            for (let i = -64; i < 128; i += 16) {
-                ctx.moveTo(i, 0); ctx.lineTo(i + 64, 64);
-            }
+            for (let i = -64; i < 128; i += 16) { ctx.moveTo(i, 0); ctx.lineTo(i + 64, 64); }
             ctx.stroke();
         } else {
             const num = colors.length;
@@ -351,45 +450,49 @@
         }
 
         const imgData = ctx.getImageData(0,0,64,64);
-        patternCache[id] = imgData; // 存入全域快取
-        
-        // 若地圖已準備好，立刻注入
-        if (map.loaded() && !map.hasImage(id)) {
-            map.addImage(id, imgData);
-        }
+        patternCache[id] = imgData; 
+        if (map && map.loaded() && !map.hasImage(id)) map.addImage(id, imgData);
         return id;
     }
 
-    function createPointMarker(coords, pId, visConfig) {
-        const el = document.createElement('div');
-        el.style.width = '18px'; el.style.height = '18px';
-        el.style.borderRadius = '50%';
-        el.style.boxShadow = '0 2px 5px rgba(0,0,0,0.5)';
-        el.style.cursor = 'pointer';
-
-        if (visConfig.isEmpty) {
-            el.style.backgroundColor = '#fff';
-            el.style.border = '2px solid #999';
-        } else if (visConfig.isMilitary) {
-            el.style.backgroundColor = '#34495E';
-            el.style.border = '3px solid #FFD700';
-        } else if (visConfig.colors.length === 1) {
-            el.style.backgroundColor = visConfig.colors[0];
-            el.style.border = '2px solid #fff';
+    function generatePointIcon(colors, isMilitary) {
+        const id = 'icon-' + colors.join('-') + (isMilitary ? '-mil' : '');
+        if (patternCache[id]) return id;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 36; canvas.height = 36;
+        const ctx = canvas.getContext('2d');
+        const cx = 18, cy = 18, r = 16;
+        
+        if (isMilitary) {
+            ctx.fillStyle = '#34495E';
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3; ctx.stroke();
+        } else if (colors.length === 0 || colors[0] === '#ffffff') {
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#999999'; ctx.lineWidth = 2; ctx.stroke();
+        } else if (colors.length === 1) {
+            ctx.fillStyle = colors[0];
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
         } else {
-            const step = 100 / visConfig.colors.length;
-            const stops = visConfig.colors.map((c, i) => `${c} ${i*step}% ${(i+1)*step}%`).join(', ');
-            el.style.background = `conic-gradient(${stops})`;
-            el.style.border = '2px solid #fff';
+            let start = 0;
+            let step = (Math.PI * 2) / colors.length;
+            for(let i=0; i<colors.length; i++) {
+                ctx.fillStyle = colors[i];
+                ctx.beginPath(); ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, start, start+step); ctx.fill();
+                start += step;
+            }
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
         }
-
-        el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            showPopup(pId, coords);
-        });
-
-        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(coords);
-        return { marker: marker, id: pId, featureRef: { geometry: { type: 'Point', coordinates: coords } } };
+        
+        const imgData = ctx.getImageData(0,0,36,36);
+        patternCache[id] = imgData;
+        if (map && map.loaded() && !map.hasImage(id)) map.addImage(id, imgData);
+        return id;
     }
 
     // --- 3. 資料讀取 ---
@@ -407,7 +510,7 @@
             window.gvizCallback = (json) => {
                 if (json && json.table) {
                     masterFeatures = [];
-                    masterMarkers = [];
+                    masterPoints = [];
                     projectDict = {};
                     dynamicCategories.clear();
 
@@ -428,20 +531,22 @@
                         const wkt = String(get(colMap.wkt));
                         if (!wkt || wkt.includes("座標") || wkt === "--") return;
 
+                        const rawId = get(colMap.id);
+                        let uniqueId = rawId;
+                        let dupCounter = 1;
+                        while(projectDict[uniqueId]) { uniqueId = `${rawId}_${dupCounter}`; dupCounter++; }
+
                         const catRaw = get(colMap.cat) || "";
                         const visConfig = getVisualConfig(catRaw);
                         
-                        // 提取並儲存類別的完整名稱
                         const fullCategories = catRaw.split(',').map(c => c.trim()).filter(c => c);
-                        fullCategories.forEach(c => {
-                            if (c.match(/^#\d{2}/)) dynamicCategories.add(c);
-                        });
+                        fullCategories.forEach(c => { if (c.match(/^#\d{2}/)) dynamicCategories.add(c); });
                         
-                        // [關鍵修正] 在這裡提早生成並快取 Pattern
                         const patternId = generatePattern(visConfig.colors, visConfig.isMilitary);
+                        const iconId = generatePointIcon(visConfig.colors, visConfig.isMilitary);
 
                         const pData = {
-                            id: get(colMap.id), name: get(colMap.name), contract: get(colMap.contract),
+                            id: rawId, uid: uniqueId, name: get(colMap.name), contract: get(colMap.contract),
                             owner: get(colMap.owner), eng: get(colMap.eng), city: get(colMap.city), 
                             location: get(colMap.city) + get(colMap.town), scale: get(colMap.scale),
                             fee: get(colMap.fee), feeVal: parseFloat(String(get(colMap.fee)).replace(/[^0-9.]/g, "")) || 0,
@@ -453,18 +558,21 @@
                             status: get(colMap.status), memo: get(colMap.memo),
                             filtered: true, selected: true, color: visConfig.colors[0] || '#ccc'
                         };
-                        projectDict[pData.id] = pData;
+                        projectDict[uniqueId] = pData;
 
                         try {
                             const geo = wellknown.parse(wkt.trim());
                             if (geo) {
                                 const processGeom = (g) => {
                                     if (g.type === 'Point') {
-                                        masterMarkers.push(createPointMarker(g.coordinates, pData.id, visConfig));
+                                        masterPoints.push({
+                                            type: 'Feature', geometry: g,
+                                            properties: { uid: uniqueId, iconId: iconId }
+                                        });
                                     } else {
                                         masterFeatures.push({ 
                                             type: 'Feature', geometry: g, 
-                                            properties: { id: pData.id, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } 
+                                            properties: { uid: uniqueId, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } 
                                         });
                                     }
                                 };
@@ -474,7 +582,6 @@
                         } catch(e) {}
                     });
 
-                    // [關鍵機制] 確保地圖載入後，一口氣把所有的 Pattern 塞進去
                     if (map.loaded()) {
                         Object.keys(patternCache).forEach(id => {
                             if (!map.hasImage(id)) map.addImage(id, patternCache[id]);
@@ -493,7 +600,7 @@
         });
     }
 
-    // --- 4. 智慧布林搜尋與篩選 ---
+    // --- 4. 智慧布林搜尋與篩選 (含縣市遮罩) ---
     function parseQuery(query) {
         const tokens = query.split(/\s+/).filter(t => t);
         let ors = [], nots = [], andGroups = [], text = [];
@@ -534,7 +641,43 @@
         document.getElementById('end-year-display').innerText = `結束年份：${document.getElementById('filter-end-year').value} 以下`;
         filterProjects();
     }
-    function handleCityFilter() { if (polygonFilter) clearSpatialFilter(); filterProjects(); }
+    
+    // 處理縣市選擇與遮罩運算
+    function handleCityFilter() { 
+        if (polygonFilter) clearSpatialFilter(); 
+        const city = document.getElementById('city-filter').value;
+        applyCityMask(city);
+        filterProjects(); 
+    }
+
+    function applyCityMask(cityName) {
+        if (!twGeoJson || !map.getSource('city-mask')) return;
+        if (cityName === "全國") {
+            map.getSource('city-mask').setData({ type: 'FeatureCollection', features: [] });
+            map.flyTo({center: [121.0, 23.8], zoom: 7});
+            return;
+        }
+        
+        // 正規化名稱比對 (將「台」轉「臺」，並只取前兩字，確保「桃園市」能配對到「桃園縣」)
+        const normalize = (s) => s.replace(/台/g, '臺').substring(0, 2);
+        const target = normalize(cityName);
+        
+        const cityFeature = twGeoJson.features.find(f => {
+            const propName = f.properties.name || f.properties.COUNTYNAME || '';
+            return normalize(propName) === target;
+        });
+        
+        if (cityFeature) {
+            // 建立包覆全球的巨型多邊形
+            const world = turf.polygon([[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]);
+            // 利用 Turf 反向扣除該縣市，產生遮罩
+            const mask = turf.difference(world, cityFeature.geometry);
+            map.getSource('city-mask').setData(mask);
+            
+            const bbox = turf.bbox(cityFeature);
+            map.fitBounds(bbox, { padding: 50, essential: true });
+        }
+    }
 
     function filterProjects() {
         const city = document.getElementById('city-filter').value;
@@ -572,11 +715,11 @@
 
             if (p.filtered && polygonFilter) {
                 p.filtered = false; 
-                for(let m of masterMarkers.filter(x=>x.id===p.id)) {
-                    if (turf.booleanPointInPolygon(m.featureRef, polygonFilter)) { p.filtered = true; break; }
+                for(let m of masterPoints.filter(x => x.properties.uid === p.uid)) {
+                    if (turf.booleanPointInPolygon(m, polygonFilter)) { p.filtered = true; break; }
                 }
                 if (!p.filtered) {
-                    for(let f of masterFeatures.filter(x=>x.properties.id===p.id)) {
+                    for(let f of masterFeatures.filter(x => x.properties.uid === p.uid)) {
                         if (turf.booleanIntersects(f, polygonFilter)) { p.filtered = true; break; }
                     }
                 }
@@ -586,8 +729,8 @@
                 count++;
                 listEl.innerHTML += `
                     <div class="list-item" style="border-left-color:${p.color}">
-                        <input type="checkbox" ${p.selected?'checked':''} onchange="toggleSelect(event, '${p.id}')" style="width:16px; height:16px;">
-                        <div class="item-content" onclick="flyToProject('${p.id}')">
+                        <input type="checkbox" ${p.selected?'checked':''} onchange="toggleSelect(event, '${p.uid}')" style="width:16px; height:16px;">
+                        <div class="item-content" onclick="flyToProject('${p.uid}')">
                             <div class="item-title">${p.id} - ${p.name}</div>
                             <div class="item-subtitle">${p.location} | ${p.owner}</div>
                         </div>
@@ -599,40 +742,39 @@
         updateMapSource();
     }
 
-    function toggleSelect(e, id) { e.stopPropagation(); projectDict[id].selected = e.target.checked; updateMapSource(); }
+    function toggleSelect(e, uid) { e.stopPropagation(); projectDict[uid].selected = e.target.checked; updateMapSource(); }
 
     function updateMapSource() {
         if (map.getSource('projects-data')) {
-            const displayFeatures = masterFeatures.filter(f => projectDict[f.properties.id] && projectDict[f.properties.id].filtered && projectDict[f.properties.id].selected);
+            const displayFeatures = masterFeatures.filter(f => projectDict[f.properties.uid] && projectDict[f.properties.uid].filtered && projectDict[f.properties.uid].selected);
             map.getSource('projects-data').setData({ type: 'FeatureCollection', features: displayFeatures });
         }
-        masterMarkers.forEach(m => {
-            const p = projectDict[m.id];
-            if (p && p.filtered && p.selected && showGeom.point) m.marker.addTo(map);
-            else m.marker.remove();
-        });
+        if (map.getSource('projects-points')) {
+            const displayPoints = masterPoints.filter(p => projectDict[p.properties.uid] && projectDict[p.properties.uid].filtered && projectDict[p.properties.uid].selected);
+            map.getSource('projects-points').setData({ type: 'FeatureCollection', features: displayPoints });
+        }
     }
 
-    function flyToProject(id) {
+    function flyToProject(uid) {
         let center = null;
-        const marker = masterMarkers.find(m => m.id === id);
-        if (marker) center = marker.featureRef.geometry.coordinates;
+        const pt = masterPoints.find(m => m.properties.uid === uid);
+        if (pt) center = pt.geometry.coordinates;
         else {
-            const feat = masterFeatures.find(f => f.properties.id === id);
+            const feat = masterFeatures.find(f => f.properties.uid === uid);
             if(feat) center = turf.centroid(feat).geometry.coordinates;
         }
         if (center) {
             map.flyTo({ center: center, zoom: 16, pitch: 45, essential: true });
-            setTimeout(() => showPopup(id, center), 1500);
+            setTimeout(() => showPopup(uid, center), 1500);
         }
     }
 
     // --- 5. Popup 生成 ---
-    function showPopup(id, lngLat) {
+    function showPopup(uid, lngLat) {
         const activePopups = document.getElementsByClassName('maplibregl-popup');
         while (activePopups[0]) activePopups[0].remove();
 
-        const p = projectDict[id];
+        const p = projectDict[uid];
         if(!p) return;
 
         let imageUrl = p.photo;
@@ -651,6 +793,7 @@
                 </div>
                 <div class="content-box">
                     <table>
+                        <tr><td>唯一識別</td><td>${p.uid}</td></tr>
                         <tr><td>案號</td><td>${p.id}</td></tr>
                         <tr><td>案件簡稱</td><td>${p.name}</td></tr>
                         <tr><td>工程名稱</td><td>${p.eng}</td></tr>
@@ -696,9 +839,22 @@
         showGeom[type] = !showGeom[type];
         btn.classList.toggle('active', showGeom[type]);
         const visibility = showGeom[type] ? 'visible' : 'none';
-        if (type === 'line' && map.getLayer('layer-line')) { map.setLayoutProperty('layer-line', 'visibility', visibility); map.setLayoutProperty('layer-line-glow', 'visibility', visibility); }
-        if (type === 'polygon' && map.getLayer('layer-polygon')) { map.setLayoutProperty('layer-polygon', 'visibility', visibility); map.setLayoutProperty('layer-polygon-outline', 'visibility', visibility); }
-        updateMapSource(); 
+        
+        if (type === 'point' && map.getLayer('clusters')) {
+            map.setLayoutProperty('clusters', 'visibility', visibility);
+            map.setLayoutProperty('cluster-count', 'visibility', visibility);
+            map.setLayoutProperty('unclustered-point', 'visibility', visibility);
+            map.setLayoutProperty('spider-legs-layer', 'visibility', visibility);
+            map.setLayoutProperty('spider-leaves-layer', 'visibility', visibility);
+        }
+        if (type === 'line' && map.getLayer('layer-line')) { 
+            map.setLayoutProperty('layer-line', 'visibility', visibility); 
+            map.setLayoutProperty('layer-line-glow', 'visibility', visibility); 
+        }
+        if (type === 'polygon' && map.getLayer('layer-polygon')) { 
+            map.setLayoutProperty('layer-polygon', 'visibility', visibility); 
+            map.setLayoutProperty('layer-polygon-outline', 'visibility', visibility); 
+        }
     }
 
     function toggle3D() {
@@ -712,13 +868,18 @@
 
     function switchStyle(val) {
         isSatellite = (val === 'esri');
-        const currentData = map.getSource('projects-data') ? map.getSource('projects-data')._data : null;
+        const currentPolygons = map.getSource('projects-data') ? map.getSource('projects-data')._data : null;
+        const currentPoints = map.getSource('projects-points') ? map.getSource('projects-points')._data : null;
+        const currentMask = map.getSource('city-mask') ? map.getSource('city-mask')._data : null;
+        
         map.setStyle(isSatellite ? esriStyle : osmStyle);
         map.once('style.load', () => {
             if (is3D) map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
             setupMapLayers(); 
-            if(currentData) map.getSource('projects-data').setData(currentData); 
-            ['line', 'polygon'].forEach(t => {
+            if(currentPolygons) map.getSource('projects-data').setData(currentPolygons); 
+            if(currentPoints) map.getSource('projects-points').setData(currentPoints); 
+            if(currentMask) map.getSource('city-mask').setData(currentMask); 
+            ['point', 'line', 'polygon'].forEach(t => {
                 if(!showGeom[t]) toggleGeom(t, {classList:{toggle:()=>{}}}); 
             });
         });
@@ -727,8 +888,8 @@
     // --- 7. 匯出工具 ---
     function exportToCSV() {
         const toExport = Object.values(projectDict).filter(p => p.filtered && p.selected);
-        let csv = "\ufeff案號,分類,案件簡稱,契約案名,業主,所在位置,經費,計畫主持人\n" + 
-                  toExport.map(p => `"${p.id}","${p.cat}","${p.name}","${p.contract}","${p.owner}","${p.location}","${p.fee}","${p.host}"`).join("\n");
+        let csv = "\ufeff案號,唯一識別碼,分類,案件簡稱,契約案名,業主,所在位置,經費,計畫主持人\n" + 
+                  toExport.map(p => `"${p.id}","${p.uid}","${p.cat}","${p.name}","${p.contract}","${p.owner}","${p.location}","${p.fee}","${p.host}"`).join("\n");
         let link = document.createElement("a"); 
         link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); 
         link.download = "空間實績篩選匯出.csv"; 
