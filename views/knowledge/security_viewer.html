@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Policy Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1A5276; /* 配合 manifest.json theme_color */
+            --bg-color: #f4f7f6;
+        }
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            border-top: 5px solid var(--primary-color);
+        }
+        #content {
+            animation: fadeIn 0.8s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Markdown 樣式優化 */
+        h1 { color: var(--primary-color); border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin-top: 30px; color: #2c3e50; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        code { background: #eee; padding: 2px 5px; border-radius: 4px; }
+        .status-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; background: #e8f4fd; color: #1a5276; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="status-tag">🛡️ AI Studio 安全性監控中心</div>
+    <div id="content">正在載入安全性政策 (SECURITY.md)...</div>
+</div>
+
+<script>
+    /**
+     * @description 非同步獲取根目錄的 SECURITY.md 並利用 marked 渲染
+     * @property {string} filePath - 指向專案根目錄的安全性文件
+     */
+    async function loadSecurityPolicy() {
+        const contentDiv = document.getElementById('content');
+        const filePath = '../../SECURITY.md'; // 根據 views/knowledge/ 路徑回推根目錄
+
+        try {
+            const response = await fetch(filePath + '?v=' + Date.now()); // 防止快取
+            if (!response.ok) throw new Error('無法取得 SECURITY.md 檔案');
+            
+            const markdownText = await response.text();
+            
+            // 使用 marked 渲染內容
+            contentDiv.innerHTML = marked.parse(markdownText);
+            
+            // 呼叫父視窗的 DebugSystem 紀錄行為
+            if (window.parent && window.parent.DebugSystem) {
+                window.parent.DebugSystem.log("安全性聲明已成功加載", "SUCCESS");
+            }
+        } catch (error) {
+            contentDiv.innerHTML = `<div style="color:red; padding:20px; border:1px dashed red;">
+                <h3>載入失敗</h3>
+                <p>${error.message}</p>
+                <p>請確認根目錄是否存在 SECURITY.md 檔案。</p>
+            </div>`;
+            
+            if (window.parent && window.parent.DebugSystem) {
+                window.parent.DebugSystem.log("安全性聲明加載失敗: " + error.message, "ERROR");
+            }
+        }
+    }
+
+    // 初始化載入
+    document.addEventListener('DOMContentLoaded', loadSecurityPolicy);
+</script>
+
+</body>
+</html>
