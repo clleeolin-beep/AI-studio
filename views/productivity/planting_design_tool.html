@@ -475,20 +475,36 @@
             }
 
             initGoogleAuth() {
-                this.tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
-                    callback: (resp) => { 
-                        this.accessToken = resp.access_token; 
-                        document.getElementById('auth-banner').className = 'authorized';
-                        document.getElementById('auth-banner').innerHTML = '🟢 授權成功：已開啟編輯與上傳功能';
-                        document.getElementById('btn-save').disabled = false;
-                        sysLog("OAuth 2.0 授權完成", "success");
-                    }
-                });
+                try {
+                    this.tokenClient = google.accounts.oauth2.initTokenClient({
+                        client_id: CLIENT_ID,
+                        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
+                        callback: (resp) => {
+                            if (resp.error) {
+                                sysLog(`授權發生錯誤: ${resp.error}`, "error");
+                                return;
+                            }
+                            this.accessToken = resp.access_token;
+                            document.getElementById('auth-banner').className = 'authorized';
+                            document.getElementById('auth-banner').innerHTML = '🟢 授權成功：已開啟編輯與上傳功能';
+                            document.getElementById('btn-save').disabled = false;
+                            sysLog("OAuth 2.0 寫入權限獲取成功", "success");
+                        }
+                    });
+                    sysLog("Google Auth 服務初始化成功", "info");
+                } catch (e) {
+                    sysLog(`Auth 初始化失敗: ${e.message}`, "error");
+                }
             }
 
-            triggerAuth() { if (!this.accessToken) this.tokenClient.requestAccessToken(); }
+            triggerAuth() {
+                if (!this.accessToken) {
+                    sysLog("觸發二次授權視窗...", "info");
+                    this.tokenClient.requestAccessToken({
+                        prompt: 'select_account consent'
+                    });
+                }
+            }
 
             loadSheetData() {
                 Utility.showLoading("載入雲端植栽資料庫...");
