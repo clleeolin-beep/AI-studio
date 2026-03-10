@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="utf-8">
-    <title>惇陽實績地圖 - 專業整合旗艦版 (Draggable UI + Pro Render + Debug)</title>
+    <title>惇陽實績地圖 - 專業整合旗艦版 (Draggable UI + Pro Render + Pro Debug)</title>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
@@ -26,11 +26,12 @@
         #tool-panel { top: 20px; left: 340px; width: 350px; }
         #result-panel { top: 20px; right: 20px; width: 350px; height: 80vh; }
         
-        /* Debug 視窗 */
-        #debug-toggle { position: absolute; bottom: 80px; left: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); font-size: 20px; border: 2px solid #555; }
-        #debug-panel { bottom: 20px; left: 70px; width: 400px; height: 300px; display: none; background: #1e1e1e; color: #0f0; font-family: monospace; font-size: 12px; z-index: 9999; }
-        #debug-panel .panel-header { background: #333; }
-        #debug-panel .panel-body { background: #1e1e1e; }
+        /* 強化版 Debug 視窗 */
+        #debug-toggle { position: absolute; bottom: 80px; left: 20px; width: 40px; height: 40px; background: #333; color: #0f0; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.4); font-size: 20px; border: 2px solid #555; transition: 0.2s; }
+        #debug-toggle:hover { transform: scale(1.1); background: #444; }
+        #debug-panel { bottom: 20px; left: 70px; width: 450px; height: 350px; display: none; background: #1e1e1e; color: #0f0; font-family: 'Consolas', monospace; font-size: 12px; z-index: 9999; border: 1px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #debug-panel .panel-header { background: #222; border-bottom: 1px solid #444; }
+        #debug-panel .panel-body { background: #0d0d0d; line-height: 1.6; }
 
         /* UI 基礎元件 */
         .section-title { font-size: 13px; font-weight: bold; color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 10px; margin-top: 15px; }
@@ -69,10 +70,10 @@
         .item-title { font-size: 13px; font-weight: bold; color: #333; }
         .item-subtitle { font-size: 11px; color: #666; margin-top: 2px; }
 
-        /* Popup 樣式 (包含多重卡片捲動) */
+        /* Popup 樣式 (多重卡片捲動) */
         .maplibregl-popup { z-index: 999999 !important; }
-        .maplibregl-popup-content { padding: 0 !important; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border-radius: 8px; overflow: hidden; background: #f9fbfc; }
-        .popup-container { width: 340px; font-size: 12px; line-height: 1.5; max-height: 480px; overflow-y: auto; position: relative; }
+        .maplibregl-popup-content { padding: 0 !important; box-shadow: 0 15px 35px rgba(0,0,0,0.4); border-radius: 10px; overflow: hidden; background: #f9fbfc; }
+        .popup-container { width: 340px; font-size: 12px; line-height: 1.5; max-height: 500px; overflow-y: auto; position: relative; }
         
         .proj-card { background: #ffffff; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .proj-card:last-child { margin-bottom: 0; }
@@ -178,27 +179,44 @@
 <div id="debug-toggle" onclick="toggleDebug()" title="開啟偵錯終端">🐛</div>
 <div id="debug-panel" class="floating-panel">
     <div class="panel-header" id="debug-header">
-        <h3>系統偵錯終端</h3>
+        <h3>系統偵錯終端 (核心監聽)</h3>
         <button class="panel-close" onclick="toggleDebug()">✖</button>
     </div>
     <div class="panel-body" id="debug-log"></div>
 </div>
 
 <script>
-    // --- 攔截 Console 輸出至 Debug 面板 (包含雜訊過濾) ---
+    // --- [強化版] 攔截 Console 輸出至 Debug 面板 ---
     const debugLogEl = document.getElementById('debug-log');
     const origConsole = { log: console.log, warn: console.warn, error: console.error };
     
+    // 全域錯誤捕捉，防止未處理的錯誤靜默失敗
+    window.addEventListener('error', function(e) {
+        console.error("Global Error Caught:", e.error ? e.error.stack : e.message);
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        console.error("Promise Rejection Caught:", e.reason);
+    });
+
     ['log', 'warn', 'error'].forEach(method => {
         console[method] = function(...args) {
-            const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
-            if (msg.includes('Failed to fetch') || msg.includes('could not be loaded') || msg.includes('styleimagemissing')) return; // 過濾地圖圖磚雜訊
+            // 解析所有參數，如果是 Error 物件則提取 stack/message
+            const msg = args.map(a => {
+                if (a instanceof Error) return `${a.name}: ${a.message}\n${a.stack}`;
+                return typeof a === 'object' ? JSON.stringify(a) : a;
+            }).join(' ');
+
+            // 嚴格過濾地圖圖磚與跨域無害報錯
+            if (msg.includes('Failed to fetch') || msg.includes('could not be loaded') || msg.includes('styleimagemissing') || msg.includes('Cross-Origin-Opener-Policy')) {
+                return;
+            }
+
             origConsole[method].apply(console, args);
             
             if (debugLogEl) {
                 const color = method === 'error' ? '#ff4d4d' : method === 'warn' ? '#f39c12' : '#00ff00';
                 const time = new Date().toLocaleTimeString();
-                debugLogEl.innerHTML += `<div style="color:${color}; margin-bottom:4px; border-bottom:1px dashed #444;">[${time}] ${msg}</div>`;
+                debugLogEl.innerHTML += `<div style="color:${color}; margin-bottom:6px; border-bottom:1px dashed #444; padding-bottom:4px;">[${time}] ${msg}</div>`;
                 debugLogEl.scrollTop = debugLogEl.scrollHeight;
             }
         };
@@ -210,35 +228,32 @@
         console.log("切換 Debug 偵錯視窗顯示狀態");
     }
 
-    // --- 核心系統定義 ---
+    // --- 全域變數定義 ---
     let map;
     let sheetId = "";
     let isSatellite = false;
     let is3D = false;
     
-    // 資料儲存庫
     let projectDict = {};       // 原始資料對照表 (使用 Unique ID)
     let masterFeatures = [];    // 拆解後的線與面 GeoJSON Feature
-    let masterPoints = [];      // 拆解後的點 GeoJSON Feature (用於手動 Turf 聚合)
-    let patternCache = {};      // Canvas Pattern / Icon 記憶體快取
+    let masterPoints = [];      // 拆解後的點 GeoJSON Feature (準備轉為 DOM Marker)
+    let activeDOMMarkers = [];  // 存放地圖上活著的聚合 DOM Markers
+    let patternCache = {};      // Canvas Pattern 記憶體快取
     let dynamicCategories = new Set(); // 存放原始的類別全名
     let twGeoJson = null;       // 台灣縣市邊界緩存
     
-    // UI 控制狀態
     let showGeom = { point: true, line: true, polygon: true };
     let polygonFilter = null;
     let drawPoints = [];
     const levelNames = ["0", "100萬", "1000萬", "5000萬", "1億", "5億", "5億+"];
     const levels = [0, 1e6, 1e7, 5e7, 1e8, 5e8, 1e12];
 
-    // --- 顏色與代碼對應表 ---
     const CodeColorMap = {
         "01": "#E74C3C", "02": "#8E44AD", "03": "#2E86C1", "04": "#F1C40F",
         "05": "#16A085", "06": "#FF1493", "07": "#00CED1", "08": "#27AE60",
         "09": "#E67E22", "10": "#D35400", "11": "#7F8C8D", "12": "#2C3E50", "13": "#34495E"
     };
 
-    // 地圖底圖樣式
     const terrainRGB = { "type": "raster-dem", "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], "encoding": "terrarium", "tileSize": 256 };
     const buildings = { "type": "vector", "tiles": ["https://{s}.data.osmbuildings.org/0.2/59f80695/tile/{z}/{x}/{y}.json"] };
     const osmStyle = { "version": 8, "sources": { "osm": { "type": "raster", "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"], "tileSize": 256 }, "osm-buildings": buildings, "t-rgb": terrainRGB }, "layers": [ { "id": "base-layer", "type": "raster", "source": "osm" }, { "id": "3d-buildings", "type": "fill-extrusion", "source": "osm-buildings", "source-layer": "building", "paint": { "fill-extrusion-color": "#fff", "fill-extrusion-height": ["get", "height"], "fill-extrusion-opacity": 0.6 } } ] };
@@ -298,17 +313,16 @@
         map.on('load', setupMapLayers);
     }
 
-    // 取得台灣縣市邊界
     async function loadTwGeoJson() {
         try {
             const res = await fetch('https://raw.githubusercontent.com/g0v/twgeojson/master/json/twCounty2010.geo.json');
             twGeoJson = await res.json();
             console.log("縣市邊界圖資載入成功");
-        } catch(e) { console.error("縣市邊界載入失敗"); }
+        } catch(e) { console.error("縣市邊界載入失敗", e); }
     }
 
     function setupMapLayers() {
-        // [城市遮罩圖層] 放在最底層 (覆蓋在地圖上方，但被資料蓋住)
+        // [城市遮罩圖層] 放在最底層
         if (!map.getSource('city-mask')) {
             map.addSource('city-mask', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
             map.addLayer({ id: 'mask-layer', type: 'fill', source: 'city-mask', paint: { 'fill-color': '#000000', 'fill-opacity': 0.65 } });
@@ -342,33 +356,20 @@
             });
         }
 
-        // [自定義聚合點位圖層]
-        if (!map.getSource('projects-points')) {
-            map.addSource('projects-points', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-
-            map.addLayer({ id: 'points-layer', type: 'symbol', source: 'projects-points',
-                layout: { 'icon-image': ['get', 'iconId'], 'icon-allow-overlap': true, 'icon-size': 0.85 }
-            });
-        }
-
-        // 綁定 Popup 與交互
-        const interactiveLayers = ['layer-polygon', 'layer-line', 'points-layer'];
+        // 綁定 面/線 Popup 與交互
+        const interactiveLayers = ['layer-polygon', 'layer-line'];
         interactiveLayers.forEach(layer => {
             map.on('click', layer, (e) => {
                 e.preventDefault(); 
                 const props = e.features[0].properties;
-                if (props.uids) {
-                    showGroupPopup(props.uids, e.lngLat); // 多點位群組彈窗
-                } else if (props.uid) {
-                    showGroupPopup(JSON.stringify([props.uid]), e.lngLat); // 單一區塊/線段彈窗轉換成相同風格
-                }
+                if (props.uid) showGroupPopup(JSON.stringify([props.uid]), e.lngLat);
             });
             map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
             map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
         });
     }
 
-    // --- 2. 視覺解析引擎 (Visual Config & Canvas Generator) ---
+    // --- 2. 視覺解析引擎 ---
     function getVisualConfig(catString) {
         if(!catString) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
         
@@ -381,12 +382,7 @@
         
         if (colors.length === 0) return { isEmpty: true, colors: ['#ffffff'], isMilitary: false, codes: [] };
         
-        colors.sort((a, b) => {
-            const idxA = Object.values(CodeColorMap).indexOf(a);
-            const idxB = Object.values(CodeColorMap).indexOf(b);
-            return idxA - idxB;
-        });
-
+        colors.sort((a, b) => Object.values(CodeColorMap).indexOf(a) - Object.values(CodeColorMap).indexOf(b));
         return { isEmpty: false, colors, isMilitary, codes };
     }
 
@@ -417,60 +413,6 @@
 
         const imgData = ctx.getImageData(0,0,64,64);
         patternCache[id] = imgData; 
-        if (map && map.loaded() && !map.hasImage(id)) map.addImage(id, imgData);
-        return id;
-    }
-
-    // [核心優化] 產生帶有數量與多色圓環(切蛋糕)的點位圖示
-    function generateGroupIcon(colors, isMilitary, count) {
-        const id = 'icon-grp-' + colors.join('-') + (isMilitary ? '-mil' : '') + '-' + count;
-        if (patternCache[id]) return id;
-
-        const canvas = document.createElement('canvas');
-        const size = count > 1 ? 46 : 36; 
-        canvas.width = size; canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        const cx = size/2, cy = size/2, r = size/2 - 2;
-
-        if (isMilitary) {
-            ctx.fillStyle = '#34495E';
-            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3; ctx.stroke();
-        } else if (colors.length === 0 || colors[0] === '#ffffff') {
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#999999'; ctx.lineWidth = 2; ctx.stroke();
-        } else if (colors.length === 1) {
-            ctx.fillStyle = colors[0];
-            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
-        } else {
-            let start = 0;
-            let step = (Math.PI * 2) / colors.length;
-            for(let i=0; i<colors.length; i++) {
-                ctx.fillStyle = colors[i];
-                ctx.beginPath(); ctx.moveTo(cx, cy);
-                ctx.arc(cx, cy, r, start, start+step); ctx.fill();
-                start += step;
-            }
-            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
-        }
-
-        // 當群聚數量大於1時，在中間繪製半透明黑底並標示數字
-        if (count > 1) {
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.beginPath(); ctx.arc(cx, cy, r*0.65, 0, Math.PI*2); ctx.fill();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 13px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(count.toString(), cx, cy);
-        }
-
-        const imgData = ctx.getImageData(0,0,size,size);
-        patternCache[id] = imgData;
         if (map && map.loaded() && !map.hasImage(id)) map.addImage(id, imgData);
         return id;
     }
@@ -512,7 +454,7 @@
                         const wkt = String(get(colMap.wkt));
                         if (!wkt || wkt.includes("座標") || wkt === "--") return;
 
-                        // [核心優化] 唯一識別碼機制，確保同案號可重複顯示
+                        // 同案號強制給予 Unique ID 以保留顯示
                         const rawId = get(colMap.id);
                         let uniqueId = rawId;
                         let dupCounter = 1;
@@ -520,10 +462,8 @@
 
                         const catRaw = get(colMap.cat) || "";
                         const visConfig = getVisualConfig(catRaw);
-                        
                         const fullCategories = catRaw.split(',').map(c => c.trim()).filter(c => c);
                         fullCategories.forEach(c => { if (c.match(/^#\d{2}/)) dynamicCategories.add(c); });
-                        
                         const patternId = generatePattern(visConfig.colors, visConfig.isMilitary);
 
                         const pData = {
@@ -546,21 +486,15 @@
                             if (geo) {
                                 const processGeom = (g) => {
                                     if (g.type === 'Point') {
-                                        masterPoints.push({
-                                            type: 'Feature', geometry: g,
-                                            properties: { uid: uniqueId }
-                                        });
+                                        masterPoints.push({ type: 'Feature', geometry: g, properties: { uid: uniqueId } });
                                     } else {
-                                        masterFeatures.push({ 
-                                            type: 'Feature', geometry: g, 
-                                            properties: { uid: uniqueId, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } 
-                                        });
+                                        masterFeatures.push({ type: 'Feature', geometry: g, properties: { uid: uniqueId, patternId: patternId, mainColor: visConfig.colors[0], isMilitary: visConfig.isMilitary } });
                                     }
                                 };
                                 if (geo.type === "GeometryCollection") geo.geometries.forEach(processGeom);
                                 else processGeom(geo);
                             }
-                        } catch(e) { console.error("WKT 解析失敗:", uniqueId); }
+                        } catch(e) { console.error("WKT 解析失敗:", uniqueId, e); }
                     });
 
                     if (map.loaded()) {
@@ -642,7 +576,6 @@
         
         const normalize = (s) => s.replace(/台/g, '臺').substring(0, 2);
         const target = normalize(cityName);
-        
         const cityFeature = twGeoJson.features.find(f => {
             const propName = f.properties.name || f.properties.COUNTYNAME || '';
             return normalize(propName) === target;
@@ -652,7 +585,6 @@
             const world = turf.polygon([[[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]]]);
             const mask = turf.difference(world, cityFeature.geometry);
             map.getSource('city-mask').setData(mask);
-            
             const bbox = turf.bbox(cityFeature);
             map.fitBounds(bbox, { padding: 50, essential: true });
             console.log(`已套用 ${cityName} 沉浸式遮罩`);
@@ -695,7 +627,7 @@
 
             p.filtered = mCat && mSearch && mPrice && mCity && mYear;
 
-            // 空間交集判斷 (如果有畫框)
+            // 空間交集判斷 (繪製框)
             if (p.filtered && polygonFilter) {
                 p.filtered = false; 
                 for(let m of masterPoints.filter(x => x.properties.uid === p.uid)) {
@@ -728,20 +660,28 @@
 
     function toggleSelect(e, uid) { e.stopPropagation(); projectDict[uid].selected = e.target.checked; updateMapSource(); }
 
-    // [核心優化] 自定義點位鄰近合併邏輯 (< 10m)
+    // [極限優化] DOM Rendering Clustering (10m 聚類) 解決 Canvas 渲染丟失問題
     function updateMapSource() {
-        if (map.getSource('projects-data')) {
-            const displayFeatures = masterFeatures.filter(f => projectDict[f.properties.uid] && projectDict[f.properties.uid].filtered && projectDict[f.properties.uid].selected);
-            map.getSource('projects-data').setData({ type: 'FeatureCollection', features: displayFeatures });
-        }
-        
-        if (map.getSource('projects-points')) {
-            const displayPoints = masterPoints.filter(p => projectDict[p.properties.uid] && projectDict[p.properties.uid].filtered && projectDict[p.properties.uid].selected);
+        try {
+            if (map.getSource('projects-data')) {
+                const displayFeatures = masterFeatures.filter(f => projectDict[f.properties.uid] && projectDict[f.properties.uid].filtered && projectDict[f.properties.uid].selected);
+                map.getSource('projects-data').setData({ type: 'FeatureCollection', features: displayFeatures });
+            }
+            
+            // 清除現有 DOM Markers
+            activeDOMMarkers.forEach(m => m.remove());
+            activeDOMMarkers = [];
 
+            const displayPoints = masterPoints.filter(p => projectDict[p.properties.uid] && projectDict[p.properties.uid].filtered && projectDict[p.properties.uid].selected);
+            if (displayPoints.length === 0) return;
+
+            // Turf.js 群組計算 (< 10m)
             let groupedData = [];
             displayPoints.forEach(pt => {
-                // 尋找距離 10 公尺內的群組
-                let matched = groupedData.find(g => turf.distance(g.center, pt, {units: 'meters'}) <= 10);
+                let matched = groupedData.find(g => {
+                    try { return turf.distance(g.center, pt, {units: 'kilometers'}) <= 0.01; } 
+                    catch(e) { return false; } // 防呆
+                });
                 if (matched) {
                     matched.points.push(pt);
                     matched.uids.push(pt.properties.uid);
@@ -750,7 +690,8 @@
                 }
             });
 
-            let groupFeatures = groupedData.map(g => {
+            // 產出 DOM Marker
+            groupedData.forEach(g => {
                 let allColors = [];
                 let isMilitary = false;
                 
@@ -761,21 +702,47 @@
                         if (proj.colors) allColors.push(...proj.colors);
                     }
                 });
-                
                 allColors = [...new Set(allColors)];
                 if (allColors.length === 0) allColors = ['#ffffff'];
 
-                // 產生匯聚多重色彩的切蛋糕圓餅圖標
-                let iconId = generateGroupIcon(allColors, isMilitary, g.points.length);
+                const el = document.createElement('div');
+                const size = g.points.length > 1 ? 26 : 18;
+                el.style.width = size + 'px'; el.style.height = size + 'px';
+                el.style.borderRadius = '50%';
+                el.style.cursor = 'pointer';
+                el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.6)';
+                el.style.display = 'flex'; el.style.justifyContent = 'center'; el.style.alignItems = 'center';
+                el.style.color = '#fff'; el.style.fontSize = '12px'; el.style.fontWeight = 'bold';
+                el.style.textShadow = '0 1px 3px rgba(0,0,0,0.8)';
 
-                return {
-                    type: 'Feature',
-                    geometry: g.center.geometry,
-                    properties: { uids: JSON.stringify(g.uids), iconId: iconId, count: g.points.length }
-                };
+                // 切蛋糕渲染邏輯
+                if (isMilitary) {
+                    el.style.backgroundColor = '#34495E'; el.style.border = '2px solid #FFD700';
+                } else if (allColors.length === 1) {
+                    el.style.backgroundColor = allColors[0]; el.style.border = '2px solid #fff';
+                } else {
+                    const step = 100 / allColors.length;
+                    const stops = allColors.map((c, i) => `${c} ${i*step}% ${(i+1)*step}%`).join(', ');
+                    el.style.background = `conic-gradient(${stops})`; el.style.border = '2px solid #fff';
+                }
+
+                if (g.points.length > 1) {
+                    el.innerHTML = g.points.length;
+                }
+
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showGroupPopup(JSON.stringify(g.uids), g.center.geometry.coordinates);
+                });
+
+                const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat(g.center.geometry.coordinates);
+
+                if (showGeom.point) marker.addTo(map);
+                activeDOMMarkers.push(marker);
             });
-
-            map.getSource('projects-points').setData({ type: 'FeatureCollection', features: groupFeatures });
+        } catch (e) {
+            console.error("更新圖層資料時發生錯誤:", e);
         }
     }
 
@@ -800,14 +767,14 @@
         const activePopups = document.getElementsByClassName('maplibregl-popup');
         while (activePopups[0]) activePopups[0].remove();
 
-        console.log(`開啟詳細卡片，內部包含 ${uids.length} 筆案件資訊`);
+        console.log(`開啟卡片，內部包含 ${uids.length} 筆案件`);
 
         let html = `<div class="popup-container">`;
-        
-        // 頂部數量提示
-        html += `<div style="background:#1A5276; color:#fff; padding:10px 15px; font-size:14px; font-weight:bold; position:sticky; top:0; z-index:20; text-align:center; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">📍 此處共有 ${uids.length} 筆案件實體</div>`;
+        if (uids.length > 1) {
+            html += `<div style="background:#1A5276; color:#fff; padding:10px 15px; font-size:14px; font-weight:bold; position:sticky; top:0; z-index:20; text-align:center; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">📍 叢集座標共有 ${uids.length} 筆案件實體</div>`;
+        }
 
-        uids.forEach((uid, index) => {
+        uids.forEach((uid) => {
             const p = projectDict[uid];
             if (!p) return;
 
@@ -818,9 +785,12 @@
                 if (fileIdMatch) imageUrl = `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${fileIdMatch[0]}`;
             }
 
+            // top:39px 用以避開上方的聚合提示列 (若為單一案件則 top:0)
+            const stickyTop = uids.length > 1 ? "39px" : "0px";
+
             html += `
                 <div class="proj-card">
-                    <div class="sticky-header" style="top:39px;">
+                    <div class="sticky-header" style="top:${stickyTop};">
                         <div class="sticky-案名">${p.contract || p.name}</div>
                         ${p.awards ? `<div class="sticky-獲獎">🏆 ${p.awards}</div>` : ''}
                         ${imageUrl ? `<img src="${imageUrl}" onerror="this.style.display='none'">` : ''}
@@ -845,7 +815,6 @@
         });
         
         html += `</div>`;
-
         new maplibregl.Popup({ offset: 15, maxWidth: '360px', anchor: 'bottom', closeButton: true })
             .setLngLat(lngLat).setHTML(html).addTo(map);
     }
@@ -879,8 +848,8 @@
         
         console.log(`切換幾何顯示 [${type}]: ${visibility}`);
         
-        if (type === 'point' && map.getLayer('points-layer')) {
-            map.setLayoutProperty('points-layer', 'visibility', visibility);
+        if (type === 'point') {
+            activeDOMMarkers.forEach(m => showGeom.point ? m.addTo(map) : m.remove());
         }
         if (type === 'line' && map.getLayer('layer-line')) { 
             map.setLayoutProperty('layer-line', 'visibility', visibility); 
@@ -906,7 +875,6 @@
         console.log(`切換地圖底圖至: ${val}`);
         isSatellite = (val === 'esri');
         const currentPolygons = map.getSource('projects-data') ? map.getSource('projects-data')._data : null;
-        const currentPoints = map.getSource('projects-points') ? map.getSource('projects-points')._data : null;
         const currentMask = map.getSource('city-mask') ? map.getSource('city-mask')._data : null;
         
         map.setStyle(isSatellite ? esriStyle : osmStyle);
@@ -914,9 +882,12 @@
             if (is3D) map.setTerrain({ 'source': 't-rgb', 'exaggeration': 1.5 });
             setupMapLayers(); 
             if(currentPolygons) map.getSource('projects-data').setData(currentPolygons); 
-            if(currentPoints) map.getSource('projects-points').setData(currentPoints); 
             if(currentMask) map.getSource('city-mask').setData(currentMask); 
-            ['point', 'line', 'polygon'].forEach(t => {
+            
+            // 恢復 DOM markers 顯示
+            if (showGeom.point) activeDOMMarkers.forEach(m => m.addTo(map));
+            
+            ['line', 'polygon'].forEach(t => {
                 if(!showGeom[t]) toggleGeom(t, {classList:{toggle:()=>{}}}); 
             });
         });
