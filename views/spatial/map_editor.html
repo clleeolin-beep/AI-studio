@@ -156,6 +156,7 @@
             <div style="display: flex; gap: 10px;">
                 <div class="form-group" style="flex: 1;"><label>協同主持人</label><input type="text" id="f-co-host" class="form-control"></div>
                 <div class="form-group" style="flex: 1;"><label>專案經理</label><input type="text" id="f-pm" class="form-control"></div>
+                <div class="form-group" style="flex: 1;"><label>案件執行經理</label><input type="text" id="f-exec-mngr" class="form-control"></div>
             </div>
             <div class="form-group"><label>工程會金質獎</label><input type="text" id="f-award-gold" class="form-control"></div>
             <div class="form-group"><label>其他獲獎</label><input type="text" id="f-award-other" class="form-control"></div>
@@ -470,7 +471,7 @@
             }
         });
 
-        // 座標去重 (精確到小數點後三位，約 100 公尺距離)
+        // 座標去重 (精精確到小數點後三位，約 100 公尺距離)
         const uniqueCoords = [];
         const seen = new Set();
         coordsToQuery.forEach(c => {
@@ -583,7 +584,7 @@
                         feeSrv: getIdx(['服務經費']), feeEng: getIdx(['工程經費']), photo: getIdx(['實績照片']),
                         cat: getIdx(['類別']), type: getIdx(['類型']), attr: getIdx(['案件屬性']),
                         gold: getIdx(['金質獎']), otherAward: getIdx(['其他獲獎']), team: getIdx(['執行組別']),
-                        host: getIdx(['計畫主持','共同主持']), coHost: getIdx(['協同主持']), pm: getIdx(['專案經理']),
+                        host: getIdx(['計畫主持','共同主持']), coHost: getIdx(['協同主持']), pm: getIdx(['專案經理']), execMngr: getIdx(['案件執行經理']),
                         approve: getIdx(['申請核准']), dateStart: getIdx(['起始日期']), dateEnd: getIdx(['結束日期']),
                         status: getIdx(['案件狀態']), memo: getIdx(['備註'])
                     };
@@ -666,6 +667,7 @@
         document.getElementById('f-host').value = r[colMap.host] || "";
         document.getElementById('f-co-host').value = r[colMap.coHost] || "";
         document.getElementById('f-pm').value = r[colMap.pm] || "";
+        document.getElementById('f-exec-mngr').value = r[colMap.execMngr] || "";
         document.getElementById('f-award-gold').value = r[colMap.gold] || "";
         document.getElementById('f-award-other').value = r[colMap.otherAward] || "";
         document.getElementById('f-photo').value = r[colMap.photo] || "";
@@ -821,6 +823,7 @@
             setV('host', document.getElementById('f-host').value);
             setV('coHost', document.getElementById('f-co-host').value);
             setV('pm', document.getElementById('f-pm').value);
+            setV('execMngr', document.getElementById('f-exec-mngr').value);
             setV('gold', document.getElementById('f-award-gold').value);
             setV('otherAward', document.getElementById('f-award-other').value);
             setV('photo', document.getElementById('f-photo').value);
