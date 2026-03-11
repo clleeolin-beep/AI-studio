@@ -23,7 +23,7 @@
 1. **GitHub Private Vulnerability Reporting (首選)**: 
    請導覽至本儲存庫的 `Security` 標籤頁面，點選 `Advisories` -> `Report a vulnerability`，私下向維護團隊提交您的發現。
 2. **安全專線信箱**: 
-   若您無法使用 GitHub 內建功能，請將漏洞詳情發送至我們指定的開發維護信箱（*請在此填入您的聯絡 Email，例如：security@yourdomain.com*）。
+   若您無法使用 GitHub 內建功能，請將漏洞詳情發送至我們指定的開發維護信箱（*clleeolin@outlook.com*）。
 
 ### 應提供的資訊 (What to Include)
 為了幫助我們快速重現並修復問題，請在報告中提供：
