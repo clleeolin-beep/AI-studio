@@ -12,42 +12,9 @@
     
     <style>
         /* =========================================
-           1. 系統主題變數定義 (六款深度客製化風格)
+           1. 系統主題變數定義 (八款深度客製化風格)
            ========================================= */
         
-        /* 預設：森林綠 (Eco Green) - 植栽與大地意象 */
-        :root, :root[data-theme='green'] { 
-            --lab-cyan: #CBC438; 
-            --lab-bg: #12240a; 
-            --lab-sidebar: #1B400D; 
-            --lab-navbar: #2C5647;
-            --lab-text: #CBC438; 
-            --lab-border: rgba(255, 255, 255, 0.08);
-            --lab-hover: rgba(255, 255, 255, 0.05);
-            --lab-active: rgba(203, 196, 56, 0.15);
-        }
-        /* 深夜極客 (Midnight Purple) - 靜謐深空與開發者氛圍 */
-        :root[data-theme='purple'] { 
-            --lab-cyan: #e2e8f0; 
-            --lab-bg: #1F0737; 
-            --lab-sidebar: #9412BC; 
-            --lab-navbar: #3E74AE;
-            --lab-text: #e2e8f0; 
-            --lab-border: rgba(255, 255, 255, 0.15);
-            --lab-hover: rgba(255, 255, 255, 0.1);
-            --lab-active: rgba(255, 255, 255, 0.2);
-        }
-        /* 尊爵琥珀 (Industrial Gold) - 大地岩石與低彩度石材 */
-        :root[data-theme='gold'] { 
-            --lab-cyan: #979D6E; 
-            --lab-bg: #2d2a28; 
-            --lab-sidebar: #BB9A88; 
-            --lab-navbar: #CAC6BD;
-            --lab-text: #979D6E; 
-            --lab-border: rgba(0, 0, 0, 0.1);
-            --lab-hover: rgba(0, 0, 0, 0.05);
-            --lab-active: rgba(151, 157, 110, 0.15);
-        }
         /* 簡約商務 (Clean Light) - 惇陽企業識別與高對比文書環境 */
         :root[data-theme='light'] { 
             --lab-cyan: #ff8c00; 
@@ -80,6 +47,28 @@
             --lab-border: rgba(200, 200, 200, 0.15);
             --lab-hover: rgba(200, 200, 200, 0.1);
             --lab-active: rgba(200, 200, 200, 0.2);
+        }
+        /* 兄弟象 (CTBC Brothers) - 黃衫軍與藏青 */
+        :root[data-theme='brothers'] { 
+            --lab-cyan: #FFCC00; 
+            --lab-bg: #111111; 
+            --lab-sidebar: #08102B; 
+            --lab-navbar: #0A1438;
+            --lab-text: #FFCC00; 
+            --lab-border: rgba(255, 204, 0, 0.15);
+            --lab-hover: rgba(255, 204, 0, 0.1);
+            --lab-active: rgba(255, 204, 0, 0.2);
+        }
+        /* 台灣隊 (Team Taiwan) - CT 藍與熱血紅 */
+        :root[data-theme='taiwan'] { 
+            --lab-cyan: #E81C24; 
+            --lab-bg: #0B1320; 
+            --lab-sidebar: #003E7E; 
+            --lab-navbar: #002A5C;
+            --lab-text: #F8F9FA; 
+            --lab-border: rgba(255, 255, 255, 0.15);
+            --lab-hover: rgba(255, 255, 255, 0.1);
+            --lab-active: rgba(232, 28, 36, 0.2);
         }
 
         /* =========================================
@@ -232,6 +221,8 @@
         <div class="theme-btn" style="background: #ffffff; border: 1px solid #ccc;" onclick="changeTheme('light', this)" title="簡約商務"></div>
         <div class="theme-btn" style="background: #461D7C; border: 2px solid #FDD023;" onclick="changeTheme('lsu', this)" title="猛虎紫金 (LSU)"></div>
         <div class="theme-btn" style="background: #024731; border: 2px solid #C8C8C8;" onclick="changeTheme('hawaii', this)" title="夏威夷戰士 (Hawaii)"></div>
+        <div class="theme-btn" style="background: #08102B; border: 2px solid #FFCC00;" onclick="changeTheme('brothers', this)" title="兄弟象 (Brothers)"></div>
+        <div class="theme-btn" style="background: #003E7E; border: 2px solid #E81C24;" onclick="changeTheme('taiwan', this)" title="台灣隊 (Team Taiwan)"></div>
     </div>
 
 <script>
@@ -332,7 +323,7 @@
 
     /**
      * 切換系統主題風格
-     * @param {string} themeName 主題名稱 (green, purple, gold, light, lsu, hawaii)
+     * @param {string} themeName 主題名稱 (green, purple, gold, light, lsu, hawaii, brothers, taiwan)
      * @param {HTMLElement} el 點擊的元素
      */
     window.changeTheme = function(themeName, el) {
