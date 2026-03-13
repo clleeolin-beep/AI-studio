@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多尺度宇宙動力學 - 真實物理矩陣轉動版</title>
+    <title>多尺度宇宙動力學 - 真實物理矩陣轉動版 (平滑修正版)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050A14; color: white; display: flex; }
@@ -50,13 +50,13 @@
             <select id="level-select"></select>
         </div>
 
-        <h3>⏱️ 實體引力旋轉引擎</h3>
+        <h3>⏱️ 真實物理動態引擎</h3>
         <div class="control-group">
             <button id="play-btn" class="action-btn">▶ 啟動模型物理演化</button>
             <label style="margin-top: 15px;">時空流逝速度: <span id="val-speed" class="range-val">1.0x</span></label>
             <input type="range" id="op-speed" min="1" max="100" value="10">
             <p style="font-size: 11px; color: #aaa; line-height: 1.4; margin-top: 5px;">
-                *相機視角將鎖定不動，由底層矩陣驅動「引力場勢線、宇宙網與天體」進行真實物理轉動與膨脹。
+                *1-4級具備實體角動量旋轉；<br>*5級以上為多軸引力流體與宇宙擴張。
             </p>
         </div>
 
@@ -97,11 +97,11 @@
 
 <script>
 /**
- * 多尺度宇宙動力學 - 真實物理矩陣轉動版 (靜止相機 + 實體變換)
+ * 多尺度宇宙動力學 - 真實物理矩陣轉動版 (防抖動修正、精確物理邏輯)
  */
 
 const LEVELS = [
-    "01. 太陽系內側 (輻射狀引力阱)", "02. 太陽系全貌 (氣體巨星與柯伊伯帶)",
+    "01. 太陽系內側 (行星軌道與引力阱)", "02. 太陽系全貌 (氣體巨星與柯伊伯帶)",
     "03. 獵戶座旋臂局部 (近鄰恆星)", "04. 銀河系全貌 (引力螺旋與 Sgr A*)",
     "05. 銀河系與衛星星系 (麥哲倫星流)", "06. 本星系群局部 (雙軸鞍點)",
     "07. 本星系群全貌 (Local Group)", "08. 周邊星系群 (Local Sheet)",
@@ -125,9 +125,7 @@ const BLACK_HOLES = [
 ];
 
 const SCALE_LIMITS = [5, 50, 50, 25, 35, 35, 60, 100, 100, 150, 280, 280, 280, 1000, 2500, 3000];
-
-// 全局快取池 (避免每幀重複計算複雜微積分)
-const CACHE = { streamlines: {}, webs: {}, spiral: {}, cones: {} };
+const CACHE = { streamlines: {}, webs: {}, cones: {} };
 
 function hexToRgba(hex, opacity = 1) {
     let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16);
@@ -138,18 +136,15 @@ function randn() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.
 
 // === 核心：頂點變換矩陣 ===
 class TransformEngine {
-    // 處理點、線、網格的空間旋轉與膨脹
     static apply(arrX, arrY, arrZ, angle, scale) {
         let len = arrX.length;
         let outX = new Array(len), outY = new Array(len), outZ = new Array(len);
         let cosA = Math.cos(angle), sinA = Math.sin(angle);
-        
         for(let i=0; i<len; i++) {
             if (arrX[i] === null) {
                 outX[i] = null; outY[i] = null; outZ[i] = null;
             } else {
-                let sx = arrX[i] * scale;
-                let sy = arrY[i] * scale;
+                let sx = arrX[i] * scale, sy = arrY[i] * scale;
                 outX[i] = sx * cosA - sy * sinA;
                 outY[i] = sx * sinA + sy * cosA;
                 outZ[i] = arrZ[i] * scale;
@@ -157,13 +152,10 @@ class TransformEngine {
         }
         return {x: outX, y: outY, z: outZ};
     }
-
-    // 專門處理向量場(Cone)的方向旋轉
     static applyVector(arrU, arrV, arrW, angle) {
         let len = arrU.length;
         let outU = new Array(len), outV = new Array(len), outW = new Array(len);
         let cosA = Math.cos(angle), sinA = Math.sin(angle);
-        
         for(let i=0; i<len; i++) {
             outU[i] = arrU[i] * cosA - arrV[i] * sinA;
             outV[i] = arrU[i] * sinA + arrV[i] * cosA;
@@ -186,34 +178,26 @@ class UniverseEngine {
         return {
             type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z,
             mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} },
-            text: [name], textposition: "top center", textfont: {color: this.textColor, size: 10},
-            hoverinfo: 'none', showlegend: false
+            text: [name], textposition: "top center", textfont: {color: this.textColor, size: 10}, hoverinfo: 'none', showlegend: false
         };
     }
 
     createBlackHole(pos, name, desc, is_mega, angle, scale) {
         let tf = TransformEngine.apply([pos[0]], [pos[1]], [pos[2]], angle, scale);
         let bh_size = is_mega ? 7 : 4; 
-        
         let core = {
             type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z,
             mode: 'markers+text', marker: { size: bh_size, color: '#000000', symbol: 'circle', line: {color: is_mega ? '#FFD700' : '#000000', width: 2} },
             text: [is_mega ? `👑 ${name}` : `🕳️ ${name}`], textposition: "bottom right", textfont: {color: is_mega ? '#FFD700' : this.textColor, size: 10}, hoverinfo: 'none', showlegend: false
         };
-
         let ring_x = [], ring_y = [], ring_z = [];
         let r = is_mega ? 1.0 : 0.5; 
         for(let i=0; i<=40; i++) {
             let theta = (i / 40) * 2 * Math.PI;
-            ring_x.push(pos[0] + r * Math.cos(theta));
-            ring_y.push(pos[1] + r * Math.sin(theta));
-            ring_z.push(pos[2]);
+            ring_x.push(pos[0] + r * Math.cos(theta)); ring_y.push(pos[1] + r * Math.sin(theta)); ring_z.push(pos[2]);
         }
         let tf_ring = TransformEngine.apply(ring_x, ring_y, ring_z, angle, scale);
-        let ring = {
-            type: 'scatter3d', x: tf_ring.x, y: tf_ring.y, z: tf_ring.z,
-            mode: 'lines', line: {color: is_mega ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 0, 255, 0.6)', width: 2}, hoverinfo: 'none', showlegend: false
-        };
+        let ring = { type: 'scatter3d', x: tf_ring.x, y: tf_ring.y, z: tf_ring.z, mode: 'lines', line: {color: is_mega ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 0, 255, 0.6)', width: 2}, hoverinfo: 'none', showlegend: false };
         return [core, ring];
     }
 
@@ -221,9 +205,7 @@ class UniverseEngine {
         let x=[], y=[], z=[];
         for(let i=0; i<=60; i++) {
             let theta = (i/60) * 2 * Math.PI;
-            x.push(radius * Math.cos(theta));
-            y.push(radius * Math.sin(theta));
-            z.push(0);
+            x.push(radius * Math.cos(theta)); y.push(radius * Math.sin(theta)); z.push(0);
         }
         let tf = TransformEngine.apply(x, y, z, angle, scale);
         return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 1.5, dash: 'dot'}, hoverinfo: 'none', showlegend: false };
@@ -232,12 +214,9 @@ class UniverseEngine {
     createSolarWind(timePhase, angle, scale) {
         let x=[], y=[], z=[], c=[];
         for(let i=0; i<150; i++) {
-            let phi = (i * 13.1) % Math.PI;
-            let theta = (i * 81.3) % (2*Math.PI);
+            let phi = (i * 13.1) % Math.PI, theta = (i * 81.3) % (2*Math.PI);
             let r = ((i * 5.7 + timePhase * 1.5) % 2.5); 
-            x.push(r * Math.sin(phi) * Math.cos(theta));
-            y.push(r * Math.sin(phi) * Math.sin(theta));
-            z.push(r * Math.cos(phi) * 0.3); 
+            x.push(r * Math.sin(phi) * Math.cos(theta)); y.push(r * Math.sin(phi) * Math.sin(theta)); z.push(r * Math.cos(phi) * 0.3); 
             c.push(`rgba(255, 150, 0, ${Math.max(0, 1 - r/2.5)})`); 
         }
         let tf = TransformEngine.apply(x, y, z, angle, scale);
@@ -245,121 +224,74 @@ class UniverseEngine {
     }
 
     createBackgroundParticles(num, radius, center, angle, scale) {
-        let x=[], y=[], z=[];
-        let actualNum = isPlaying ? Math.floor(num * 0.3) : num; 
+        let x=[], y=[], z=[], actualNum = isPlaying ? Math.floor(num * 0.3) : num; 
         for(let i=0; i<actualNum; i++) {
             let r = radius * Math.cbrt(((i*17.3)%100)/100);
             let theta = ((i*31.7)%100)/100 * 2 * Math.PI;
             let phi = Math.acos(1 - 2 * (((i*43.1)%100)/100));
-            x.push(center[0] + r * Math.sin(phi) * Math.cos(theta));
-            y.push(center[1] + r * Math.sin(phi) * Math.sin(theta));
-            z.push(center[2] + r * Math.cos(phi));
+            x.push(center[0] + r * Math.sin(phi) * Math.cos(theta)); y.push(center[1] + r * Math.sin(phi) * Math.sin(theta)); z.push(center[2] + r * Math.cos(phi));
         }
         let tf = TransformEngine.apply(x, y, z, angle, scale);
         return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: 1.5, color: this.particleColor}, hoverinfo: 'none', showlegend: false };
     }
 
-    // --- 預計算與實體動態繪製 ---
     precalcStreamlines(key, field_type, center, max_scale, attractors, point_density) {
         if(CACHE.streamlines[key]) return CACHE.streamlines[key];
-        
-        let streams = [];
-        let steps = 35; 
-        let dt = max_scale / (steps * 1.2);
-
+        let streams = [], steps = 35, dt = max_scale / (steps * 1.2);
         for(let i=0; i<point_density; i++) {
-            let r = max_scale * Math.cbrt(((i*7.1)%100)/100);
-            let phi = ((i*11.3)%100)/100 * Math.PI;
-            let theta = ((i*19.7)%100)/100 * 2*Math.PI;
-            let cx = center[0] + r * Math.sin(phi) * Math.cos(theta);
-            let cy = center[1] + r * Math.sin(phi) * Math.sin(theta);
-            let cz = center[2] + r * Math.cos(phi);
-            
-            let path_x=[cx], path_y=[cy], path_z=[cz];
-            let basin_id = -1;
+            let r = max_scale * Math.cbrt(((i*7.1)%100)/100), phi = ((i*11.3)%100)/100 * Math.PI, theta = ((i*19.7)%100)/100 * 2*Math.PI;
+            let cx = center[0] + r * Math.sin(phi) * Math.cos(theta), cy = center[1] + r * Math.sin(phi) * Math.sin(theta), cz = center[2] + r * Math.cos(phi);
+            let path_x=[cx], path_y=[cy], path_z=[cz], basin_id = -1;
 
             for(let step=0; step<steps; step++) {
                 let gx=0, gy=0, gz=0;
-                
                 if (field_type === 'spiral') {
-                    let dx=center[0]-cx, dy=center[1]-cy, dz=center[2]-cz;
-                    let dist = Math.hypot(dx, dy, dz) + 1e-5;
-                    gx=(dx/(dist*dist)) + (dy*1.5/dist);
-                    gy=(dy/(dist*dist)) - (dx*1.5/dist);
-                    gz=(dz/(dist*dist)) * 2.0;
+                    let dist = Math.hypot(center[0]-cx, center[1]-cy, center[2]-cz) + 1e-5;
+                    gx=((center[0]-cx)/(dist*dist)) + ((center[1]-cy)*1.5/dist); gy=((center[1]-cy)/(dist*dist)) - ((center[0]-cx)*1.5/dist); gz=((center[2]-cz)/(dist*dist)) * 2.0;
                 } else if (field_type === 'multi_axis' && attractors) {
                     for(let a=0; a<attractors.length; a++) {
-                        let attr = attractors[a];
-                        let dx=attr.pos[0]-cx, dy=attr.pos[1]-cy, dz=attr.pos[2]-cz;
-                        let dist = Math.hypot(dx, dy, dz) + 1e-5;
-                        let pull = attr.mass / Math.pow(dist, 1.5);
+                        let attr = attractors[a], dx=attr.pos[0]-cx, dy=attr.pos[1]-cy, dz=attr.pos[2]-cz;
+                        let dist = Math.hypot(dx, dy, dz) + 1e-5, pull = attr.mass / Math.pow(dist, 1.5);
                         gx += (dx/dist)*pull; gy += (dy/dist)*pull; gz += (dz/dist)*pull;
-                        
-                        let vaX = Math.sin(a), vaY = Math.cos(a), vaZ = 1.0;
-                        let norm = Math.hypot(vaX, vaY, vaZ);
+                        let vaX = Math.sin(a), vaY = Math.cos(a), vaZ = 1.0, norm = Math.hypot(vaX, vaY, vaZ);
                         vaX/=norm; vaY/=norm; vaZ/=norm;
-                        
-                        let vpx = (dy/dist)*vaZ - (dz/dist)*vaY;
-                        let vpy = (dz/dist)*vaX - (dx/dist)*vaZ;
-                        let vpz = (dx/dist)*vaY - (dy/dist)*vaX;
-                        
-                        gx += vpx * (pull*0.4); gy += vpy * (pull*0.4); gz += vpz * (pull*0.4);
+                        gx += ((dy/dist)*vaZ - (dz/dist)*vaY)*(pull*0.4); gy += ((dz/dist)*vaX - (dx/dist)*vaZ)*(pull*0.4); gz += ((dx/dist)*vaY - (dy/dist)*vaX)*(pull*0.4);
                     }
-                } else if (field_type === 'expansion') {
-                    gx = cx * 0.05; gy = cy * 0.05; gz = cz * 0.05;
-                }
+                } else if (field_type === 'expansion') { gx = cx * 0.05; gy = cy * 0.05; gz = cz * 0.05; }
 
                 let f_mag = Math.hypot(gx, gy, gz) + 1e-10;
                 cx += (gx/f_mag)*dt; cy += (gy/f_mag)*dt; cz += (gz/f_mag)*dt;
                 path_x.push(cx); path_y.push(cy); path_z.push(cz);
-
                 if (attractors && field_type === 'multi_axis') {
-                    for(let a=0; a<attractors.length; a++) {
-                        if (Math.hypot(cx-attractors[a].pos[0], cy-attractors[a].pos[1], cz-attractors[a].pos[2]) < dt) {
-                            basin_id = a; break;
-                        }
-                    }
+                    for(let a=0; a<attractors.length; a++) if (Math.hypot(cx-attractors[a].pos[0], cy-attractors[a].pos[1], cz-attractors[a].pos[2]) < dt) { basin_id = a; break; }
                 }
                 if (basin_id !== -1) break;
             }
             streams.push({path_x, path_y, path_z, basin_id});
         }
-        CACHE.streamlines[key] = streams;
-        return streams;
+        CACHE.streamlines[key] = streams; return streams;
     }
 
     drawStreamlinesDynamic(streams, color, angle, scale) {
         let all_x=[], all_y=[], all_z=[];
-        streams.forEach(s => {
-            all_x.push(...s.path_x, null); all_y.push(...s.path_y, null); all_z.push(...s.path_z, null);
-        });
+        streams.forEach(s => { all_x.push(...s.path_x, null); all_y.push(...s.path_y, null); all_z.push(...s.path_z, null); });
         let tf = TransformEngine.apply(all_x, all_y, all_z, angle, scale);
         return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 1.5}, hoverinfo: 'none', showlegend: false }];
     }
 
     drawLaniakeaWatershedDynamic(streams, target_basin_id, angle, scale, drawMesh) {
-        let traces = [];
-        let target_x=[], target_y=[], target_z=[];
-        let outer_x=[], outer_y=[], outer_z=[];
-        let basin_x=[], basin_y=[], basin_z=[];
-
+        let traces = [], target_x=[], target_y=[], target_z=[], outer_x=[], outer_y=[], outer_z=[], basin_x=[], basin_y=[], basin_z=[];
         streams.forEach(stream => {
             if (stream.basin_id === target_basin_id) {
                 target_x.push(...stream.path_x, null); target_y.push(...stream.path_y, null); target_z.push(...stream.path_z, null);
-                if(drawMesh) {
-                    for(let i=0; i<stream.path_x.length; i+=3) { basin_x.push(stream.path_x[i]); basin_y.push(stream.path_y[i]); basin_z.push(stream.path_z[i]); }
-                }
+                if(drawMesh) for(let i=0; i<stream.path_x.length; i+=3) { basin_x.push(stream.path_x[i]); basin_y.push(stream.path_y[i]); basin_z.push(stream.path_z[i]); }
             } else {
                 outer_x.push(...stream.path_x, null); outer_y.push(...stream.path_y, null); outer_z.push(...stream.path_z, null);
             }
         });
-
-        let tf_target = TransformEngine.apply(target_x, target_y, target_z, angle, scale);
-        let tf_outer = TransformEngine.apply(outer_x, outer_y, outer_z, angle, scale);
-
+        let tf_target = TransformEngine.apply(target_x, target_y, target_z, angle, scale), tf_outer = TransformEngine.apply(outer_x, outer_y, outer_z, angle, scale);
         traces.push({ type: 'scatter3d', x: tf_target.x, y: tf_target.y, z: tf_target.z, mode: 'lines', line: {color: 'rgba(255, 204, 0, 0.55)', width: 1.5}, hoverinfo: 'none', showlegend: false });
         traces.push({ type: 'scatter3d', x: tf_outer.x, y: tf_outer.y, z: tf_outer.z, mode: 'lines', line: {color: 'rgba(50, 150, 255, 0.35)', width: 1.5}, hoverinfo: 'none', showlegend: false });
-        
         if (drawMesh && basin_x.length > 10) {
             let tf_mesh = TransformEngine.apply(basin_x, basin_y, basin_z, angle, scale);
             traces.push({ type: 'mesh3d', x: tf_mesh.x, y: tf_mesh.y, z: tf_mesh.z, alphahull: 4, opacity: 0.15, color: 'goldenrod', hoverinfo: 'none', showlegend: false });
@@ -367,40 +299,31 @@ class UniverseEngine {
         return traces;
     }
 
-    precalcDensityWeb(key, center, radius, num_halos, cluster_pos) {
+    // 新版宇宙網預計算：支援多重錨點，創造複雜纖維網絡
+    precalcDensityWeb(key, center, radius, num_halos, anchor_arrays) {
         if(CACHE.webs[key]) return CACHE.webs[key];
-        
         let halos = [];
-        for(let i=0; i<num_halos; i++) {
-            let u = (i*13.3)%1, v = (i*29.7)%1, w = (i*41.1)%1;
-            halos.push([center[0] + (u-0.5)*2*radius, center[1] + (v-0.5)*2*radius, center[2] + (w-0.5)*2*radius]);
-        }
-        if(cluster_pos) {
-            for(let i=0; i<Math.floor(num_halos/2); i++) {
-                halos.push([cluster_pos[0] + randn()*radius*0.15, cluster_pos[1] + randn()*radius*0.15, cluster_pos[2] + randn()*radius*0.15]);
-            }
+        if(anchor_arrays && anchor_arrays.length > 0) {
+            let halos_per_anchor = Math.floor((num_halos * 1.5) / anchor_arrays.length);
+            anchor_arrays.forEach(cp => {
+                for(let i=0; i<halos_per_anchor; i++) halos.push([cp[0] + randn()*radius*0.25, cp[1] + randn()*radius*0.25, cp[2] + randn()*radius*0.25]);
+            });
+        } else {
+            for(let i=0; i<num_halos; i++) halos.push([center[0] + rand(-radius, radius), center[1] + rand(-radius, radius), center[2] + rand(-radius, radius)]);
         }
         
-        let line_x=[], line_y=[], line_z=[];
-        let px=[], py=[], pz=[], psize=[];
-        
+        let line_x=[], line_y=[], line_z=[], px=[], py=[], pz=[], psize=[];
         for(let i=0; i<halos.length; i++) {
-            let h = halos[i];
-            px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%3) + 2); 
-            
+            let h = halos[i]; px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%3) + 2); 
             let dists = [];
             for(let j=0; j<halos.length; j++) {
                 if(i === j) continue;
-                let d = Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2]);
-                dists.push({idx: j, d: d});
+                dists.push({idx: j, d: Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2])});
             }
             dists.sort((a,b) => a.d - b.d);
-            
             for(let k=0; k<Math.min(4, dists.length); k++) {
                 let neighbor = halos[dists[k].idx];
-                line_x.push(h[0], neighbor[0], null);
-                line_y.push(h[1], neighbor[1], null);
-                line_z.push(h[2], neighbor[2], null);
+                line_x.push(h[0], neighbor[0], null); line_y.push(h[1], neighbor[1], null); line_z.push(h[2], neighbor[2], null);
             }
         }
         CACHE.webs[key] = {line: {x:line_x, y:line_y, z:line_z}, points: {x:px, y:py, z:pz, size:psize}};
@@ -420,29 +343,24 @@ class UniverseEngine {
         if(CACHE.cones[key]) return CACHE.cones[key];
         let x=[], y=[], z=[], u=[], v=[], w=[];
         for(let i=0; i<num; i++) {
-            let r = scale_val * (((i*11.1)%50+40)/100); 
-            let phi = ((i*17.3)%100)/100 * Math.PI;
-            let theta = ((i*23.9)%100)/100 * 2*Math.PI;
-            let px = r * Math.sin(phi) * Math.cos(theta);
-            let py = r * Math.sin(phi) * Math.sin(theta);
-            let pz = r * Math.cos(phi);
-            x.push(px); y.push(py); z.push(pz);
-            u.push(px); v.push(py); w.push(pz);
+            let r = scale_val * (((i*11.1)%50+40)/100), phi = ((i*17.3)%100)/100 * Math.PI, theta = ((i*23.9)%100)/100 * 2*Math.PI;
+            let px = r * Math.sin(phi) * Math.cos(theta), py = r * Math.sin(phi) * Math.sin(theta), pz = r * Math.cos(phi);
+            x.push(px); y.push(py); z.push(pz); u.push(px); v.push(py); w.push(pz);
         }
-        CACHE.cones[key] = {x, y, z, u, v, w, scale_val};
-        return CACHE.cones[key];
+        CACHE.cones[key] = {x, y, z, u, v, w, scale_val}; return CACHE.cones[key];
     }
 
     drawConesDynamic(coneData, angle, scale) {
-        let tf_pos = TransformEngine.apply(coneData.x, coneData.y, coneData.z, angle, scale);
-        let tf_vec = TransformEngine.applyVector(coneData.u, coneData.v, coneData.w, angle);
+        let tf_pos = TransformEngine.apply(coneData.x, coneData.y, coneData.z, angle, scale), tf_vec = TransformEngine.applyVector(coneData.u, coneData.v, coneData.w, angle);
         return { type: 'cone', x: tf_pos.x, y: tf_pos.y, z: tf_pos.z, u: tf_vec.u, v: tf_vec.v, w: tf_vec.w, colorscale: 'Blues', sizemode: "absolute", sizeref: coneData.scale_val*0.1*scale, opacity: 0.7, showscale: false, hoverinfo: 'none' };
     }
 
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
         
-        let rotationAngle = isPlaying ? time * 0.15 : 0; 
+        // 核心物理法則修正：只有受引力束縛的盤狀星系(<=4)才具備整體旋轉；超星系團與宇宙網不再旋轉，只受哈伯膨脹影響。
+        let rotationAngle = (isPlaying && level_idx <= 4) ? time * 0.15 : 0; 
+        
         let loopTime = time % 30.0;
         let expandFactor = (level_idx >= 12 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
 
@@ -454,14 +372,12 @@ class UniverseEngine {
 
         if (vis.landmarks && level_idx >= 3) {
             BLACK_HOLES.forEach(bh => {
-                if (bh.dist_scale <= SCALE_LIMITS[level_idx] * 1.5) {
-                    t.push(...this.createBlackHole(bh.pos, bh.name, bh.desc, bh.is_mega, rotationAngle, expandFactor));
-                }
+                if (bh.dist_scale <= SCALE_LIMITS[level_idx] * 1.5) t.push(...this.createBlackHole(bh.pos, bh.name, bh.desc, bh.is_mega, rotationAngle, expandFactor));
             });
         }
 
         if (level_idx <= 2) {
-            let W_earth = 0.15, W_moon = 2.09, W_merc = 0.6, W_venus = 0.25, W_mars = 0.08;
+            let W_earth = 0.15, W_moon = 2.09, W_merc = 0.6, W_venus = 0.25, W_mars = 0.08, W_jup = 0.03, W_sat = 0.01;
             let e_x = 1.0 * Math.cos(time * W_earth), e_y = 1.0 * Math.sin(time * W_earth);
             let m_x = e_x + 0.08 * Math.cos(time * W_moon), m_y = e_y + 0.08 * Math.sin(time * W_moon);
             let me_x = 0.39 * Math.cos(time * W_merc), me_y = 0.39 * Math.sin(time * W_merc);
@@ -479,9 +395,15 @@ class UniverseEngine {
                 }
             }
             if(vis.streams && level_idx === 0 && isPlaying) t.push(this.createSolarWind(time, rotationAngle, 1.0));
-            if(vis.streams && level_idx === 0) [0.39, 0.72, 1.0, 1.52].forEach(r => t.push(this.createOrbit(r, 'rgba(255,255,255,0.2)', rotationAngle, 1.0)));
             
-            if (level_idx === 1 && vis.landmarks) t.push(this.createLandmark([5.2, 3, 0], '#DDAA77', '木星', 4, 'circle', rotationAngle, 1.0), this.createLandmark([-9.5, 0, 0], '#EEEEBB', '土星', 4, 'circle', rotationAngle, 1.0));
+            // 標示完整行星軌道
+            if(vis.streams && level_idx === 0) {
+                [0.39, 0.72, 1.0, 1.52].forEach(r => t.push(this.createOrbit(r, 'rgba(255,255,255,0.2)', rotationAngle, 1.0)));
+            }
+            if (level_idx === 1) {
+                if(vis.landmarks) t.push(this.createLandmark([5.2*Math.cos(time*W_jup), 5.2*Math.sin(time*W_jup), 0], '#DDAA77', '木星', 4, 'circle', rotationAngle, 1.0), this.createLandmark([9.5*Math.cos(time*W_sat), 9.5*Math.sin(time*W_sat), 0], '#EEEEBB', '土星', 4, 'circle', rotationAngle, 1.0));
+                if(vis.streams) [5.2, 9.5].forEach(r => t.push(this.createOrbit(r, 'rgba(255,255,255,0.2)', rotationAngle, 1.0)));
+            }
             if (level_idx === 2 && vis.landmarks) t.push(this.createLandmark([4.3, 2, 1], '#FFFFFF', '半人馬座 α', 4, 'circle', rotationAngle, 1.0));
             if(vis.particles && !isPlaying) t.push(this.createBackgroundParticles(300, 50.0, [0,0,0], rotationAngle, 1.0));
         } 
@@ -541,9 +463,12 @@ class UniverseEngine {
                 if(vis.landmarks) {
                     t.push(this.createLandmark(sloan_wall_pos, '#FF5500', '史隆長城', 6, 'circle', rotationAngle, expandFactor));
                     t.push(this.createLandmark(hcb_wall_pos, '#FFFFFF', '北冕座長城', 6, 'diamond', rotationAngle, expandFactor));
+                    t.push(this.createLandmark([1500, -800, 600], '#AAAAAA', '英仙-雙魚座超星系團', 5, 'circle', rotationAngle, expandFactor));
                 }
                 if(vis.web) {
-                    let webData = this.precalcDensityWeb(`L14`, [0,0,0], sim_scale, 400, hcb_wall_pos);
+                    // 加入多個錨點，恢復極其壯觀的宇宙多重纖維網
+                    let anchors = [[0,0,0], sloan_wall_pos, hcb_wall_pos, shapley_pos, perseus_pos, [1500, -800, 600], [-1200, 1000, -500]];
+                    let webData = this.precalcDensityWeb(`L14`, [0,0,0], sim_scale, 700, anchors);
                     t.push(...this.drawDensityWebDynamic(webData, rotationAngle, expandFactor));
                 }
                 if(vis.streams) {
@@ -572,11 +497,7 @@ document.getElementById('op-speed').addEventListener('input', e => document.getE
 document.getElementById('op-bg').addEventListener('input', e => document.getElementById('val-bg-op').innerText = e.target.value + '%');
 document.getElementById('op-grid').addEventListener('input', e => document.getElementById('val-grid-op').innerText = e.target.value + '%');
 
-let globalTime = 0;
-let isPlaying = false;
-let animReq = null;
-let lastTimestamp = 0;
-let isFirstRender = true; 
+let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
 
 const renderBtn = document.getElementById('render-btn');
 const playBtn = document.getElementById('play-btn');
@@ -591,12 +512,14 @@ function getEngineConfig() {
 }
 
 function drawFrame(forceResetCamera = false) {
-    let conf = getEngineConfig();
-    let engine = new UniverseEngine(conf.colors, conf.opacities);
+    let conf = getEngineConfig(), engine = new UniverseEngine(conf.colors, conf.opacities);
     let idx = parseInt(selLevel.value);
     
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
-    let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false };
+    
+    // 【終極防抖動鎖】：將視角軸範圍強制鎖定在最大膨脹邊界，避免 Plotly 每幀重新計算 Layout 造成閃爍
+    let max_limit = SCALE_LIMITS[idx] * 2.2; 
+    let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-max_limit, max_limit] };
     
     let loopTime = globalTime % 30.0;
     let expProgress = (idx >= 12 && isPlaying) ? ` | 擴張週期: ${((loopTime/30)*100).toFixed(0)}%` : '';
@@ -606,7 +529,7 @@ function drawFrame(forceResetCamera = false) {
         paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
         scene: { bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config },
         margin: { l: 0, r: 0, b: 0, t: 50 },
-        uirevision: 'true' // 【關鍵】相機完全鎖定，任由使用者自由觀測，不受重繪影響
+        uirevision: 'true' // 相機完全鎖定
     };
 
     if (forceResetCamera || isFirstRender) {
@@ -624,9 +547,7 @@ function animatePhysics(timestamp) {
     if(dt > 0.1) dt = 0.016; 
     lastTimestamp = timestamp;
 
-    let speedMulti = document.getElementById('op-speed').value / 10;
-    globalTime += dt * speedMulti;
-
+    globalTime += dt * (document.getElementById('op-speed').value / 10);
     drawFrame(false); 
     animReq = requestAnimationFrame(animatePhysics);
 }
@@ -634,45 +555,30 @@ function animatePhysics(timestamp) {
 playBtn.addEventListener('click', () => {
     isPlaying = !isPlaying;
     if (isPlaying) {
-        playBtn.innerText = "⏸ 暫停物理演化";
-        playBtn.classList.add('playing');
-        lastTimestamp = performance.now();
-        animReq = requestAnimationFrame(animatePhysics);
+        playBtn.innerText = "⏸ 暫停物理演化"; playBtn.classList.add('playing');
+        lastTimestamp = performance.now(); animReq = requestAnimationFrame(animatePhysics);
     } else {
-        playBtn.innerText = "▶ 啟動模型物理演化";
-        playBtn.classList.remove('playing');
-        cancelAnimationFrame(animReq);
-        drawFrame(false);
+        playBtn.innerText = "▶ 啟動模型物理演化"; playBtn.classList.remove('playing');
+        cancelAnimationFrame(animReq); drawFrame(false);
     }
 });
 
 renderBtn.addEventListener('click', () => {
     loading.style.display = "flex";
-    setTimeout(() => {
-        globalTime = 0; 
-        if(isPlaying) playBtn.click(); 
-        drawFrame(true); 
-        loading.style.display = "none";
-    }, 50);
+    setTimeout(() => { globalTime = 0; if(isPlaying) playBtn.click(); drawFrame(true); loading.style.display = "none"; }, 50);
 });
 
 selLevel.addEventListener('change', () => {
     if(isPlaying) playBtn.click(); 
     loading.style.display = "flex";
-    setTimeout(() => {
-        globalTime = 0;
-        drawFrame(true);
-        loading.style.display = "none";
-    }, 50);
+    setTimeout(() => { globalTime = 0; drawFrame(true); loading.style.display = "none"; }, 50);
 });
 
 ['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web', 'toggle-cones'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => drawFrame(false));
 });
 
-// 首次載入
 setTimeout(() => drawFrame(true), 100);
-
 </script>
 </body>
 </html>
