@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多尺度宇宙動力學 - Web 極限版</title>
+    <title>多尺度宇宙動力學 - Web 極限版 (引力觀測版)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050A14; color: white; display: flex; }
         
         /* 控制面板樣式 */
-        #control-panel { width: 290px; min-width: 290px; background-color: #2C3E50; padding: 20px; box-sizing: border-box; overflow-y: auto; border-right: 2px solid #1a252f; z-index: 10; }
-        /* 隱藏捲軸但保留功能 */
+        #control-panel { width: 310px; min-width: 310px; background-color: #2C3E50; padding: 20px; box-sizing: border-box; overflow-y: auto; border-right: 2px solid #1a252f; z-index: 10; }
         #control-panel::-webkit-scrollbar { width: 6px; }
         #control-panel::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); border-radius: 3px; }
         
@@ -36,9 +35,14 @@
         input[type="range"] { width: 100%; cursor: pointer; accent-color: #00FFFF; }
         .range-val { font-size: 12px; float: right; color: #00FFFF; }
         
-        button#render-btn { width: 100%; background-color: #E74C3C; color: white; font-weight: bold; border: none; padding: 12px; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; margin-top: 10px; }
-        button#render-btn:hover { background-color: #c0392b; transform: scale(1.02); }
+        button.action-btn { width: 100%; background-color: #E74C3C; color: white; font-weight: bold; border: none; padding: 12px; border-radius: 5px; cursor: pointer; transition: 0.2s; font-size: 14px; margin-top: 10px; }
+        button.action-btn:hover { background-color: #c0392b; transform: scale(1.02); }
         
+        /* 攝影機動態按鈕特效 */
+        button#cam-btn { background-color: #3498DB; border: 2px solid #3498DB; margin-top: 5px;}
+        button#cam-btn.playing { background-color: #2ECC71; border-color: #2ECC71; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } }
+
         #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.8); display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: #00FFFF; z-index: 100; backdrop-filter: blur(5px); display: none; }
     </style>
 </head>
@@ -48,6 +52,16 @@
         <h3>🌌 觀測尺度切換</h3>
         <div class="control-group">
             <select id="level-select"></select>
+        </div>
+
+        <h3>🎥 電影級動態觀測引擎</h3>
+        <div class="control-group">
+            <button id="cam-btn" class="action-btn">▶ 啟動引力與擴張觀測</button>
+            <label style="margin-top: 15px;">視角環繞流速: <span id="val-cam-speed" class="range-val">1.0x</span></label>
+            <input type="range" id="cam-speed" min="1" max="100" value="10">
+            <p style="font-size: 11px; color: #aaa; line-height: 1.4; margin-top: 5px;">
+                *啟動後系統將鎖定 WebGL 矩陣，展示模型環繞與 30 秒為一週期的空間擴張現象。
+            </p>
         </div>
 
         <h3>👁️ 顯示項目控制</h3>
@@ -77,17 +91,17 @@
             <input type="range" id="op-grid" min="0" max="100" value="20">
         </div>
 
-        <button id="render-btn">🚀 套用設定並重繪</button>
+        <button id="render-btn" class="action-btn">🔄 重新生成靜態模型</button>
     </div>
 
     <div id="plot-container">
-        <div id="loading-overlay">⏳ 單層極速運算中...</div>
+        <div id="loading-overlay">⏳ 物理模型運算中...</div>
         <div id="plotly-div" style="width:100%; height:100%;"></div>
     </div>
 
 <script>
 /**
- * 多尺度宇宙動力學 - Web 轉換版 (圖層控制優化版)
+ * 多尺度宇宙動力學 - Web 轉換版 (完整物理保留 + 攝影機動態擴張版)
  */
 
 // === 核心資料設定 ===
@@ -132,7 +146,7 @@ function randn() {
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
 
-// === 視覺生成器 ===
+// === 視覺生成器 (保留 100% 完整物理運算) ===
 class UniverseEngine {
     constructor(colors, opacities) {
         this.bgColor = hexToRgba(colors.bg, opacities.bg / 100);
@@ -141,7 +155,6 @@ class UniverseEngine {
         this.textColor = colors.text;
     }
 
-    // 縮小化標籤尺寸，讓出背景視野
     createLandmark(pos, color, name, size=4, symbol='circle') {
         return {
             type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]],
@@ -153,7 +166,7 @@ class UniverseEngine {
     }
 
     createBlackHole(pos, name, desc, is_mega=false) {
-        let bh_size = is_mega ? 7 : 4; // 大幅縮小黑洞視覺佔比
+        let bh_size = is_mega ? 7 : 4; 
         let core_color = is_mega ? '#FFD700' : '#000000';
         let text_label = is_mega ? `👑 ${name}` : `🕳️ ${name}`;
         
@@ -165,7 +178,7 @@ class UniverseEngine {
         };
 
         let ring_x = [], ring_y = [], ring_z = [];
-        let r = is_mega ? 1.0 : 0.5; // 縮小光環半徑
+        let r = is_mega ? 1.0 : 0.5; 
         for(let i=0; i<=40; i++) {
             let theta = (i / 40) * 2 * Math.PI;
             ring_x.push(pos[0] + r * Math.cos(theta));
@@ -255,7 +268,7 @@ class UniverseEngine {
         
         for(let i=0; i<halos.length; i++) {
             let h = halos[i];
-            px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(rand(2, 5)); // 縮小宇宙網節點
+            px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(rand(2, 5)); 
             
             let dists = [];
             for(let j=0; j<halos.length; j++) {
@@ -402,7 +415,6 @@ class UniverseEngine {
         
         let current_limit = SCALE_LIMITS[level_idx];
 
-        // 1. 黑洞處理
         if (vis.landmarks && level_idx >= 3) {
             BLACK_HOLES.forEach(bh => {
                 if (bh.dist_scale <= current_limit * 1.5) {
@@ -411,7 +423,6 @@ class UniverseEngine {
             });
         }
 
-        // 2. 分層物理渲染
         if (level_idx <= 2) {
             if(vis.landmarks) t.push(this.createLandmark(sun_pos_L1, '#FF5500', '太陽 (Sun)', 5));
             if(vis.particles) t.push(this.createBackgroundParticles(300, 50.0));
@@ -507,7 +518,7 @@ class UniverseEngine {
     }
 }
 
-// === UI 綁定與渲染流程 ===
+// === UI 綁定與靜態/動態切換流程 ===
 const selLevel = document.getElementById('level-select');
 LEVELS.forEach((lv, i) => {
     let opt = document.createElement('option');
@@ -515,76 +526,117 @@ LEVELS.forEach((lv, i) => {
     selLevel.appendChild(opt);
 });
 
-// 滑桿文字即時更新
 document.getElementById('op-bg').addEventListener('input', e => document.getElementById('val-bg-op').innerText = e.target.value + '%');
 document.getElementById('op-grid').addEventListener('input', e => document.getElementById('val-grid-op').innerText = e.target.value + '%');
+document.getElementById('cam-speed').addEventListener('input', e => document.getElementById('val-cam-speed').innerText = (e.target.value / 10).toFixed(1) + 'x');
 
 const renderBtn = document.getElementById('render-btn');
+const camBtn = document.getElementById('cam-btn');
 const loading = document.getElementById('loading-overlay');
 
-function triggerRender() {
-    renderBtn.innerText = "⏳ 運算中...";
+// 攝影機動態變數
+let isCamPlaying = false;
+let camAnimReq = null;
+let currentCamAngle = 0;
+
+function getEngineConfig() {
+    return {
+        colors: { bg: document.getElementById('color-bg').value, grid: document.getElementById('color-grid').value, particle: document.getElementById('color-particle').value, text: document.getElementById('color-text').value },
+        opacities: { bg: document.getElementById('op-bg').value, grid: document.getElementById('op-grid').value },
+        vis: { landmarks: document.getElementById('toggle-landmarks').checked, streams: document.getElementById('toggle-streams').checked, particles: document.getElementById('toggle-particles').checked, web: document.getElementById('toggle-web').checked, cones: document.getElementById('toggle-cones').checked }
+    };
+}
+
+// 靜態重繪 (產生完整的模型)
+function triggerStaticRender() {
+    // 停止攝影機動態
+    if(isCamPlaying) {
+        isCamPlaying = false;
+        cancelAnimationFrame(camAnimReq);
+        camBtn.innerText = "▶ 啟動引力與擴張觀測";
+        camBtn.classList.remove('playing');
+    }
+
+    renderBtn.innerText = "⏳ 矩陣運算中...";
     loading.style.display = "flex";
     
-    // 使用 setTimeout 讓 UI 先更新載入畫面再進行重運算
     setTimeout(() => {
-        // 抓取顏色與透明度設定
-        let colors = {
-            bg: document.getElementById('color-bg').value,
-            grid: document.getElementById('color-grid').value,
-            particle: document.getElementById('color-particle').value,
-            text: document.getElementById('color-text').value
-        };
-        let opacities = {
-            bg: document.getElementById('op-bg').value,
-            grid: document.getElementById('op-grid').value
-        };
-        
-        // 抓取圖層顯示開關狀態
-        let visibility = {
-            landmarks: document.getElementById('toggle-landmarks').checked,
-            streams: document.getElementById('toggle-streams').checked,
-            particles: document.getElementById('toggle-particles').checked,
-            web: document.getElementById('toggle-web').checked,
-            cones: document.getElementById('toggle-cones').checked
-        };
-        
-        let engine = new UniverseEngine(colors, opacities);
+        let conf = getEngineConfig();
+        let engine = new UniverseEngine(conf.colors, conf.opacities);
         let idx = parseInt(selLevel.value);
-        let traces = engine.buildLevelTraces(idx, visibility);
+        let traces = engine.buildLevelTraces(idx, conf.vis);
 
-        let axis_config = {
-            showgrid: true, gridcolor: engine.gridColor,
-            zeroline: false, showline: false,
-            showbackground: false, showspikes: false, visible: true
-        };
+        let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, visible: true };
 
+        // 設定初始視角
+        currentCamAngle = Math.PI / 4;
         let layout = {
             title: `<b>${LEVELS[idx]}</b>`,
-            paper_bgcolor: engine.bgColor,
-            plot_bgcolor: engine.bgColor,
-            scene: { bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config },
+            paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
+            scene: { 
+                bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config,
+                camera: { eye: { x: 1.5 * Math.cos(currentCamAngle), y: 1.5 * Math.sin(currentCamAngle), z: 1.0 } }
+            },
             hoverlabel: { bgcolor: "black", font_color: "yellow" },
             margin: { l: 0, r: 0, b: 0, t: 50 }
         };
 
         Plotly.newPlot('plotly-div', traces, layout).then(() => {
-            renderBtn.innerText = "🚀 套用設定並重繪";
+            renderBtn.innerText = "🔄 重新生成靜態模型";
             loading.style.display = "none";
         });
     }, 50);
 }
 
-// 綁定所有控制元件的連動事件 (包含新加入的開關)
-document.getElementById('render-btn').addEventListener('click', triggerRender);
-selLevel.addEventListener('change', triggerRender);
+// 動態攝影機引擎 (0 運算負擔)
+function animateCamera(timestamp) {
+    if (!isCamPlaying) return;
+
+    let speedMulti = document.getElementById('cam-speed').value / 10;
+    currentCamAngle += 0.002 * speedMulti;
+
+    // 宇宙擴張演算法 (以30秒為一個呼吸週期)
+    // 讓攝影機的半徑在 1.25 到 2.5 之間平滑縮放，製造出空間推移感
+    let cycle = (timestamp % 30000) / 30000; 
+    let expandRadius = 1.25 + Math.sin(cycle * Math.PI) * 1.25; 
+    let expandZ = 0.5 + Math.sin(cycle * Math.PI) * 0.8;
+
+    let newEye = {
+        x: expandRadius * Math.cos(currentCamAngle),
+        y: expandRadius * Math.sin(currentCamAngle),
+        z: expandZ
+    };
+
+    // 使用 relayout 只更新攝影機矩陣，不重繪資料，確保 60FPS
+    Plotly.relayout('plotly-div', {
+        'scene.camera.eye': newEye
+    });
+
+    camAnimReq = requestAnimationFrame(animateCamera);
+}
+
+camBtn.addEventListener('click', () => {
+    isCamPlaying = !isCamPlaying;
+    if (isCamPlaying) {
+        camBtn.innerText = "⏸ 暫停空間擴張觀測";
+        camBtn.classList.add('playing');
+        camAnimReq = requestAnimationFrame(animateCamera);
+    } else {
+        camBtn.innerText = "▶ 啟動引力與擴張觀測";
+        camBtn.classList.remove('playing');
+        cancelAnimationFrame(camAnimReq);
+    }
+});
+
+document.getElementById('render-btn').addEventListener('click', triggerStaticRender);
+selLevel.addEventListener('change', triggerStaticRender);
 
 ['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web', 'toggle-cones'].forEach(id => {
-    document.getElementById(id).addEventListener('change', triggerRender);
+    document.getElementById(id).addEventListener('change', triggerStaticRender);
 });
 
 // 首次載入自動渲染
-triggerRender();
+triggerStaticRender();
 
 </script>
 </body>
