@@ -12,58 +12,52 @@
     
     <style>
         /* =========================================
-           1. 系統主題變數定義 (柔和霧面風格)
+           1. 系統主題變數定義 (四款深度客製化風格)
            ========================================= */
         
-        /* 預設：森林綠 (Eco Green) - 柔和的葉綠與莫蘭迪苔蘚綠 */
+        /* 預設：森林綠 (Eco Green) - 植栽與大地意象 */
         :root, :root[data-theme='green'] { 
-            --lab-cyan: #4ade80; 
-            --lab-bg: #1a2421; 
-            --lab-sidebar: #131b19; 
-            --lab-text: #e2e8f0; 
-            --lab-border: rgba(255, 255, 255, 0.06);
-            --lab-hover: rgba(255, 255, 255, 0.04);
-            --lab-active: rgba(74, 222, 128, 0.12);
+            --lab-cyan: #CBC438; 
+            --lab-bg: #12240a; 
+            --lab-sidebar: #1B400D; 
+            --lab-navbar: #2C5647;
+            --lab-text: #CBC438; 
+            --lab-border: rgba(255, 255, 255, 0.08);
+            --lab-hover: rgba(255, 255, 255, 0.05);
+            --lab-active: rgba(203, 196, 56, 0.15);
         }
-        /* 惇陽橘 (Tun-Yang Orange) - 溫潤的暖橘與深暖灰 */
-        :root[data-theme='orange'] { 
-            --lab-cyan: #f97316; 
-            --lab-bg: #272422; 
-            --lab-sidebar: #1c1a19; 
-            --lab-text: #e2e8f0; 
-            --lab-border: rgba(255, 255, 255, 0.06);
-            --lab-hover: rgba(255, 255, 255, 0.04);
-            --lab-active: rgba(249, 115, 22, 0.12);
-        }
-        /* 深夜極客 (Midnight Purple) - 靜謐的薰衣草紫與海軍藍 */
+        /* 深夜極客 (Midnight Purple) - 靜謐深空與開發者氛圍 */
         :root[data-theme='purple'] { 
-            --lab-cyan: #a78bfa; 
-            --lab-bg: #1e1e2f; 
-            --lab-sidebar: #151521; 
+            --lab-cyan: #e2e8f0; 
+            --lab-bg: #1F0737; 
+            --lab-sidebar: #9412BC; 
+            --lab-navbar: #3E74AE;
             --lab-text: #e2e8f0; 
-            --lab-border: rgba(255, 255, 255, 0.06);
-            --lab-hover: rgba(255, 255, 255, 0.04);
-            --lab-active: rgba(167, 139, 250, 0.12);
+            --lab-border: rgba(255, 255, 255, 0.15);
+            --lab-hover: rgba(255, 255, 255, 0.1);
+            --lab-active: rgba(255, 255, 255, 0.2);
         }
-        /* 尊爵琥珀 (Industrial Gold) - 啞光香檳金與碳灰 */
+        /* 尊爵琥珀 (Industrial Gold) - 大地岩石與低彩度石材 */
         :root[data-theme='gold'] { 
-            --lab-cyan: #d4af37; 
-            --lab-bg: #262626; 
-            --lab-sidebar: #1a1a1a; 
-            --lab-text: #e2e8f0; 
-            --lab-border: rgba(255, 255, 255, 0.06);
-            --lab-hover: rgba(255, 255, 255, 0.04);
-            --lab-active: rgba(212, 175, 55, 0.12);
+            --lab-cyan: #979D6E; 
+            --lab-bg: #2d2a28; 
+            --lab-sidebar: #BB9A88; 
+            --lab-navbar: #CAC6BD;
+            --lab-text: #979D6E; 
+            --lab-border: rgba(0, 0, 0, 0.1);
+            --lab-hover: rgba(0, 0, 0, 0.05);
+            --lab-active: rgba(151, 157, 110, 0.15);
         }
-        /* 簡約商務 (Clean Light) - 輕盈的北歐灰藍與雲灰白 */
+        /* 簡約商務 (Clean Light) - 惇陽企業識別與高對比文書環境 */
         :root[data-theme='light'] { 
-            --lab-cyan: #5e81ac; 
+            --lab-cyan: #ff8c00; 
             --lab-bg: #f4f6f8; 
             --lab-sidebar: #ffffff; 
-            --lab-text: #334155; 
+            --lab-navbar: #ffffff;
+            --lab-text: #ff8c00; 
             --lab-border: rgba(0, 0, 0, 0.08);
-            --lab-hover: rgba(0, 0, 0, 0.03);
-            --lab-active: rgba(94, 129, 172, 0.1);
+            --lab-hover: rgba(255, 140, 0, 0.05);
+            --lab-active: rgba(255, 140, 0, 0.1);
         }
 
         /* =========================================
@@ -78,7 +72,7 @@
         }
         
         .navbar { 
-            background: var(--lab-sidebar) !important; 
+            background: var(--lab-navbar) !important; 
             border-bottom: 1px solid var(--lab-border); 
             height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; 
             transition: background 0.4s ease, border-color 0.4s ease;
@@ -170,7 +164,6 @@
             opacity: 0.8;
         }
         .theme-btn:hover { transform: scale(1.15); opacity: 1; }
-        /* 移除外發光，改用實心邊框標示 active 狀態 */
         .theme-btn.active { border-color: var(--lab-text); transform: scale(1.15); opacity: 1; }
     </style>
 </head>
@@ -209,11 +202,10 @@
     </div>
 
     <div class="theme-switcher">
-        <div class="theme-btn active" style="background: #4ade80;" onclick="changeTheme('green', this)" title="森林綠 (預設)"></div>
-        <div class="theme-btn" style="background: #f97316;" onclick="changeTheme('orange', this)" title="惇陽橘"></div>
-        <div class="theme-btn" style="background: #a78bfa;" onclick="changeTheme('purple', this)" title="深夜極客"></div>
-        <div class="theme-btn" style="background: #d4af37;" onclick="changeTheme('gold', this)" title="尊爵琥珀"></div>
-        <div class="theme-btn" style="background: #e2e8f0; border: 1px solid #cbd5e1;" onclick="changeTheme('light', this)" title="簡約商務"></div>
+        <div class="theme-btn active" style="background: #1B400D;" onclick="changeTheme('green', this)" title="森林綠 (預設)"></div>
+        <div class="theme-btn" style="background: #9412BC;" onclick="changeTheme('purple', this)" title="深夜極客"></div>
+        <div class="theme-btn" style="background: #BB9A88;" onclick="changeTheme('gold', this)" title="尊爵琥珀"></div>
+        <div class="theme-btn" style="background: #ffffff; border: 1px solid #ccc;" onclick="changeTheme('light', this)" title="簡約商務"></div>
     </div>
 
 <script>
@@ -313,8 +305,8 @@
     });
 
     /**
-     * 切換系統主題風格 (柔和版支援)
-     * @param {string} themeName 主題名稱 (green, orange, purple, gold, light)
+     * 切換系統主題風格
+     * @param {string} themeName 主題名稱 (green, purple, gold, light)
      * @param {HTMLElement} el 點擊的元素
      */
     window.changeTheme = function(themeName, el) {
@@ -331,7 +323,7 @@
         }
         
         localStorage.setItem('ai_lab_theme', themeName);
-        if (window.sysLog) window.sysLog(`介面風格切換至: ${themeName} (Soft Mode)`, "info");
+        if (window.sysLog) window.sysLog(`介面風格切換至: ${themeName}`, "info");
     };
 
     // 主題初始化
