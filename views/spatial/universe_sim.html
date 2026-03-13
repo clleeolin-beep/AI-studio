@@ -438,7 +438,7 @@ class UniverseEngine {
     }
 
     drawDensityWeb(webData, scale) {
-        let tf_line = TransformEngine.apply(webData.line.x, webData.line.y, webData.line.z, 0, scale); // 宇宙網不旋轉，只膨脹
+        let tf_line = TransformEngine.apply(webData.line.x, webData.line.y, webData.line.z, 0, scale); 
         let tf_pts = TransformEngine.apply(webData.points.x, webData.points.y, webData.points.z, 0, scale);
         return [
             { type: 'scatter3d', x: tf_line.x, y: tf_line.y, z: tf_line.z, mode: 'lines', line: {color: 'rgba(180, 50, 255, 0.45)', width: 1.5}, hoverinfo: 'none', showlegend: false },
@@ -518,6 +518,7 @@ class UniverseEngine {
             if(vis.particles && !isPlaying) t.push(this.createBackgroundParticles(300, 50.0, [0,0,0], rotationAngle, 1.0));
         } 
         else if (level_idx === 3 || level_idx === 4) {
+            // [BUG 修復]: 將 mw_center_L4 更換為動態座標 dyn.mw
             if(vis.landmarks) t.push(this.createLandmark([8,0,0], '#FF0000', '<上一層: 太陽系>', 4, 'circle', rotationAngle, 1.0));
             if(level_idx === 4 && vis.landmarks) t.push(this.createLandmark([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0));
             
@@ -525,7 +526,7 @@ class UniverseEngine {
             if(vis.particles) t.push(this.createBackgroundParticles(1500, 25, dyn.mw, rotationAngle, 1.0, true));
             
             if(vis.streams) {
-                // 1. 扁平的螺旋懸臂
+                // 1. 扁平的螺旋懸臂 (Bug Fixed: dyn.mw)
                 let arms = this.precalcSpiralArms(`L${level_idx}_arms`, dyn.mw, 15, 4);
                 t.push(...this.drawSpiralArmsDynamic(arms, 'rgba(0, 255, 255, 0.4)', rotationAngle, 1.0));
                 
@@ -586,6 +587,10 @@ class UniverseEngine {
                     let streams = this.calcDynamicStreamlines(seeds, 1000.0, attractors, false);
                     t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, expandFactor, vis.web));
                 }
+                if(level_idx === 13 && vis.cones) {
+                    let cones = this.precalcCones(`L13`, 1000.0, 100);
+                    t.push(this.drawConesDynamic(cones, 0, expandFactor));
+                }
             } else {
                 if(vis.landmarks) {
                     t.push(this.createLandmark(dyn.sloan, '#FF5500', '史隆長城', 6, 'circle', 0, expandFactor));
@@ -593,7 +598,6 @@ class UniverseEngine {
                     t.push(this.createLandmark([1500, -800, 600], '#AAAAAA', '英仙-雙魚座超星系團', 5, 'circle', 0, expandFactor));
                 }
                 if(vis.web) {
-                    // 完美還原：多重錨點高斯坍縮宇宙網
                     let anchors = [[0,0,0], dyn.sloan, dyn.hcb, dyn.shapley, dyn.perseus, [1500, -800, 600], [-1200, 1000, -500]];
                     let webData = this.precalcDensityWeb(`L14_Gaussian`, [0,0,0], sim_scale, 800, anchors);
                     t.push(...this.drawDensityWeb(webData, expandFactor));
@@ -648,6 +652,9 @@ function drawFrame(forceResetCamera = false) {
     let max_limit = SCALE_LIMITS[idx] * 2.0; 
     let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-max_limit, max_limit] };
     
+    let loopTime = globalTime % 30.0;
+    let expProgress = (idx >= 12 && isPlaying) ? ` | 擴張週期: ${((loopTime/30)*100).toFixed(0)}%` : '';
+
     let layout = {
         title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(Time: ${globalTime.toFixed(1)}s)</span>`,
         paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
