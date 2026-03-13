@@ -73,6 +73,7 @@
       { "id": "AdminConsole", "name": "系統後台管理", "icon": "⚙️", "path": "views/management/admin_console.html", "category": "管理決策" },
       { "id": "NasSync", "name": "NAS 架構說明", "icon": "🔗", "path": "views/knowledge/AI_NAS.html", "category": "知識架構" },
       { "id": "Tutorial", "name": "操作教學指南", "icon": "📖", "path": "views/knowledge/tutorial.html", "category": "知識架構" },
+      { "id": "PlantingDesignAnalysis", "name": "植栽設計分析工具", "icon": "🌸", "path": "views/productivity/planting_design_analysis.html", "category": "生產力" },
       { "id": "PlantingDesignTool", "name": "植栽設計表工具", "icon": "🌱", "path": "views/productivity/planting_design_tool.html", "category": "生產力" },
       { "id": "SecurityViewer", "name": "系統安全性聲明", "icon": "🛡️", "path": "views/knowledge/security_viewer.html", "category": "知識架構"}
     ]

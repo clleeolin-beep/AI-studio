@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Studio - Pro 植栽專案排程與文件生成平台</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #2c3e50; --bg: #f4f7f6; --accent: #2e7d32; 
+            --blue: #2980b9; --orange: #e67e22; --border: #ddd; 
+            --danger: #d32f2f; --auth: #8e44ad;
+        }
+        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* 頂部工具列 */
+        .header { background: #fff; padding: 12px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; }
+        .header h3 { margin: 0; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; gap: 5px; font-size: 13px; }
+        .btn:hover { opacity: 0.85; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .btn-blue { background: var(--blue); }
+        .btn-green { background: var(--accent); }
+        .btn-orange { background: var(--orange); }
+        .btn-dark { background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+
+        /* 版面劃分 */
+        .main { flex: 1; display: flex; overflow: hidden; }
+        
+        /* 左側：植栽資料庫目錄 */
+        .catalog-panel { width: 380px; background: #fff; padding: 15px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.05); flex-shrink: 0; display: flex; flex-direction: column; z-index: 5; border-right: 1px solid var(--border); }
+        .search-box { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; }
+        
+        .plant-card { border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fafafa; display: flex; gap: 10px; align-items: center; transition: 0.2s; }
+        .plant-card:hover { border-color: var(--accent); background: #f1f8e9; }
+        .plant-card img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; background: #ddd; }
+        .plant-card-info { flex: 1; min-width: 0; }
+        .plant-card-info h4 { margin: 0 0 4px 0; font-size: 15px; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plant-card-info p { margin: 0; font-size: 12px; color: #666; font-family: 'Times New Roman', serif; font-style: italic; }
+        .btn-add { background: #fff; border: 1px solid var(--accent); color: var(--accent); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-add:hover { background: var(--accent); color: #fff; }
+
+        /* 右側：專案看板與預覽 */
+        .preview-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #e0e4e8; }
+        .preview-tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 2; padding: 0 10px; }
+        .tab-btn { padding: 15px 25px; text-align: center; font-weight: bold; color: #666; cursor: pointer; transition: 0.3s; border-bottom: 3px solid transparent; }
+        .tab-btn:hover { background: #e9ecef; }
+        .tab-btn.active { background: #fff; color: var(--blue); border-bottom: 3px solid var(--blue); }
+        
+        .preview-content { flex: 1; overflow-y: auto; padding: 30px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+
+        /* 專案籃子 (Basket UI) */
+        .basket-container { width: 100%; max-width: 800px; background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .basket-item { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px dashed #eee; }
+        .basket-item:last-child { border-bottom: none; }
+        .basket-item img { width: 50px; height: 50px; border-radius: 4px; object-fit: cover; }
+        .basket-item select, .basket-item input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        /* A4 紙張預覽區 (強制鎖定尺寸以利 html2canvas) */
+        .page-a4-landscape { 
+            width: 297mm; min-height: 210mm; background: #fff; padding: 15mm 20mm; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
+            font-family: "標楷體", serif; position: relative; flex-shrink: 0;
+        }
+        
+        /* 表格樣式 */
+        .doc-title { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 15px; }
+        .doc-table { width: 100%; border-collapse: collapse; font-size: 11pt; text-align: center; }
+        .doc-table th, .doc-table td { border: 1px solid black; padding: 8px; vertical-align: middle; }
+        .doc-table th { background: #f2f2f2; font-weight: bold; }
+        
+        /* 色譜表甘特圖樣式 */
+        .gantt-cell { width: calc(100% / 12); position: relative; border-left: 1px dotted #ccc; }
+        .color-bar { height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-family: sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.3); text-shadow: 0 0 2px rgba(0,0,0,0.8); }
+
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: none; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; flex-direction: column; backdrop-filter: blur(3px); }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+    <div id="loading-text">載入中，請稍候...</div>
+</div>
+
+<div class="header">
+    <h3>🌿 AI Studio - 植栽專案配置平台</h3>
+    <div class="btn-group">
+        <input type="text" id="projNameInput" value="錦和運動公園 - 森林區配置" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 220px; font-weight: bold;" onchange="updateProjectName(this.value)" placeholder="請輸入專案名稱">
+        <div style="width:1px; background:#ddd; height:20px; margin:0 5px;"></div>
+        
+        <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)" style="display:none;">
+        <button class="btn btn-dark" onclick="document.getElementById('fileInput').click()">📂 匯入情境</button>
+        <button class="btn btn-dark" onclick="exportJSON()">💾 存檔情境</button>
+        <div style="width:1px; background:#ddd; height:20px; margin:0 5px;"></div>
+        
+        <button class="btn btn-blue" onclick="exportToImage()">🖼️ 匯出圖片</button>
+        <button class="btn btn-green" onclick="exportToWord()">📝 匯出 Word</button>
+    </div>
+</div>
+
+<div class="main">
+    <div class="catalog-panel">
+        <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜尋植物名稱、編號或特性標籤..." oninput="renderCatalog()">
+        <div id="catalogList"></div>
+    </div>
+
+    <div class="preview-panel">
+        <div class="preview-tabs">
+            <div class="tab-btn active" onclick="switchTab('basket', this)">📋 專案選取清單</div>
+            <div class="tab-btn" onclick="switchTab('table', this)">📄 植栽說明表 (預覽)</div>
+            <div class="tab-btn" onclick="switchTab('gantt', this)">📊 季節色譜表 (預覽)</div>
+        </div>
+        <div class="preview-content" id="previewContainer">
+            </div>
+    </div>
+</div>
+
+<script>
+    /**
+     * =========================================================
+     * 核心資料與狀態管理
+     * =========================================================
+     */
+    const SHEET_ID = '14MuMDLEB0fdWtjpUkQfqPMMa-HWntauG44BWfY8zAgs'; 
+    const SHEET_NAME = '工作表1';
+
+    let dataStore = [];
+    let colMap = {};
+    
+    // 專案狀態物件 (支援 JSON 匯出入)
+    let projectState = {
+        projectName: "錦和運動公園 - 森林區配置",
+        items: [] // 格式: { id: "T001", photoType: "sim", qty: 1, spec: "預設規格" }
+    };
+
+    // Base64 圖片快取，避免重複轉碼
+    let base64Cache = {}; 
+    let currentTab = 'basket';
+
+    const PAGE_ROWS_LIMIT = 5; // A4 橫式表格容納行數
+
+    window.onload = () => {
+        showLoading("連線至雲端植栽資料庫...");
+        fetchSheetData();
+    };
+
+    function showLoading(msg) {
+        document.getElementById('loading-text').innerText = msg;
+        document.getElementById('loading-overlay').style.display = 'flex';
+    }
+    function hideLoading() {
+        document.getElementById('loading-overlay').style.display = 'none';
+    }
+
+    /**
+     * =========================================================
+     * 資料讀取與解析
+     * =========================================================
+     */
+    function fetchSheetData() {
+        window.gvizCallback = (json) => {
+            if (json && json.table) {
+                let rawHeaders = json.table.cols.map(c => c.label || "");
+                const firstRow = json.table.rows[0] ? json.table.rows[0].c.map(cell => cell ? (cell.f || cell.v || "") : "") : [];
+                if (rawHeaders.every(h => h === "")) { rawHeaders = firstRow; }
+                
+                const getIdx = (name) => rawHeaders.findIndex(h => String(h).trim() === name);
+                colMap = {
+                    id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
+                    category: getIdx('分類高度'), tags: getIdx('景觀特性標籤'),
+                    bloomColor: getIdx('花色'), colorColor: getIdx('變葉果色'),
+                    bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
+                    colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
+                    urlReal: getIdx('真實照片網址'), urlSim: getIdx('優型模擬網址')
+                };
+
+                dataStore = json.table.rows.map(r => {
+                    const vals = rawHeaders.map((_, i) => (r.c && r.c[i]) ? (r.c[i].f || r.c[i].v || "") : "");
+                    return { id: String(vals[colMap.id] || "").trim(), _raw: vals };
+                }).filter(p => p.id && p.id !== '植栽編號');
+
+                renderCatalog();
+            }
+            hideLoading();
+        };
+        const s = document.createElement('script');
+        s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:gvizCallback&sheet=${SHEET_NAME}&tq=SELECT *`;
+        document.body.appendChild(s);
+    }
+
+    function cleanDriveUrl(url) {
+        if (!url) return "";
+        let parsedUrl = String(url).trim();
+        if (parsedUrl.includes('drive.google.com')) {
+            const match = parsedUrl.match(/[-\w]{25,}/);
+            if (match) return `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${match[0]}`;
+        }
+        return parsedUrl;
+    }
+
+    /**
+     * =========================================================
+     * Base64 轉換處理器 (核心離線防破圖技術)
+     * =========================================================
+     */
+    async function getBase64Image(url) {
+        if (!url || !url.startsWith('http')) return "";
+        if (base64Cache[url]) return base64Cache[url];
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                base64Cache[url] = dataUrl;
+                resolve(dataUrl);
+            };
+            img.onerror = () => {
+                console.warn("Base64轉換失敗 (CORS或網址失效):", url);
+                resolve(""); // 失敗回傳空值，避免卡死
+            };
+            img.src = url;
+        });
+    }
+
+    // 將顏色字串 "#HEX (名稱)" 拆解
+    function parseColorStr(str) {
+        const match = String(str || "").match(/^(#[0-9A-Fa-f]{3,6})\s*\((.*)\)$/);
+        if (match) return { hex: match[1], name: match[2] };
+        return { hex: "#ffffff", name: str };
+    }
+
+    // 判斷月份是否在週期內 (包含跨年處理，如 11月 到 2月)
+    function isMonthInPeriod(m, start, end) {
+        if (!start || !end) return false;
+        let s = parseInt(start), e = parseInt(end);
+        if (isNaN(s) || isNaN(e)) return false;
+        if (s <= e) return m >= s && m <= e;
+        else return m >= s || m <= e; // 跨年邏輯
+    }
+
+    /**
+     * =========================================================
+     * 左側目錄渲染與專案清單操作
+     * =========================================================
+     */
+    function renderCatalog() {
+        const kw = document.getElementById('searchInput').value.toLowerCase();
+        const list = document.getElementById('catalogList');
+        list.innerHTML = '';
+
+        dataStore.forEach(plant => {
+            const r = plant._raw;
+            const searchStr = `${plant.id} ${r[colMap.name]} ${r[colMap.tags]}`.toLowerCase();
+            if (kw && !searchStr.includes(kw)) return;
+
+            let imgUrl = cleanDriveUrl(r[colMap.urlSim] || r[colMap.urlReal]) || 'https://via.placeholder.com/150?text=No+Image';
+
+            list.innerHTML += `
+                <div class="plant-card">
+                    <img src="${imgUrl}" onerror="this.src='https://via.placeholder.com/150?text=Error'">
+                    <div class="plant-card-info">
+                        <div style="font-size:11px; color:#888;">${plant.id}</div>
+                        <h4>${r[colMap.name]}</h4>
+                        <p>${r[colMap.scientific]}</p>
+                    </div>
+                    <button class="btn-add" onclick="addToProject('${plant.id}')">➕ 加入</button>
+                </div>
+            `;
+        });
+    }
+
+    function addToProject(id) {
+        if (projectState.items.some(item => item.id === id)) {
+            alert("該植物已在專案清單中！"); return;
+        }
+        
+        // 預設抓取模擬圖，若無則用真實圖
+        const p = dataStore.find(d => d.id === id)._raw;
+        const defaultType = p[colMap.urlSim] ? "sim" : "real";
+
+        projectState.items.push({ id: id, photoType: defaultType, qty: 1, spec: "依圖面規定" });
+        
+        // 提早觸發 Base64 轉換緩存
+        const url = cleanDriveUrl(p[defaultType === 'sim' ? colMap.urlSim : colMap.urlReal]);
+        getBase64Image(url);
+
+        renderPreview();
+    }
+
+    function removeFromProject(id) {
+        projectState.items = projectState.items.filter(item => item.id !== id);
+        renderPreview();
+    }
+
+    function updateItemData(id, field, value) {
+        const item = projectState.items.find(i => i.id === id);
+        if (item) {
+            item[field] = value;
+            if(field === 'photoType') {
+                const p = dataStore.find(d => d.id === id)._raw;
+                const url = cleanDriveUrl(p[value === 'sim' ? colMap.urlSim : colMap.urlReal]);
+                getBase64Image(url).then(() => renderPreview()); // 更新照片時重新轉碼並渲染
+            } else {
+                renderPreview();
+            }
+        }
+    }
+
+    function updateProjectName(val) {
+        projectState.projectName = val || "未命名專案";
+        renderPreview();
+    }
+
+    /**
+     * =========================================================
+     * 右側 Tab 切換與視圖渲染 (清單、植栽表、色譜表)
+     * =========================================================
+     */
+    function switchTab(tab, el) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+        renderPreview();
+    }
+
+    async function renderPreview() {
+        const container = document.getElementById('previewContainer');
+        container.innerHTML = '';
+
+        if (currentTab === 'basket') {
+            if (projectState.items.length === 0) {
+                container.innerHTML = '<div style="color:#888; font-size:16px;">專案目前為空，請從左側加入植物。</div>';
+                return;
+            }
+            
+            let html = `<div class="basket-container">
+                <h2 style="margin-top:0; border-bottom:2px solid var(--accent); padding-bottom:10px;">📋 當前選取清單</h2>`;
+            
+            for (let item of projectState.items) {
+                const p = dataStore.find(d => d.id === item.id)._raw;
+                const imgUrl = cleanDriveUrl(p[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]) || 'https://via.placeholder.com/50';
+                
+                html += `
+                    <div class="basket-item">
+                        <img src="${imgUrl}">
+                        <div style="flex:1;">
+                            <strong>${p[colMap.name]}</strong> <span style="font-size:12px;color:#888;">(${item.id})</span>
+                        </div>
+                        <select onchange="updateItemData('${item.id}', 'photoType', this.value)">
+                            <option value="sim" ${item.photoType==='sim'?'selected':''}>✨ 模擬圖</option>
+                            <option value="real" ${item.photoType==='real'?'selected':''}>📷 真實圖</option>
+                        </select>
+                        <input type="text" placeholder="規格" value="${item.spec}" onchange="updateItemData('${item.id}', 'spec', this.value)" style="width:120px;">
+                        <input type="number" placeholder="數量" value="${item.qty}" min="1" onchange="updateItemData('${item.id}', 'qty', this.value)" style="width:60px;">
+                        <button class="btn btn-danger" onclick="removeFromProject('${item.id}')">移除</button>
+                    </div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        } 
+        else if (currentTab === 'table') {
+            await renderPlantingTable(container);
+        } 
+        else if (currentTab === 'gantt') {
+            renderColorGantt(container);
+        }
+    }
+
+    async function renderPlantingTable(container) {
+        if(projectState.items.length === 0) return;
+        let html = '';
+        
+        // 處理分頁
+        const chunks = [];
+        for (let i = 0; i < projectState.items.length; i += PAGE_ROWS_LIMIT) {
+            chunks.push(projectState.items.slice(i, i + PAGE_ROWS_LIMIT));
+        }
+
+        for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
+            const chunk = chunks[cIdx];
+            html += `<div class="page-a4-landscape">
+                        <h2 class="doc-title">${projectState.projectName} - 植栽說明表 (第 ${cIdx+1} 頁)</h2>
+                        <table class="doc-table">
+                            <thead>
+                                <tr>
+                                    <th width="8%">編號</th>
+                                    <th width="20%">參考照片</th>
+                                    <th width="15%">植物名稱</th>
+                                    <th width="20%">規格</th>
+                                    <th width="8%">數量</th>
+                                    <th width="29%">景觀特徵</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+            
+            for (let item of chunk) {
+                const p = dataStore.find(d => d.id === item.id)._raw;
+                const url = cleanDriveUrl(p[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]);
+                // 強制取得 Base64 用於預覽，保證導出時已經存在記憶體
+                const b64 = await getBase64Image(url); 
+                const imgSrc = b64 || 'https://via.placeholder.com/150?text=No+Image';
+
+                html += `<tr style="height:110px;">
+                            <td>${p[colMap.id]}</td>
+                            <td><img src="${imgSrc}" style="width:140px; height:100px; object-fit:cover; border-radius:4px;"></td>
+                            <td><b style="font-size:14pt;">${p[colMap.name]}</b><br><i style="font-family:serif;font-size:10pt;">${p[colMap.scientific]}</i></td>
+                            <td>${item.spec}</td>
+                            <td>${item.qty}</td>
+                            <td style="text-align:left; font-size:10pt;">${(p[colMap.tags] || "").replace(/ /g, '<br>')}</td>
+                         </tr>`;
+            }
+
+            // 補齊空白列以維持 A4 高度
+            for(let i = 0; i < (PAGE_ROWS_LIMIT - chunk.length); i++) {
+                html += `<tr style="height:110px;"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
+
+            html += `</tbody></table></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function renderColorGantt(container) {
+        if(projectState.items.length === 0) return;
+        
+        let html = `<div class="page-a4-landscape">
+            <h2 class="doc-title">${projectState.projectName} - 季節花期/變葉色譜排程表</h2>
+            <table class="doc-table">
+                <thead>
+                    <tr>
+                        <th width="15%">植物名稱</th>
+                        ${Array.from({length:12}, (_,i) => `<th width="6%">${i+1}月</th>`).join('')}
+                        <th width="13%">特徵說明</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        projectState.items.forEach(item => {
+            const p = dataStore.find(d => d.id === item.id)._raw;
+            const bS = p[colMap.bloomS], bE = p[colMap.bloomE];
+            const cS = p[colMap.colorS], cE = p[colMap.colorE];
+            
+            const bData = parseColorStr(p[colMap.bloomColor]);
+            const cData = parseColorStr(p[colMap.colorColor]);
+
+            html += `<tr style="height:45px;">
+                        <td><b>${p[colMap.name]}</b></td>`;
+            
+            for(let m = 1; m <= 12; m++) {
+                html += `<td>`;
+                if(isMonthInPeriod(m, bS, bE)) {
+                    html += `<div class="color-bar" style="background:${bData.hex}; margin-bottom:2px;">花 ${bData.name}</div>`;
+                }
+                if(isMonthInPeriod(m, cS, cE)) {
+                    html += `<div class="color-bar" style="background:${cData.hex};">葉果 ${cData.name}</div>`;
+                }
+                // 若兩者皆無，顯示常綠狀態 (選填)
+                if(!isMonthInPeriod(m, bS, bE) && !isMonthInPeriod(m, cS, cE)) {
+                    html += `<div style="width:100%; height:4px; background:#e8f5e9; border-radius:2px;"></div>`;
+                }
+                html += `</td>`;
+            }
+            
+            html += `<td style="font-size:9pt; text-align:left;">${p[colMap.category]}</td></tr>`;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    /**
+     * =========================================================
+     * 匯出引擎 (JSON / PNG / MS-Word)
+     * =========================================================
+     */
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(projectState, null, 2));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = `${projectState.projectName}_植栽情境.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const loaded = JSON.parse(e.target.result);
+                if (loaded.projectName && loaded.items) {
+                    projectState = loaded;
+                    document.getElementById('projNameInput').value = projectState.projectName;
+                    
+                    // 預先載入所有圖片的 Base64
+                    showLoading("解析情境並編碼圖片...");
+                    Promise.all(projectState.items.map(item => {
+                        const p = dataStore.find(d => d.id === item.id);
+                        if(p) {
+                            const url = cleanDriveUrl(p._raw[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]);
+                            return getBase64Image(url);
+                        }
+                    })).then(() => {
+                        hideLoading();
+                        switchTab('basket', document.querySelector('.tab-btn')); // 切回清單
+                        alert("情境載入成功！");
+                    });
+                }
+            } catch(err) {
+                alert("檔案解析失敗：" + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    async function exportToImage() {
+        if (currentTab === 'basket') { alert("請先切換至【植栽表】或【色譜表】預覽畫面，才能匯出圖片！"); return; }
+        
+        showLoading("產生高畫質圖檔中...");
+        const pages = document.querySelectorAll('.page-a4-landscape');
+        
+        for (let i = 0; i < pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
+            const link = document.createElement('a');
+            link.download = `${projectState.projectName}_圖表_${i+1}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        }
+        hideLoading();
+    }
+
+    async function exportToWord() {
+        if(projectState.items.length === 0) { alert("專案為空，無法匯出！"); return; }
+        showLoading("編碼圖片並產生 Word 文件...");
+
+        let bodyHtml = `<div class="Section1">`;
+        
+        // --- 產生植栽表 HTML ---
+        const chunks = [];
+        for (let i = 0; i < projectState.items.length; i += PAGE_ROWS_LIMIT) { chunks.push(projectState.items.slice(i, i + PAGE_ROWS_LIMIT)); }
+
+        for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
+            const chunk = chunks[cIdx];
+            if (cIdx > 0) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
+            
+            bodyHtml += `
+                <h2 align="center" style="font-size:18pt; font-family:標楷體;">${projectState.projectName} - 植栽說明表</h2>
+                <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:12pt; font-family:標楷體; text-align:center;">
+                    <thead>
+                        <tr style="background:#f2f2f2;">
+                            <th width="10%">編號</th><th width="20%">參考照片</th><th width="15%">植物名稱</th><th width="20%">規格</th><th width="10%">數量</th><th width="25%">景觀特徵</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+            
+            for (let item of chunk) {
+                const p = dataStore.find(d => d.id === item.id)._raw;
+                const url = cleanDriveUrl(p[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]);
+                const b64 = await getBase64Image(url); // 等待編碼
+
+                bodyHtml += `
+                    <tr style="height:120pt;">
+                        <td>${p[colMap.id]}</td>
+                        <td><img src="${b64}" width="150" height="110"></td>
+                        <td><b>${p[colMap.name]}</b><br><i style="font-family:serif;">${p[colMap.scientific]}</i></td>
+                        <td>${item.spec}</td>
+                        <td>${item.qty}</td>
+                        <td align="left">${(p[colMap.tags] || "").replace(/ /g, '<br>')}</td>
+                    </tr>`;
+            }
+            
+            for(let i = 0; i < (PAGE_ROWS_LIMIT - chunk.length); i++) {
+                bodyHtml += `<tr style="height:120pt;"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+            }
+            bodyHtml += `</tbody></table>`;
+        }
+
+        // --- 產生色譜表 HTML (附加在下一頁) ---
+        bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
+        bodyHtml += `
+            <h2 align="center" style="font-size:18pt; font-family:標楷體;">${projectState.projectName} - 季節花期/變葉色譜排程表</h2>
+            <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt; font-family:標楷體; text-align:center;">
+                <thead>
+                    <tr style="background:#f2f2f2;">
+                        <th width="15%">植物名稱</th>
+                        ${Array.from({length:12}, (_,i) => `<th width="6%">${i+1}月</th>`).join('')}
+                        <th width="13%">特徵說明</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        projectState.items.forEach(item => {
+            const p = dataStore.find(d => d.id === item.id)._raw;
+            const bS = p[colMap.bloomS], bE = p[colMap.bloomE];
+            const cS = p[colMap.colorS], cE = p[colMap.colorE];
+            const bData = parseColorStr(p[colMap.bloomColor]);
+            const cData = parseColorStr(p[colMap.colorColor]);
+
+            bodyHtml += `<tr style="height:40pt;"><td><b>${p[colMap.name]}</b></td>`;
+            
+            for(let m = 1; m <= 12; m++) {
+                let bgStyle = ""; let text = "";
+                if(isMonthInPeriod(m, bS, bE)) { bgStyle = `background-color:${bData.hex}; color:white; font-weight:bold;`; text = "花"; }
+                else if(isMonthInPeriod(m, cS, cE)) { bgStyle = `background-color:${cData.hex}; color:white; font-weight:bold;`; text = "葉"; }
+                bodyHtml += `<td style="${bgStyle}">${text}</td>`;
+            }
+            bodyHtml += `<td align="left">${p[colMap.category]}</td></tr>`;
+        });
+        bodyHtml += `</tbody></table></div>`;
+
+        // 封裝為 MS Word 格式
+        const style = `@page Section1 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 1.5cm; } div.Section1 { page: Section1; }`;
+        const htmlContent = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
+            <head><meta charset='utf-8'><style>${style}</style></head>
+            <body>${bodyHtml}</body></html>`;
+
+        const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+        saveAs(blob, `${projectState.projectName}_植栽設計總表.doc`);
+        
+        hideLoading();
+    }
+</script>
+
+</body>
+</html>
