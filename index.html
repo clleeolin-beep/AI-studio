@@ -79,8 +79,13 @@
         }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; text-decoration: none; transition: color 0.4s ease; }
         
-        #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: background 0.4s ease; }
-        .login-box { background: var(--lab-sidebar); padding: 30px; border-radius: 16px; border: 1px solid var(--lab-border); text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); transition: background 0.4s ease, border-color 0.4s ease; }
+        #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: background 0.4s ease; overflow: hidden; }
+        
+        /* 宇宙模型背景 Canvas 樣式設定 */
+        #universe-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 1.0; }
+        
+        /* 確保登入框在宇宙背景之上 */
+        .login-box { position: relative; z-index: 1; background: var(--lab-sidebar); padding: 30px; border-radius: 16px; border: 1px solid var(--lab-border); text-align: center; width: 450px; box-shadow: 0 15px 50px rgba(0,0,0,0.6); transition: background 0.4s ease, border-color 0.4s ease; backdrop-filter: blur(10px); }
         
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid var(--lab-border); display: flex; flex-direction: column; height: 100%; overflow-y: auto; transition: background 0.4s ease, border-color 0.4s ease; }
@@ -172,6 +177,8 @@
 <body>
 
     <div id="auth-overlay">
+        <canvas id="universe-canvas"></canvas>
+        
         <div class="login-box">
             <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan); transition: color 0.4s ease;"><i class="bi bi-cpu-fill"></i></div>
             <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan); transition: color 0.4s ease;">AI Studio Lab</h2>
@@ -212,19 +219,177 @@
 
 <script>
     /**
+     * =========================================
+     * 宇宙 16 級別模型 - 輕量化纖維網 (Pseudo-3D)
+     * 從 Univer.py 抽取的巨型結構演算法，轉化為 Canvas 渲染
+     * =========================================
+     */
+    let universeAnimFrameId = null;
+
+    function initUniverseSimulation() {
+        const canvas = document.getElementById('universe-canvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        // 參數設定：效能極限的 16 級宇宙網
+        const NUM_NODES = 280;     // 節點總數量 (已大幅降低參數)
+        const MAX_LINK_DIST = 180; // 形成纖維的極限距離
+        const CLUSTER_COUNT = 4;   // 模擬超星系團中心點 (如拉尼亞凱亞、史隆長城)
+
+        const nodes = [];
+        const links = [];
+
+        // 1. 生成大尺度結構的引力中心
+        const clusters = [];
+        for(let i=0; i<CLUSTER_COUNT; i++) {
+            clusters.push({
+                x: (Math.random() - 0.5) * 1000,
+                y: (Math.random() - 0.5) * 1000,
+                z: (Math.random() - 0.5) * 1000
+            });
+        }
+
+        // 2. 依照密度分佈生成星系節點
+        for (let i = 0; i < NUM_NODES; i++) {
+            // 85% 集中在骨架上，15% 散佈在空洞區
+            let c = Math.random() > 0.15 ? clusters[Math.floor(Math.random() * CLUSTER_COUNT)] : {x:0, y:0, z:0};
+            let spread = Math.random() > 0.15 ? 250 : 900; 
+            
+            nodes.push({
+                x: c.x + (Math.random() - 0.5) * spread,
+                y: c.y + (Math.random() - 0.5) * spread,
+                z: c.z + (Math.random() - 0.5) * spread,
+                size: Math.random() * 1.5 + 0.5, // 質量/大小
+                driftX: (Math.random() - 0.5) * 0.15,
+                driftY: (Math.random() - 0.5) * 0.15,
+                driftZ: (Math.random() - 0.5) * 0.15
+            });
+        }
+
+        // 3. 預先計算纖維連線 (取代 cKDTree)，節省每幀運算
+        for (let i = 0; i < NUM_NODES; i++) {
+            for (let j = i + 1; j < NUM_NODES; j++) {
+                const dx = nodes[i].x - nodes[j].x;
+                const dy = nodes[i].y - nodes[j].y;
+                const dz = nodes[i].z - nodes[j].z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                
+                if (dist < MAX_LINK_DIST) {
+                    links.push({ source: i, target: j, dist: dist });
+                }
+            }
+        }
+
+        let angleX = 0;
+        let angleY = 0;
+
+        function renderUniverse() {
+            // 帶有殘影效果的深色宇宙背景
+            ctx.fillStyle = 'rgba(12, 12, 18, 0.3)'; 
+            ctx.fillRect(0, 0, width, height);
+
+            // 整個宇宙網緩慢旋轉 (模擬巨觀視角)
+            angleX += 0.0004;
+            angleY += 0.0009;
+
+            const cosX = Math.cos(angleX), sinX = Math.sin(angleX);
+            const cosY = Math.cos(angleY), sinY = Math.sin(angleY);
+
+            const projectedNodes = [];
+            const fov = 900;
+            const viewerZ = 1300; // 視角拉遠
+
+            // 4. 進行 3D 空間投影
+            for (let i = 0; i < NUM_NODES; i++) {
+                let n = nodes[i];
+                
+                // 天體微小漂移
+                n.x += n.driftX; n.y += n.driftY; n.z += n.driftZ;
+
+                // 繞 Y 軸旋轉矩陣
+                let x1 = n.x * cosY - n.z * sinY;
+                let z1 = n.z * cosY + n.x * sinY;
+                
+                // 繞 X 軸旋轉矩陣
+                let y2 = n.y * cosX - z1 * sinX;
+                let z2 = z1 * cosX + n.y * sinX;
+
+                // 轉換為螢幕 2D 座標 (透視法)
+                let scale = fov / (fov + z2 + viewerZ);
+                let px = width / 2 + x1 * scale;
+                let py = height / 2 + y2 * scale;
+
+                projectedNodes.push({ px, py, scale, z: z2 });
+            }
+
+            // 5. 繪製纖維網絡 (宇宙暗物質骨架)
+            ctx.lineWidth = 0.8;
+            for (let i = 0; i < links.length; i++) {
+                let link = links[i];
+                let n1 = projectedNodes[link.source];
+                let n2 = projectedNodes[link.target];
+                
+                // 景深剔除：只畫出現在鏡頭前方的線條
+                if (n1.z > -viewerZ + 200 && n2.z > -viewerZ + 200) {
+                    let avgZ = (n1.z + n2.z) / 2;
+                    let depthAlpha = Math.max(0, 1 - (avgZ + 500) / 1500); // 越深越暗
+                    
+                    if (depthAlpha > 0) {
+                        // 使用紫色系表現暗物質纖維 (契合 LSU Theme)
+                        ctx.strokeStyle = `rgba(148, 18, 188, ${depthAlpha * 0.6})`;
+                        ctx.beginPath();
+                        ctx.moveTo(n1.px, n1.py);
+                        ctx.lineTo(n2.px, n2.py);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // 6. 繪製超星系團節點 (發光核心)
+            for (let i = 0; i < NUM_NODES; i++) {
+                let p = projectedNodes[i];
+                if (p.z > -viewerZ + 100) {
+                    let size = Math.max(0.1, nodes[i].size * p.scale * 1.5);
+                    let depthAlpha = Math.max(0, 1 - (p.z + 500) / 1500);
+                    
+                    // 核心高光 (LSU/兄弟象 金黃色)
+                    ctx.fillStyle = `rgba(253, 208, 35, ${depthAlpha * 0.9})`; 
+                    ctx.beginPath();
+                    ctx.arc(p.px, p.py, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            universeAnimFrameId = requestAnimationFrame(renderUniverse);
+        }
+
+        renderUniverse();
+        console.log("[System] 第 16 級可觀測宇宙 (輕量纖維結構) 渲染引擎已啟動");
+    }
+
+    // 啟動登入背景模型
+    window.addEventListener('DOMContentLoaded', initUniverseSimulation);
+
+
+    /**
      * [手動偵錯程序加回]
-     * 支援全域 sysLog 呼叫，並自動對接 DebugSystem 實例
      */
     window.sysLog = function(msg, type = '') {
         console.log(`[${type.toUpperCase() || 'LOG'}] ${msg}`);
         
-        // 1. 如果 DebugSystem 實例存在，使用其實例方法 (維持核心一致性)
         if (window.DebugInstance && typeof window.DebugInstance.addLog === 'function') {
             window.DebugInstance.addLog(type || 'info', msg);
             return;
         }
 
-        // 2. 備用機制：直接更新 DOM (確保初始化期間訊息不遺失)
         const logBox = document.getElementById('debug-log');
         if (logBox) {
             const div = document.createElement('div');
@@ -238,7 +403,6 @@
         }
     };
 
-    // 接收來自 Iframe (MapEditor等) 的偵錯訊息橋接
     window.addEventListener('message', (event) => {
         if (event.data && event.data.source === 'AI_STUDIO_APP') {
             const { type, content } = event.data;
@@ -252,7 +416,6 @@
         return decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     }
 
-    // Google Auth 回調：修正 Scope 隔離導致的啟動失敗
     window.handleCredentialResponse = async (response) => {
         window.sysLog("收到憑證，開始驗證...", "success");
         try {
@@ -268,7 +431,6 @@
                 sessionStorage.setItem('ai_lab_auth', 'true');
                 sessionStorage.setItem('user_email', userEmail);
                 
-                // 觸發模組內的啟動程序
                 if (window.startSystem) {
                     window.startSystem();
                 } else {
@@ -280,7 +442,6 @@
         } catch (e) { window.sysLog("解析錯誤: " + e.message, "err"); }
     };
 
-    // 偵錯視窗拖移邏輯 (完全補回)
     const dragWin = document.getElementById("debug-log-window");
     const dragHeader = document.getElementById("debug-header");
     let isDragging = false, startX, startY, transX = 0, transY = 0;
@@ -306,20 +467,13 @@
         dragHeader.style.cursor = 'move';
     });
 
-    /**
-     * 切換系統主題風格
-     * @param {string} themeName 主題名稱 (lsu, hawaii, brothers, taiwan)
-     * @param {HTMLElement} el 點擊的元素
-     */
     window.changeTheme = function(themeName, el) {
         document.documentElement.setAttribute('data-theme', themeName);
         
-        // 更新 UI 狀態
         document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
         if (el) {
             el.classList.add('active');
         } else {
-            // 初始化時根據名稱找按鈕
             const target = document.querySelector(`.theme-btn[onclick*='${themeName}']`);
             if (target) target.classList.add('active');
         }
@@ -328,13 +482,11 @@
         if (window.sysLog) window.sysLog(`介面風格切換至: ${themeName}`, "info");
     };
 
-    // 主題初始化
     async function initTheme() {
-        const savedTheme = localStorage.getItem('ai_lab_theme') || 'lsu'; // 預設 LSU
+        const savedTheme = localStorage.getItem('ai_lab_theme') || 'lsu'; 
         window.changeTheme(savedTheme);
     }
     
-    // 確保 DOM 載入後套用主題
     window.addEventListener('DOMContentLoaded', initTheme);
 </script>
 
@@ -344,14 +496,23 @@
 
     /**
      * [核心啟動程序]
-     * 對接全域 startSystem 供 Auth 回調使用
      */
     window.startSystem = function() {
+        // --- 【效能保護機制】徹底銷毀宇宙模型，釋放資源給主系統 ---
+        if (universeAnimFrameId !== null) {
+            cancelAnimationFrame(universeAnimFrameId);
+            window.sysLog("宇宙背景模型已暫停 (釋放運算資源)", "warn");
+        }
+        const universeCanvas = document.getElementById('universe-canvas');
+        if (universeCanvas) {
+            universeCanvas.remove(); // 從 DOM 徹底移除，觸發瀏覽器 GC
+        }
+        // ----------------------------------------
+
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('main-layout').style.display = 'flex';
         document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
         
-        // 將 core/DebugSystem.js 的實例掛載至全域
         window.DebugInstance = debugSystem; 
         window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
         
@@ -361,7 +522,6 @@
         }
     };
 
-    // 初始化檢測
     async function init() {
         try {
             const response = await fetch('./manifest.json?v=' + Date.now());
@@ -374,15 +534,12 @@
         } catch (e) { console.error("Init Error", e); }
     }
 
-    // 監聽手動啟動事件 (預防 Race Condition)
     window.addEventListener('manual-start', window.startSystem);
     
     init();
     
-    // 系統登出邏輯
     window.logout = () => { 
         sessionStorage.clear(); 
-        // 登出時不清除主題偏好，只刷新頁面
         location.reload(); 
     };
 </script>
