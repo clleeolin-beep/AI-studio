@@ -86,6 +86,41 @@
         .card .click-hint { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; opacity: 0; transition: 0.2s; }
         .card:hover .click-hint { opacity: 1; }
 
+        /* 色彩輸入群組與預覽塊樣式 */
+        .color-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        /* 隱藏原生醜陋的 Color Picker 按鈕樣式，使其看起來更專業 */
+        .color-picker-input {
+            width: 45px !important;
+            height: 38px;
+            padding: 0 !important;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* 文字壓印在顏色方塊上的關鍵樣式 */
+        .color-preview-overlay {
+            flex: 1;
+            height: 38px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 13px;
+            border: 1px solid #ddd;
+            /* 增加陰影確保文字在深淺色背景下都能辨識 */
+            text-shadow: 0px 0px 3px rgba(255,255,255,0.7), 0px 0px 3px rgba(0,0,0,0.2);
+            transition: background-color 0.3s, color 0.3s;
+            user-select: none;
+        }
+        
         /* Debug Terminal */
         #debug-terminal { position: fixed; bottom: 20px; right: 20px; width: 450px; height: 300px; background: rgba(15,23,42,0.95); border: 1px solid #334155; border-radius: 8px; z-index: 9000; display: none; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
         #debug-header { padding: 8px 12px; background: #1e293b; color: #00f2ff; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 8px 8px 0 0; user-select: none; }
@@ -180,12 +215,23 @@
             </div>
 
             <div class="form-group">
-                <label>🌺 開花時程 (滑鼠拖曳選擇月份)</label>
+                <label>🌺 花色屬性 (HEX + 名稱)</label>
+                <div class="color-input-group">
+                    <input type="color" id="v_bloom_color_picker" class="color-picker-input" oninput="app.syncColorUI('bloom')">
+                    <input type="text" id="v_bloom_color_name" placeholder="例如：亮粉" oninput="app.syncColorUI('bloom')">
+                    <div id="bloom_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+                </div>
                 <div class="gantt-container" id="ganttBloom"></div>
                 <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
-            </div>
+             </div>
+
             <div class="form-group">
-                <label>🍁 變葉/落果時程 (滑鼠拖曳選擇月份)</label>
+                <label>🍁 變葉果色屬性 (HEX + 名稱)</label>
+                <div class="color-input-group">
+                <input type="color" id="v_color_color_picker" class="color-picker-input" oninput="app.syncColorUI('color')">
+                <input type="text" id="v_color_color_name" placeholder="例如：暗紫紅漿果" oninput="app.syncColorUI('color')">
+                <div id="color_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+            </div>
                 <div class="gantt-container" id="ganttColor"></div>
                 <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
             </div>
@@ -813,3 +859,4 @@
     </script>
 </body>
 </html>
+
