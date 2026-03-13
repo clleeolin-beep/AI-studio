@@ -77,6 +77,16 @@
             <div class="color-picker-row"><span>重要天體標籤</span><input type="color" id="color-text" value="#FFFF00"></div>
         </div>
 
+        <h3>🎚️ 參數微調</h3>
+        <div class="control-group">
+            <label>背景透明度: <span id="val-bg-op" class="range-val">95%</span></label>
+            <input type="range" id="op-bg" min="0" max="100" value="95">
+        </div>
+        <div class="control-group">
+            <label>網格透明度: <span id="val-grid-op" class="range-val">20%</span></label>
+            <input type="range" id="op-grid" min="0" max="100" value="20">
+        </div>
+
         <button id="render-btn" class="action-btn">🔄 重置時空與相機視角</button>
     </div>
 
@@ -429,15 +439,10 @@ class UniverseEngine {
         return { type: 'cone', x: tf_pos.x, y: tf_pos.y, z: tf_pos.z, u: tf_vec.u, v: tf_vec.v, w: tf_vec.w, colorscale: 'Blues', sizemode: "absolute", sizeref: coneData.scale_val*0.1*scale, opacity: 0.7, showscale: false, hoverinfo: 'none' };
     }
 
-    // 核心建立圖層
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
         
-        // --- 物理轉動與擴張變數 ---
-        // 矩陣旋轉角度：所有結構都會跟著旋轉 (相機不動)
         let rotationAngle = isPlaying ? time * 0.15 : 0; 
-        
-        // 哈伯擴張常數 (僅 L12 以上大尺度受影響)
         let loopTime = time % 30.0;
         let expandFactor = (level_idx >= 12 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
 
@@ -456,7 +461,6 @@ class UniverseEngine {
         }
 
         if (level_idx <= 2) {
-            // Level 1: 太陽系局域動力學 (不套用銀河系旋轉，展示自身軌道)
             let W_earth = 0.15, W_moon = 2.09, W_merc = 0.6, W_venus = 0.25, W_mars = 0.08;
             let e_x = 1.0 * Math.cos(time * W_earth), e_y = 1.0 * Math.sin(time * W_earth);
             let m_x = e_x + 0.08 * Math.cos(time * W_moon), m_y = e_y + 0.08 * Math.sin(time * W_moon);
@@ -467,7 +471,6 @@ class UniverseEngine {
             if(vis.landmarks) {
                 t.push(this.createLandmark([0,0,0], '#FF5500', '太陽 (Sun)', 5, 'circle', rotationAngle, 1.0));
                 if (level_idx === 0) {
-                    // 行星加入全局旋轉
                     t.push(this.createLandmark([me_x, me_y, 0], '#AAAAAA', '水星', 3, 'circle', rotationAngle, 1.0));
                     t.push(this.createLandmark([v_x, v_y, 0], '#FFCC00', '金星', 3, 'circle', rotationAngle, 1.0));
                     t.push(this.createLandmark([e_x, e_y, 0], '#00AAFF', '地球', 3, 'circle', rotationAngle, 1.0));
@@ -573,7 +576,7 @@ let globalTime = 0;
 let isPlaying = false;
 let animReq = null;
 let lastTimestamp = 0;
-let isFirstRender = true; // 確保首次載入相機視角正確
+let isFirstRender = true; 
 
 const renderBtn = document.getElementById('render-btn');
 const playBtn = document.getElementById('play-btn');
@@ -592,7 +595,6 @@ function drawFrame(forceResetCamera = false) {
     let engine = new UniverseEngine(conf.colors, conf.opacities);
     let idx = parseInt(selLevel.value);
     
-    // 計算圖層與矩陣變換
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
     let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false };
     
@@ -604,10 +606,9 @@ function drawFrame(forceResetCamera = false) {
         paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
         scene: { bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config },
         margin: { l: 0, r: 0, b: 0, t: 50 },
-        uirevision: 'true' // 【關鍵】永遠保持相機鎖定，任由使用者自由觀測！
+        uirevision: 'true' // 【關鍵】相機完全鎖定，任由使用者自由觀測，不受重繪影響
     };
 
-    // 如果是強制重置，或者第一次載入，設定相機初始位置
     if (forceResetCamera || isFirstRender) {
         layout.scene.camera = { eye: {x: 1.2, y: 1.2, z: 0.8} };
         isFirstRender = false;
@@ -649,7 +650,7 @@ renderBtn.addEventListener('click', () => {
     loading.style.display = "flex";
     setTimeout(() => {
         globalTime = 0; 
-        if(isPlaying) playBtn.click(); // 強制停止
+        if(isPlaying) playBtn.click(); 
         drawFrame(true); 
         loading.style.display = "none";
     }, 50);
