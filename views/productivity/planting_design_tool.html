@@ -567,7 +567,8 @@
                         this.colMap = {
                             id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
                             category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
-                            native: getIdx('原生種'), bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
+                            native: getIdx('原生種'), bloomColor: getIdx('花色'), colorColor: getIdx('變葉果色'),
+                            bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
                             colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
                             tags: getIdx('景觀特性標籤'), 
                             urlReal: getIdx('真實照片網址'), 
@@ -785,6 +786,14 @@
                 cropperSvc.pendingRealBlob = null;
                 cropperSvc.pendingSimBlob = null;
                 this.renderTagsPreview();
+
+                document.getElementById('v_bloom_color_picker').value = '#eeeeee';
+                document.getElementById('v_bloom_color_name').value = '';
+                this.syncColorUI('bloom');
+
+                document.getElementById('v_color_color_picker').value = '#eeeeee';
+                document.getElementById('v_color_color_name').value = '';
+                this.syncColorUI('color');
             }
 
             renderTagsPreview() {
@@ -859,4 +868,5 @@
     </script>
 </body>
 </html>
+
 
