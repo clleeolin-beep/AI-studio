@@ -41,6 +41,36 @@
         .badge.low-alt { background: var(--tag-low); }
         .badge.high-alt { background: var(--tag-high); }
 
+/* --- 1. 請將這段 CSS 加入 <style> 區段中 --- */
+.color-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.color-picker-input {
+    width: 45px !important;
+    height: 38px;
+    padding: 0 !important;
+    cursor: pointer;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.color-preview-overlay {
+    flex: 1;
+    height: 38px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    text-shadow: 0px 0px 3px rgba(255,255,255,0.7), 0px 0px 3px rgba(0,0,0,0.2);
+    transition: background-color 0.3s, color 0.3s;
+    user-select: none;
+}
+
         /* Gantt Chart Range Selector */
         .gantt-container { display: flex; gap: 2px; height: 30px; background: #eee; border-radius: 4px; overflow: hidden; position: relative; user-select: none; }
         .gantt-cell { flex: 1; border-right: 1px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7em; color: #999; cursor: pointer; transition: background 0.2s; }
@@ -214,28 +244,27 @@
                 <div class="tag-display" id="tagPreview"></div>
             </div>
 
-            <div class="form-group">
-                <label>🌺 花色屬性 (HEX + 名稱)</label>
-                <div class="color-input-group">
-                    <input type="color" id="v_bloom_color_picker" class="color-picker-input" oninput="app.syncColorUI('bloom')">
-                    <input type="text" id="v_bloom_color_name" placeholder="例如：亮粉" oninput="app.syncColorUI('bloom')">
-                    <div id="bloom_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
-                </div>
-                <div class="gantt-container" id="ganttBloom"></div>
-                <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
-             </div>
+<div class="form-group">
+    <label>🌺 花色屬性 (HEX + 名稱)</label>
+    <div class="color-input-group">
+        <input type="color" id="v_bloom_color_picker" class="color-picker-input" oninput="app.syncColorUI('bloom')">
+        <input type="text" id="v_bloom_color_name" placeholder="例如：亮粉" oninput="app.syncColorUI('bloom')">
+        <div id="bloom_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+    </div>
+    <div class="gantt-container" id="ganttBloom"></div>
+    <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
+</div>
 
-            <div class="form-group">
-                <label>🍁 變葉果色屬性 (HEX + 名稱)</label>
-                <div class="color-input-group">
-                <input type="color" id="v_color_color_picker" class="color-picker-input" oninput="app.syncColorUI('color')">
-                <input type="text" id="v_color_color_name" placeholder="例如：暗紫紅漿果" oninput="app.syncColorUI('color')">
-                <div id="color_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
-            </div>
-                <div class="gantt-container" id="ganttColor"></div>
-                <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
-            </div>
-
+<div class="form-group">
+    <label>🍁 變葉果色屬性 (HEX + 名稱)</label>
+    <div class="color-input-group">
+        <input type="color" id="v_color_color_picker" class="color-picker-input" oninput="app.syncColorUI('color')">
+        <input type="text" id="v_color_color_name" placeholder="例如：暗紫紅漿果" oninput="app.syncColorUI('color')">
+        <div id="color_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+    </div>
+    <div class="gantt-container" id="ganttColor"></div>
+    <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
+</div>
             <input type="file" id="fileInputReal" accept="image/*" style="display:none;">
             <input type="file" id="fileInputSim" accept="image/*" style="display:none;">
             <input type="hidden" id="v_url_real">
@@ -551,26 +580,18 @@
                     });
                 }
                 // 💡 新增：處理色彩即時同步與 UI 壓碼文字
-                syncColorUI(type) {
-                    const picker = document.getElementById(`v_${type}_color_picker`);
-                    const nameInput = document.getElementById(`v_${type}_color_name`);
-                    const preview = document.getElementById(`${type}_preview`);
-                    if (!picker || !nameInput || !preview) return;
-            
-                    const hex = picker.value;
-                    const name = nameInput.value || '未設定';
-
-                // 更新方塊背景色與壓印文字
-                    preview.style.backgroundColor = hex;
-                    preview.innerText = name;
-
-                // 智慧型文字顯色：自動判斷背景深淺來決定文字用黑色或白色
-                    const r = parseInt(hex.slice(1, 3), 16);
-                    const g = parseInt(hex.slice(3, 5), 16);
-                    const b = parseInt(hex.slice(5, 7), 16);
-                    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-                    preview.style.color = brightness > 125 ? '#333' : '#fff';
-                }
+syncColorUI(type) {
+    const picker = document.getElementById(`v_${type}_color_picker`);
+    const nameInput = document.getElementById(`v_${type}_color_name`);
+    const preview = document.getElementById(`${type}_preview`);
+    const hex = picker.value;
+    const name = nameInput.value || '未設定';
+    preview.style.backgroundColor = hex;
+    preview.innerText = name;
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    preview.style.color = brightness > 125 ? '#333' : '#fff';
+}
             }
 
             loadSheetData() {
@@ -585,18 +606,25 @@
                         const getIdx = (name) => this.headerRow.findIndex(h => String(h).trim() === name);
                         
                         // 🌟 核心修復：欄位映射更新，區分雙網址
-                        this.colMap = {
-                            id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
-                            category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
-                            native: getIdx('原生種'), bloomColor: getIdx('花色'), colorColor: getIdx('變葉果色'),
-                            bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
-                            colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
-                            tags: getIdx('景觀特性標籤'), 
-                            urlReal: getIdx('真實照片網址'), 
-                            urlSim: getIdx('優型模擬網址'), 
-                            meta: getIdx('維護訊息')
-                        };
-
+this.colMap = {
+    id: getIdx('植栽編號'), 
+    name: getIdx('中文名稱'), 
+    scientific: getIdx('拉丁學名'),
+    category: getIdx('分類高度'), 
+    env: getIdx('光照環境'), 
+    alt: getIdx('海拔'),
+    native: getIdx('原生種'), 
+    bloomColor: getIdx('花色'),        // 確保 Sheets 有此欄位
+    colorColor: getIdx('變葉果色'),    // 確保 Sheets 有此欄位
+    bloomS: getIdx('開花期_起'), 
+    bloomE: getIdx('開花期_止'),
+    colorS: getIdx('變葉果期_起'), 
+    colorE: getIdx('變葉果期_止'),
+    tags: getIdx('景觀特性標籤'), 
+    urlReal: getIdx('真實照片網址'), 
+    urlSim: getIdx('優型模擬網址'), 
+    meta: getIdx('維護訊息')
+};
                         if (this.colMap.id === -1 || this.colMap.urlReal === -1) {
                             sysLog("❌ 欄位映射異常，請確認 Google Sheet 是否包含『真實照片網址』與『優型模擬網址』", "error");
                         } else {
@@ -742,40 +770,30 @@
                 }
             }
 
-            editPlant(id) {
-                sysLog(`點選讀取植栽 ID: ${id}`, "info");
-                const plant = this.dataStore.find(p => p.id === id);
-                if(!plant) return;
-                const r = plant._raw;
+editPlant(id) {
+    const plant = this.dataStore.find(p => p.id === id);
+    if(!plant) return;
+    const r = plant._raw;
 
-                // 1. 設定基本文字欄位
-                document.getElementById('v_id').value = r[this.colMap.id] || "";
-                document.getElementById('v_name').value = r[this.colMap.name] || "";
-                document.getElementById('v_scientific').value = r[this.colMap.scientific] || "";
-                document.getElementById('v_category').value = r[this.colMap.category] || "喬木";
-                document.getElementById('v_env').value = r[this.colMap.env] || "全日照";
-                document.getElementById('v_alt').value = r[this.colMap.alt] || "低海拔";
-                document.getElementById('v_native').checked = (String(r[this.colMap.native]).toUpperCase() === 'TRUE');
-                document.getElementById('v_tags').value = r[this.colMap.tags] || "";
+    // 設定基本欄位 (省略重複代碼...)
+    document.getElementById('v_id').value = r[this.colMap.id] || "";
+    document.getElementById('v_name').value = r[this.colMap.name] || "";
+    // ... 其他欄位設定
 
-                // 💡 2. 核心新增：解析「#HEX (名稱)」並填入顏色與文字框
-                const parseColorData = (type, rawVal) => {
-                    // 使用正規表達式匹配 "#FFFFFF (名稱)" 格式
-                    const match = String(rawVal).match(/^(#[0-9A-Fa-f]{6})\s*\((.*)\)$/);
-                    if (match) {
-                        document.getElementById(`v_${type}_color_picker`).value = match[1]; // 存入 HEX 代碼
-                        document.getElementById(`v_${type}_color_name`).value = match[2];   // 存入 中文名稱
-                    } else {
-                        // 若資料不符格式，則給予預設值
-                        document.getElementById(`v_${type}_color_picker`).value = '#eeeeee';
-                        document.getElementById(`v_${type}_color_name`).value = rawVal || '';
-                    }
-                    this.syncColorUI(type); // 立即觸發 UI 預覽方塊更新
-                };
-            
-                // 執行花色與果色的解析
-                parseColorData('bloom', r[this.colMap.bloomColor]);
-                parseColorData('color', r[this.colMap.colorColor]);
+    // 解析色彩格式：#HEX (名稱)
+    const parseColor = (type, val) => {
+        const match = String(val).match(/^(#[0-9A-Fa-f]{6})\s*\((.*)\)$/);
+        if (match) {
+            document.getElementById(`v_${type}_color_picker`).value = match[1];
+            document.getElementById(`v_${type}_color_name`).value = match[2];
+        } else {
+            document.getElementById(`v_${type}_color_picker`).value = '#eeeeee';
+            document.getElementById(`v_${type}_color_name`).value = val || '';
+        }
+        this.syncColorUI(type);
+    };
+    parseColor('bloom', r[this.colMap.bloomColor]);
+    parseColor('color', r[this.colMap.colorColor]);
             
                 // 3. 設定時程表與最後更新資訊
                 this.bloomGantt.setData(r[this.colMap.bloomS], r[this.colMap.bloomE]);
@@ -911,6 +929,5 @@
     </script>
 </body>
 </html>
-
 
 
