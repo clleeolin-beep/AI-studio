@@ -138,6 +138,9 @@
         <div style="display:flex; gap:5px; margin-bottom:10px;">
             <button class="btn-action" style="flex:2; margin:0;" onclick="startDraw()">📐 繪製篩選區域</button>
             <button class="btn-action btn-cancel" style="flex:1; margin:0;" onclick="clearSpatialFilter()">✕ 清除</button>
+            <div id="area-info" style="font-size: 12px; color: #E67E22; font-weight: bold; margin-bottom: 10px; display: none; background: #fff; padding: 5px; border: 1px dashed #E67E22; border-radius: 4px; text-align: center;">
+    📐 框選面積：<span id="area-value">0</span>
+</div>
         </div>
         <select id="city-filter" onchange="handleCityFilter()"><option value="全國">--- 全國縣市遮罩篩選 ---</option></select>
         <input type="text" id="search-input" placeholder="🔍 搜尋 (例如: 01+08 -13 科技)" oninput="filterProjects()">
@@ -528,7 +531,16 @@
         });
         return { ors, nots, andGroups, text: text.join(' ') };
     }
-
+    // 新增：面積格式化函數
+    function formatArea(sqMeters) {
+        if (sqMeters >= 1000000) {
+        return (sqMeters / 1000000).toFixed(3) + " km² (平方公里)";
+        } else if (sqMeters >= 1) {
+        return sqMeters.toLocaleString(undefined, {maximumFractionDigits: 2}) + " m² (平方米)";
+    }
+    return "0 m²";
+    }
+    
     function buildDynamicFilters() {
         const cities = [...new Set(Object.values(projectDict).map(p => p.city))].filter(c => c && c.length >= 2).sort();
         cities.forEach(c => document.getElementById('city-filter').innerHTML += `<option value="${c}">${c}</option>`);
@@ -832,15 +844,63 @@
     }
     function handleDrawClick(e) { drawPoints.push([e.lngLat.lng, e.lngLat.lat]); updateDraw(); }
     function handleDrawDblClick(e) { e.originalEvent.preventDefault(); if (drawPoints.length >= 3) finishDraw(); }
-    function updateDraw() { if (drawPoints.length < 2) return; map.getSource('draw-path').setData({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...drawPoints, drawPoints[0]]] } }); }
+function updateDraw() {
+    if (drawPoints.length < 2) return;
+    
+    // 建立暫時性的 GeoJSON 面要素
+    const polygonGeoJSON = { 
+        type: 'Feature', 
+        geometry: { 
+            type: 'Polygon', 
+            coordinates: [[...drawPoints, drawPoints[0]]] 
+        } 
+    };
+    
+    // 更新地圖上的路徑線條與填充
+    map.getSource('draw-path').setData(polygonGeoJSON);
+
+    // 當點數大於等於 3，即可計算面積
+    if (drawPoints.length >= 3) {
+        try {
+            const area = turf.area(polygonGeoJSON); // 使用 Turf.js 計算 WGS84 面積
+            const areaDisplay = document.getElementById('area-info');
+            const areaValue = document.getElementById('area-value');
+            
+            areaDisplay.style.display = 'block';
+            areaValue.innerText = formatArea(area);
+            
+            console.log(`即時計算面積: ${area.toFixed(2)} 平方米`);
+        } catch (e) {
+            console.error("面積計算錯誤:", e);
+        }
+    }
+}
     function finishDraw() {
         polygonFilter = turf.polygon([[...drawPoints, drawPoints[0]]]);
         map.off('click', handleDrawClick); map.off('dblclick', handleDrawDblClick); map.getCanvas().style.cursor = ''; map.doubleClickZoom.enable();
         console.log("空間繪製完成，執行地理交集運算");
         filterProjects(); 
     }
-    function clearSpatialFilter() { polygonFilter = null; drawPoints = []; if (map.getSource('draw-path')) map.getSource('draw-path').setData({ type: 'FeatureCollection', features: [] }); filterProjects(); console.log("清除空間繪製範圍"); }
-
+function clearSpatialFilter() {
+    polygonFilter = null;
+    drawPoints = [];
+    
+    // 清除地圖圖層資料
+    if (map.getSource('draw-path')) {
+        map.getSource('draw-path').setData({ type: 'FeatureCollection', features: [] });
+    }
+    
+    // 隱藏面積顯示面板
+    const areaDisplay = document.getElementById('area-info');
+    if (areaDisplay) {
+        areaDisplay.style.display = 'none';
+        document.getElementById('area-value').innerText = "0";
+    }
+    
+    filterProjects(); 
+    console.log("清除空間繪製範圍與面積數據");
+}
+    
     function toggleGeom(type, btn) {
         showGeom[type] = !showGeom[type];
         btn.classList.toggle('active', showGeom[type]);
@@ -957,3 +1017,4 @@
 </script>
 </body>
 </html>
+
