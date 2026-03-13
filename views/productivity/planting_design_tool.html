@@ -14,7 +14,7 @@
             --primary: #2e7d32; --secondary: #81c784; --bg: #f4f6f8; --text: #333;
             --tag-sun: #fbc02d; --tag-shade: #7b1fa2; --tag-water: #1976d2; --tag-low: #8d6e63; --tag-high: #00838f;
         }
-        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; height: 95vh; box-sizing: border-box; overflow: hidden; }
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; background: transparent; color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; height: 95vh; box-sizing: border-box; overflow: hidden; }
         h1, h2, h3 { color: var(--primary); margin-top: 0; }
         .scientific { font-family: 'Times New Roman', serif; font-style: italic; }
         
@@ -41,35 +41,10 @@
         .badge.low-alt { background: var(--tag-low); }
         .badge.high-alt { background: var(--tag-high); }
 
-/* 色彩輸入群組與預覽塊樣式 */
-.color-input-group {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
-}
-.color-picker-input {
-    width: 45px !important;
-    height: 38px;
-    padding: 0 !important;
-    cursor: pointer;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-.color-preview-overlay {
-    flex: 1;
-    height: 38px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 13px;
-    border: 1px solid #ddd;
-    text-shadow: 0px 0px 3px rgba(255,255,255,0.7), 0px 0px 3px rgba(0,0,0,0.2);
-    transition: background-color 0.3s, color 0.3s;
-    user-select: none;
-}
+        /* 色彩輸入群組與預覽塊樣式 */
+        .color-input-group { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+        .color-picker-input { width: 45px !important; height: 38px; padding: 0 !important; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; }
+        .color-preview-overlay { flex: 1; height: 38px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; border: 1px solid #ddd; text-shadow: 0px 0px 3px rgba(255,255,255,0.7), 0px 0px 3px rgba(0,0,0,0.2); transition: background-color 0.3s, color 0.3s; user-select: none; }
 
         /* Gantt Chart Range Selector */
         .gantt-container { display: flex; gap: 2px; height: 30px; background: #eee; border-radius: 4px; overflow: hidden; position: relative; user-select: none; }
@@ -106,7 +81,7 @@
         button.success:hover { background: #1b5e20; }
 
         /* Loading Overlay */
-        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; display: flex; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
+        #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 99999; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; display: none; backdrop-filter: blur(3px); flex-direction: column; }
 
         /* Catalog Grid */
         .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
@@ -114,9 +89,10 @@
         .card:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(46,125,50,0.2); border-color: var(--primary); }
         .card img { width: 100%; height: 160px; object-fit: cover; border-radius: 4px; background: #f9f9f9; margin-bottom: 8px; border: 1px solid #eee; }
         .card .click-hint { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 2px 6px; border-radius: 10px; opacity: 0; transition: 0.2s; }
+        .card:hover .click-hint { opacity: 1; }
 
         /* Debug Terminal */
-        #debug-terminal { position: fixed; bottom: 20px; right: 20px; width: 450px; height: 300px; background: rgba(15,23,42,0.95); border: 1px solid #334155; border-radius: 8px; z-index: 9000; display: none; flex-direction: column; box-shadow: 0 	10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+        #debug-terminal { position: fixed; bottom: 20px; right: 20px; width: 450px; height: 300px; background: rgba(15,23,42,0.95); border: 1px solid #334155; border-radius: 8px; z-index: 9000; display: none; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
         #debug-header { padding: 8px 12px; background: #1e293b; color: #00f2ff; font-size: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 8px 8px 0 0; user-select: none; }
         #debug-log { flex: 1; overflow-y: auto; padding: 10px; font-family: 'Consolas', monospace; font-size: 11px; color: #0f0; word-break: break-all; }
         .log-entry { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
@@ -124,7 +100,7 @@
         .log-success { color: #00f2ff; }
         .log-error { color: #ff4b4b; }
         .log-warn { color: #ffbb33; }
-</style>
+    </style>
 </head>
 <body>
 
@@ -208,27 +184,28 @@
                 <div class="tag-display" id="tagPreview"></div>
             </div>
 
-<div class="form-group">
-    <label>🌺 花色屬性 (HEX + 名稱)</label>
-    <div class="color-input-group">
-        <input type="color" id="v_bloom_color_picker" class="color-picker-input" oninput="app.syncColorUI('bloom')">
-        <input type="text" id="v_bloom_color_name" placeholder="例如：亮粉" oninput="app.syncColorUI('bloom')">
-        <div id="bloom_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
-    </div>
-    <div class="gantt-container" id="ganttBloom"></div>
-    <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
-</div>
+            <div class="form-group">
+                <label>🌺 花色屬性 (HEX + 名稱)</label>
+                <div class="color-input-group">
+                    <input type="color" id="v_bloom_color_picker" class="color-picker-input" oninput="app.syncColorUI('bloom')">
+                    <input type="text" id="v_bloom_color_name" placeholder="例如：亮粉" oninput="app.syncColorUI('bloom')">
+                    <div id="bloom_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+                </div>
+                <div class="gantt-container" id="ganttBloom"></div>
+                <input type="hidden" id="v_bloom_start"><input type="hidden" id="v_bloom_end">
+            </div>
 
-<div class="form-group">
-    <label>🍁 變葉果色屬性 (HEX + 名稱)</label>
-    <div class="color-input-group">
-        <input type="color" id="v_color_color_picker" class="color-picker-input" oninput="app.syncColorUI('color')">
-        <input type="text" id="v_color_color_name" placeholder="例如：暗紫紅漿果" oninput="app.syncColorUI('color')">
-        <div id="color_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
-    </div>
-    <div class="gantt-container" id="ganttColor"></div>
-    <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
-</div>
+            <div class="form-group">
+                <label>🍁 變葉果色屬性 (HEX + 名稱)</label>
+                <div class="color-input-group">
+                    <input type="color" id="v_color_color_picker" class="color-picker-input" oninput="app.syncColorUI('color')">
+                    <input type="text" id="v_color_color_name" placeholder="例如：暗紫紅漿果" oninput="app.syncColorUI('color')">
+                    <div id="color_preview" class="color-preview-overlay" style="background-color: #eee;">未設定</div>
+                </div>
+                <div class="gantt-container" id="ganttColor"></div>
+                <input type="hidden" id="v_color_start"><input type="hidden" id="v_color_end">
+            </div>
+            
             <input type="file" id="fileInputReal" accept="image/*" style="display:none;">
             <input type="file" id="fileInputSim" accept="image/*" style="display:none;">
             <input type="hidden" id="v_url_real">
@@ -237,7 +214,7 @@
             <div class="dual-img-container">
                 <div class="img-col">
                     <label>📷 真實照片 (-01)</label>
-                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputReal').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
+                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputReal').click(); else app.triggerAuth();">
                         <img id="preview_real" src="" style="display:none;">
                         <span id="text_real">點擊上傳真實照片<br>(4:3 裁切)</span>
                         <button id="btn_del_real" class="btn-delete-img" onclick="app.deleteImage(event, 'real')" style="display:none;" title="刪除真實照片">🗑️</button>
@@ -245,7 +222,7 @@
                 </div>
                 <div class="img-col">
                     <label>✨ 優型模擬圖 (-02)</label>
-                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputSim').click(); else alert('請先點擊上方黃色橫幅完成 Google 授權！');">
+                    <div class="img-preview-box" onclick="if(app.accessToken) document.getElementById('fileInputSim').click(); else app.triggerAuth();">
                         <img id="preview_sim" src="" style="display:none;">
                         <span id="text_sim">點擊上傳 AI 模擬圖<br>(4:3 裁切)</span>
                         <button id="btn_del_sim" class="btn-delete-img" onclick="app.deleteImage(event, 'sim')" style="display:none;" title="刪除模擬圖">🗑️</button>
@@ -269,8 +246,7 @@
                     <button class="success" onclick="app.clearForm()">➕ 新增植栽</button>
                 </div>
             </div>
-            <div class="catalog-grid" id="catalogGrid">
-                </div>
+            <div class="catalog-grid" id="catalogGrid"></div>
         </div>
     </div>
 
@@ -297,12 +273,23 @@
         // --- 監視器與拖曳邏輯 ---
         const sysLog = (msg, type = 'info') => {
             const logBox = document.getElementById('debug-log');
-            const div = document.createElement('div');
-            div.className = `log-entry log-${type}`;
-            div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
-            logBox.appendChild(div);
-            logBox.scrollTop = logBox.scrollHeight;
+            if (logBox) {
+                const div = document.createElement('div');
+                div.className = `log-entry log-${type}`;
+                div.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+                logBox.appendChild(div);
+                logBox.scrollTop = logBox.scrollHeight;
+            }
             console.log(`[${type.toUpperCase()}] ${msg}`);
+            
+            // 跨視窗通訊：將 log 發送給父視窗的 AI Studio 殼層
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    source: 'AI_STUDIO_APP',
+                    type: type,
+                    content: msg
+                }, '*');
+            }
         };
 
         const toggleDebug = () => {
@@ -357,8 +344,11 @@
             static cleanDriveUrl(url) {
                 if (!url) return "";
                 let parsedUrl = String(url).trim();
+                // 處理 JSON 陣列格式的 URL 字串
+                if (parsedUrl.startsWith('[')) {
+                    try { parsedUrl = JSON.parse(parsedUrl)[0] || ""; } catch(e){}
+                }
                 if (parsedUrl.includes('drive.google.com')) {
-                    try { if(parsedUrl.startsWith('[')) parsedUrl = JSON.parse(parsedUrl)[0]; } catch(e){}
                     const match = parsedUrl.match(/[-\w]{25,}/);
                     if (match) {
                         return `https://drive.google.com/thumbnail?authuser=0&sz=w1000&id=${match[0]}`;
@@ -405,7 +395,9 @@
                 });
             }
             setData(start, end) {
-                if(start && end) this.updateVisuals(parseInt(start), parseInt(end));
+                const s = parseInt(start) || 0;
+                const e = parseInt(end) || 0;
+                if(s > 0 && e > 0) this.updateVisuals(s, e);
                 else { this.updateVisuals(0, 0); this.startInput.value = ''; this.endInput.value = ''; }
             }
         }
@@ -508,6 +500,7 @@
                 this.colMap = {};
                 this.headerRow = [];
                 this.accessToken = null;
+                this.tokenClient = null;
                 this.bloomGantt = new GanttController('ganttBloom', 'v_bloom_start', 'v_bloom_end', 'active-bloom');
                 this.colorGantt = new GanttController('ganttColor', 'v_color_start', 'v_color_end', 'active-color');
             }
@@ -525,39 +518,64 @@
                             this.accessToken = resp.access_token;
                             document.getElementById('auth-banner').className = 'authorized';
                             document.getElementById('auth-banner').innerHTML = '🟢 授權成功：已開啟編輯與上傳功能';
-                            document.getElementById('btn-save').disabled = false;
+                            
+                            // 重新檢查欄位映射是否正常，若正常才開啟儲存按鈕
+                            if(this.colMap.id !== -1 && this.colMap.name !== -1) {
+                                document.getElementById('btn-save').disabled = false;
+                            }
                             sysLog("OAuth 2.0 寫入權限獲取成功", "success");
                         }
                     });
-                    sysLog("Google Auth 服務初始化成功", "info");
+                    sysLog("Google Auth 服務初始化成功 (待命狀態)", "info");
                 } catch (e) {
                     sysLog(`Auth 初始化失敗: ${e.message}`, "error");
                 }
             }
 
             triggerAuth() {
-                if (!this.accessToken) {
+                if (!this.accessToken && this.tokenClient) {
                     sysLog("觸發二次授權視窗...", "info");
                     this.tokenClient.requestAccessToken({ prompt: 'select_account consent' });
+                } else if (!this.tokenClient) {
+                    sysLog("Token Client 尚未就緒", "warn");
                 }
-            } 
+            }
 
-// 1. 同步介面顯示 (壓碼文字)
-syncColorUI(type) {
-    const picker = document.getElementById(`v_${type}_color_picker`);
-    const nameInput = document.getElementById(`v_${type}_color_name`);
-    const preview = document.getElementById(`${type}_preview`);
-    const hex = picker.value;
-    const name = nameInput.value || '未設定';
-    preview.style.backgroundColor = hex;
-    preview.innerText = name;
-    // 自動判斷文字黑白
-    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-    preview.style.color = ((r * 299 + g * 587 + b * 114) / 1000) > 125 ? '#333' : '#fff';
-}
+            syncColorUI(type) {
+                const picker = document.getElementById(`v_${type}_color_picker`);
+                const nameInput = document.getElementById(`v_${type}_color_name`);
+                const preview = document.getElementById(`${type}_preview`);
+                const hex = picker.value;
+                const name = nameInput.value || '未設定';
+                preview.style.backgroundColor = hex;
+                preview.innerText = name;
+                
+                const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+                preview.style.color = ((r * 299 + g * 587 + b * 114) / 1000) > 125 ? '#333' : '#fff';
+            }
+
+            renderTagsPreview() {
+                const input = document.getElementById('v_tags').value;
+                const container = document.getElementById('tagPreview');
+                container.innerHTML = '';
+                if (!input.trim()) return;
+                
+                const tags = Utility.formatTags(input).split(' ').filter(t => t);
+                tags.forEach(tag => {
+                    const span = document.createElement('span');
+                    span.className = 'badge';
+                    if(tag === '#全日照') span.classList.add('sun');
+                    else if(tag === '#耐陰') span.classList.add('shade');
+                    else if(tag === '#水生') span.classList.add('water');
+                    else if(tag === '#低海拔') span.classList.add('low-alt');
+                    else if(tag === '#高海拔') span.classList.add('high-alt');
+                    span.innerText = tag;
+                    container.appendChild(span);
+                });
+            }
 
             loadSheetData() {
-                Utility.showLoading("載入雲端植栽資料庫...");
+                Utility.showLoading("載入雲端植栽資料庫 (唯讀模式)...");
                 window.gvizCallback = (json) => {
                     if (json && json.table) {
                         let rawHeaders = json.table.cols.map(c => c.label || "");
@@ -567,21 +585,24 @@ syncColorUI(type) {
 
                         const getIdx = (name) => this.headerRow.findIndex(h => String(h).trim() === name);
                         
-this.colMap = {
-    id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
-    category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
-    native: getIdx('原生種'), 
-    bloomColor: getIdx('花色'),        // 💡 對應新欄位
-    colorColor: getIdx('變葉果色'),    // 💡 對應新欄位
-    bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
-    colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
-    tags: getIdx('景觀特性標籤'), urlReal: getIdx('真實照片網址'), urlSim: getIdx('優型模擬網址'), meta: getIdx('維護訊息')
-};
+                        this.colMap = {
+                            id: getIdx('植栽編號'), name: getIdx('中文名稱'), scientific: getIdx('拉丁學名'),
+                            category: getIdx('分類高度'), env: getIdx('光照環境'), alt: getIdx('海拔'),
+                            native: getIdx('原生種'), 
+                            bloomColor: getIdx('花色'),        
+                            colorColor: getIdx('變葉果色'),    
+                            bloomS: getIdx('開花期_起'), bloomE: getIdx('開花期_止'),
+                            colorS: getIdx('變葉果期_起'), colorE: getIdx('變葉果期_止'),
+                            tags: getIdx('景觀特性標籤'), urlReal: getIdx('真實照片網址'), urlSim: getIdx('優型模擬網址'), meta: getIdx('維護訊息')
+                        };
 
-                        if (this.colMap.id === -1 || this.colMap.urlReal === -1) {
-                            sysLog("❌ 欄位映射異常，請確認 Sheets 欄位名稱", "error");
+                        if (this.colMap.id === -1 || this.colMap.name === -1) {
+                            sysLog("❌ 嚴重錯誤：找不到必要的欄位 (植栽編號 或 中文名稱)，請檢查 Google Sheets 標題！", "error");
+                            document.getElementById('btn-save').disabled = true;
                         } else {
                             sysLog(`✅ 欄位映射成功`, "success");
+                            // 如果已經登入過且欄位正確，確保按鈕為啟用狀態
+                            if (this.accessToken) document.getElementById('btn-save').disabled = false;
                         }
 
                         this.dataStore = json.table.rows.map(r => {
@@ -597,15 +618,20 @@ this.colMap = {
                 const oldScript = document.getElementById('gvizScript');
                 if(oldScript) oldScript.remove();
                 const s = document.createElement('script');
-                s.id = 'gvizScript';
+                // 透過 gviz 讀取，不需要 accessToken
                 s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=responseHandler:gvizCallback&sheet=${SHEET_NAME}&tq=SELECT *`;
                 document.body.appendChild(s);
             }
 
             async saveToGoogleSheet() {
-                if (!this.accessToken) { this.triggerAuth(); return; }
+                if (!this.accessToken) { 
+                    sysLog("尚未授權，無法儲存資料", "warn");
+                    this.triggerAuth(); 
+                    return; 
+                }
                 const nameInput = document.getElementById('v_name').value.trim();
                 if (!nameInput) { alert("請填寫中文名稱！"); return; }
+                if (this.colMap.id === -1) { alert("欄位映射錯誤，禁止寫入避免破壞資料庫！"); return; }
 
                 Utility.showLoading("正在同步資料至雲端...");
                 try {
@@ -670,6 +696,11 @@ this.colMap = {
                     }
 
                     if (!writeRes.ok) throw new Error("寫入失敗");
+                    
+                    // 寫入成功，清空暫存 Blob
+                    cropperSvc.pendingRealBlob = null;
+                    cropperSvc.pendingSimBlob = null;
+                    
                     sysLog(`✅ 儲存成功！`, "success");
                     alert(`✅ [${nameInput}] 儲存成功！`);
                     this.loadSheetData(); 
@@ -693,18 +724,22 @@ this.colMap = {
                 document.getElementById('v_native').checked = (String(r[this.colMap.native]).toUpperCase() === 'TRUE');
                 document.getElementById('v_tags').value = r[this.colMap.tags] || "";
 
-                //在 editPlant(id) 內部，找到基本文字設定後，加入解析邏輯
-const parseColor = (type, val) => {
-    const match = String(val).match(/^(#[0-9A-Fa-f]{6})\s*\((.*)\)$/);
-    document.getElementById(`v_${type}_color_picker`).value = match ? match[1] : '#eeeeee';
-    document.getElementById(`v_${type}_color_name`).value = match ? match[2] : val;
-    this.syncColorUI(type);
-};
-parseColor('bloom', r[this.colMap.bloomColor]);
-parseColor('color', r[this.colMap.colorColor]);
+                // 解析顏色邏輯修正：相容 HEX、HEX (名稱)、空值
+                const parseColor = (type, val) => {
+                    const valStr = String(val || "").trim();
+                    const hexMatch = valStr.match(/^(#[0-9A-Fa-f]{6})/i);
+                    const nameMatch = valStr.match(/\((.*)\)$/);
+                    
+                    document.getElementById(`v_${type}_color_picker`).value = hexMatch ? hexMatch[1] : '#eeeeee';
+                    document.getElementById(`v_${type}_color_name`).value = nameMatch ? nameMatch[1] : (hexMatch ? '' : valStr);
+                    this.syncColorUI(type);
+                };
+                parseColor('bloom', r[this.colMap.bloomColor]);
+                parseColor('color', r[this.colMap.colorColor]);
 
-                this.bloomGantt.setData(r[this.colMap.bloomS], r[this.colMap.bloomE]);
-                this.colorGantt.setData(r[this.colMap.colorS], r[this.colMap.colorE]);
+                // 甘特圖防呆處理
+                this.bloomGantt.setData(parseInt(r[this.colMap.bloomS]) || 0, parseInt(r[this.colMap.bloomE]) || 0);
+                this.colorGantt.setData(parseInt(r[this.colMap.colorS]) || 0, parseInt(r[this.colMap.colorE]) || 0);
                 document.getElementById('v_meta').innerText = `最後更新：${r[this.colMap.meta] || '無'}`;
 
                 const setPreview = (urlKey, imgId, textId, inputId, delBtnId) => {
@@ -745,49 +780,51 @@ parseColor('color', r[this.colMap.colorColor]);
                     document.getElementById(`btn_del_${t}`).style.display = 'none';
                     document.getElementById(`v_url_${t}`).value = '';
                 });
+                // 確實清除待上傳的暫存照片
+                cropperSvc.pendingRealBlob = null;
+                cropperSvc.pendingSimBlob = null;
                 this.renderTagsPreview();
+                sysLog("表單已清空", "info");
             }
 
-renderCatalog() {
-    const kw = document.getElementById('searchInput').value.toLowerCase();
-    const grid = document.getElementById('catalogGrid');
-    grid.innerHTML = '';
+            renderCatalog() {
+                const kw = document.getElementById('searchInput').value.toLowerCase();
+                const grid = document.getElementById('catalogGrid');
+                grid.innerHTML = '';
 
-    this.dataStore.forEach(plant => {
-        const r = plant._raw;
-        const searchStr = `${plant.id} ${r[this.colMap.name]} ${r[this.colMap.tags]}`.toLowerCase();
-        if(kw && !searchStr.includes(kw)) return;
+                this.dataStore.forEach(plant => {
+                    const r = plant._raw;
+                    const searchStr = `${plant.id} ${r[this.colMap.name]} ${r[this.colMap.tags]}`.toLowerCase();
+                    if(kw && !searchStr.includes(kw)) return;
 
-        // 讀取標籤屬性
-        const env = r[this.colMap.env];
-        const alt = r[this.colMap.alt];
-        let envClass = env === '全日照' ? 'sun' : env === '耐陰' ? 'shade' : env === '水生' ? 'water' : '';
-        let altClass = alt === '高海拔' ? 'high-alt' : 'low-alt';
-        let nativeTag = (String(r[this.colMap.native]).toUpperCase() === 'TRUE') ? `<span class="badge" style="background:#e65100">#原生種</span>` : '';
+                    const env = r[this.colMap.env];
+                    const alt = r[this.colMap.alt];
+                    let envClass = env === '全日照' ? 'sun' : env === '耐陰' ? 'shade' : env === '水生' ? 'water' : '';
+                    let altClass = alt === '高海拔' ? 'high-alt' : 'low-alt';
+                    let nativeTag = (String(r[this.colMap.native]).toUpperCase() === 'TRUE') ? `<span class="badge" style="background:#e65100">#原生種</span>` : '';
 
-        // 雙圖 Fallback 邏輯
-        let cleanImg = Utility.cleanDriveUrl(r[this.colMap.urlSim] || r[this.colMap.urlReal]);
-        const imgSrc = cleanImg || 'https://via.placeholder.com/400x300?text=No+Image';
+                    let cleanImg = Utility.cleanDriveUrl(r[this.colMap.urlSim] || r[this.colMap.urlReal]);
+                    const imgSrc = cleanImg || 'https://via.placeholder.com/400x300?text=No+Image';
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.onclick = () => this.editPlant(plant.id);
-        card.innerHTML = `
-            <div class="click-hint">✏️ 點擊編輯</div>
-            <img src="${imgSrc}">
-            <div style="padding: 5px 0; flex: 1;">
-                <div style="font-size:0.8em; color:#888;">${plant.id} | ${r[this.colMap.category] || '未分類'}</div>
-                <strong style="font-size:1.1em; color:var(--primary);">${r[this.colMap.name] || '無名稱'}</strong>
-                <div class="tag-display">
-                    ${env ? `<span class="badge ${envClass}">#${env}</span>` : ''}
-                    ${alt ? `<span class="badge ${altClass}">#${alt}</span>` : ''}
-                    ${nativeTag}
-                </div>
-            </div>
-        `;
-        grid.appendChild(card);
-    });
-}
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.onclick = () => this.editPlant(plant.id);
+                    card.innerHTML = `
+                        <div class="click-hint">✏️ 點擊編輯</div>
+                        <img src="${imgSrc}">
+                        <div style="padding: 5px 0; flex: 1;">
+                            <div style="font-size:0.8em; color:#888;">${plant.id} | ${r[this.colMap.category] || '未分類'}</div>
+                            <strong style="font-size:1.1em; color:var(--primary);">${r[this.colMap.name] || '無名稱'}</strong>
+                            <div class="tag-display">
+                                ${env ? `<span class="badge ${envClass}">#${env}</span>` : ''}
+                                ${alt ? `<span class="badge ${altClass}">#${alt}</span>` : ''}
+                                ${nativeTag}
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
             
             deleteImage(event, type) {
                 event.stopPropagation();
@@ -797,6 +834,7 @@ renderCatalog() {
                 document.getElementById(`text_${targetId}`).style.display = 'block';
                 document.getElementById(`btn_del_${targetId}`).style.display = 'none';
                 if(type === 'real') cropperSvc.pendingRealBlob = null; else cropperSvc.pendingSimBlob = null;
+                sysLog(`已移除 ${targetId === 'real' ? '真實照片' : '模擬圖'}，請點擊儲存以寫入資料庫`, "warn");
             }
         }
 
@@ -816,7 +854,7 @@ renderCatalog() {
                 sysLog("未讀取到 manifest.json，使用預設 SHEET_ID", "warn");
             }
             app.initGoogleAuth();
-            app.loadSheetData();
+            app.loadSheetData(); // 直接讀取，無需等候授權
         };
     </script>
 </body>
