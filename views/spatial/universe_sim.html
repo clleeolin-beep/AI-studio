@@ -98,7 +98,7 @@
 
 <script>
 /**
- * 多尺度宇宙動力學 - 真實觀測還原版 (Bug修復 + 扁平吸積盤噴流)
+ * 多尺度宇宙動力學 - 真實觀測還原版 (Bug修復、全層級穩定版)
  */
 
 const LEVELS = [
@@ -126,7 +126,9 @@ const BLACK_HOLES = [
 ];
 
 const SCALE_LIMITS = [5, 50, 50, 25, 35, 35, 60, 100, 100, 150, 280, 280, 280, 1000, 2500, 3000];
-const CACHE = { streamlines: {}, webs: {}, arms: {}, cones: {} };
+
+// 【關鍵修復】：確保所有的快取容器都已宣告，避免讀取 L5 時崩潰
+const CACHE = { streamlines: {}, webs: {}, arms: {}, cones: {}, jets: {}, seeds: {} };
 
 function hexToRgba(hex, opacity = 1) {
     let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16);
@@ -233,14 +235,12 @@ class UniverseEngine {
             let phi = Math.acos(1 - 2 * (((i*43.1)%100)/100));
             x.push(center[0] + r * Math.sin(phi) * Math.cos(theta)); 
             y.push(center[1] + r * Math.sin(phi) * Math.sin(theta)); 
-            // 如果是在星系盤，強制壓扁星體分佈
             z.push(center[2] + r * Math.cos(phi) * (forceFlat ? 0.05 : 1.0));
         }
         let tf = TransformEngine.apply(x, y, z, angle, scale);
         return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: 1.5, color: this.particleColor}, hoverinfo: 'none', showlegend: false };
     }
 
-    // --- 完美修正：扁平旋臂 ---
     precalcSpiralArms(key, center, radius, arms) {
         if(CACHE.arms[key]) return CACHE.arms[key];
         let all_x=[], all_y=[], all_z=[];
@@ -251,7 +251,6 @@ class UniverseEngine {
                 let theta = (j/200) * 3 * Math.PI;
                 all_x.push(center[0] + r * Math.cos(theta + offset));
                 all_y.push(center[1] + r * Math.sin(theta + offset));
-                // 極度扁平化 (Pancake)
                 all_z.push(center[2] + randn() * 0.15); 
             }
             all_x.push(null); all_y.push(null); all_z.push(null);
@@ -265,7 +264,6 @@ class UniverseEngine {
         return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 2.5}, hoverinfo: 'none', showlegend: false }];
     }
 
-    // --- 完美修正：角動量吸積盤 + 兩極噴流微積分 ---
     precalcAccretionJets(key, center, max_scale, num_lines) {
         if(CACHE.streamlines[key]) return CACHE.streamlines[key];
         let streams = [];
@@ -289,21 +287,16 @@ class UniverseEngine {
                 let current_r = Math.hypot(dx, dy) + 0.1;
                 
                 if(state === 'accretion') {
-                    // 角動量輾壓：強烈將物質拉向赤道盤面 (Z=0)
                     cz -= dz * 0.15 * dt; 
-                    
-                    // 螺旋吸入
                     let theta_force = 1.8 / Math.sqrt(current_r);
                     let inward_force = 0.6;
                     cx += (-dx * inward_force - dy * theta_force) * dt / current_r;
                     cy += (-dy * inward_force + dx * theta_force) * dt / current_r;
                     
-                    // 抵達黑洞邊界，引發兩極高能噴流
                     if(current_r < 1.8 && Math.abs(cz) < 1.5) {
                         state = 'jet'; 
                     }
                 } else {
-                    // 噴湧勢態：沿 Z 軸高速射出，伴隨微弱自旋散開
                     cz += jet_dir * 3.5 * dt;
                     let jet_swirl = 2.5;
                     cx += (-dy * jet_swirl + dx * 0.15) * dt / current_r;
@@ -390,24 +383,20 @@ class UniverseEngine {
         return traces;
     }
 
-    // 完美還原 Python：高斯引力坍縮宇宙網 (Massive Gaussian Clustering)
     precalcDensityWeb(key, center, radius, num_halos, anchors) {
         if(CACHE.webs[key]) return CACHE.webs[key];
         
         let halos = [];
-        // 30% 散佈在宇宙背景 (展現空洞)
         let bg_count = Math.floor(num_halos * 0.3);
         for(let i=0; i<bg_count; i++) {
             halos.push([center[0] + rand(-radius, radius), center[1] + rand(-radius, radius), center[2] + rand(-radius, radius)]);
         }
         
-        // 70% 極度集中在多個長城錨點周圍 (高度塌縮效應)
         let cluster_count = num_halos - bg_count;
         if(anchors && anchors.length > 0) {
             let per_anchor = Math.floor(cluster_count / anchors.length);
             anchors.forEach(anc => {
                 for(let i=0; i<per_anchor; i++) { 
-                    // 使用高斯常態分佈製造聚攏感
                     halos.push([anc[0] + randn()*radius*0.2, anc[1] + randn()*radius*0.2, anc[2] + randn()*radius*0.2]);
                 }
             });
@@ -425,7 +414,6 @@ class UniverseEngine {
             }
             dists.sort((a,b) => a.d - b.d);
             
-            // 距離限制避免跨越空洞的錯誤連線
             for(let k=0; k<Math.min(4, dists.length); k++) {
                 if(dists[k].d < radius*0.3) {
                     let neighbor = halos[dists[k].idx];
@@ -518,19 +506,15 @@ class UniverseEngine {
             if(vis.particles && !isPlaying) t.push(this.createBackgroundParticles(300, 50.0, [0,0,0], rotationAngle, 1.0));
         } 
         else if (level_idx === 3 || level_idx === 4) {
-            // [BUG 修復]: 將 mw_center_L4 更換為動態座標 dyn.mw
             if(vis.landmarks) t.push(this.createLandmark([8,0,0], '#FF0000', '<上一層: 太陽系>', 4, 'circle', rotationAngle, 1.0));
             if(level_idx === 4 && vis.landmarks) t.push(this.createLandmark([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0));
             
-            // 銀河系星體高度壓扁
             if(vis.particles) t.push(this.createBackgroundParticles(1500, 25, dyn.mw, rotationAngle, 1.0, true));
             
             if(vis.streams) {
-                // 1. 扁平的螺旋懸臂 (Bug Fixed: dyn.mw)
                 let arms = this.precalcSpiralArms(`L${level_idx}_arms`, dyn.mw, 15, 4);
                 t.push(...this.drawSpiralArmsDynamic(arms, 'rgba(0, 255, 255, 0.4)', rotationAngle, 1.0));
                 
-                // 2. 黑洞吸積盤與極地噴流 (Pancake + Jets)
                 let jets = this.precalcAccretionJets(`L${level_idx}_jets`, dyn.mw, 25.0, 150);
                 t.push(...this.drawStreamlinesDynamic(jets, 'rgba(200, 50, 255, 0.6)', rotationAngle, 1.0));
             }
@@ -607,6 +591,10 @@ class UniverseEngine {
                     let streams = this.calcDynamicStreamlines(seeds, sim_scale, null, true); 
                     t.push(...this.drawStreamlinesDynamic(streams, 'rgba(100,150,255,0.4)', 0, expandFactor));
                 }
+                if(vis.cones) {
+                    let cones = this.precalcCones(`L14_cone`, sim_scale, 150);
+                    t.push(this.drawConesDynamic(cones, 0, expandFactor));
+                }
             }
         }
         return t;
@@ -626,7 +614,6 @@ document.getElementById('op-grid').addEventListener('input', e => document.getEl
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
 let isUserInteracting = false; 
 
-// 觀測者干涉機制：滑鼠操作時暫停時空推移，確保相機絕對自由順暢
 const plotContainer = document.getElementById('plot-container');
 plotContainer.addEventListener('mousedown', () => isUserInteracting = true);
 plotContainer.addEventListener('mouseup', () => isUserInteracting = false);
@@ -648,7 +635,6 @@ function drawFrame(forceResetCamera = false) {
     
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
     
-    // 【完美防抖動】：強制鎖定視角軸範圍
     let max_limit = SCALE_LIMITS[idx] * 2.0; 
     let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-max_limit, max_limit] };
     
@@ -656,7 +642,7 @@ function drawFrame(forceResetCamera = false) {
     let expProgress = (idx >= 12 && isPlaying) ? ` | 擴張週期: ${((loopTime/30)*100).toFixed(0)}%` : '';
 
     let layout = {
-        title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(Time: ${globalTime.toFixed(1)}s)</span>`,
+        title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(1)}s${expProgress})</span>`,
         paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
         scene: { bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' },
         margin: { l: 0, r: 0, b: 0, t: 50 },
@@ -680,7 +666,6 @@ function animatePhysics(timestamp) {
     lastTimestamp = timestamp;
     if(dt > 0.1) dt = 0.016; 
 
-    // 若使用者正在操作攝影機，略過座標重算
     if (isUserInteracting) return;
 
     globalTime += dt * (document.getElementById('op-speed').value / 10);
