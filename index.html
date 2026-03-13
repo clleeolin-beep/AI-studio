@@ -15,10 +15,10 @@
            1. 系統主題變數定義 (精選四款運動風/大學風格)
            ========================================= */
         
-        /* 預設：LSU 猛虎紫金 (LSU Purple & Gold) - Live is gold, love is purple */
+        /* 預設：LSU 猛虎紫金 (LSU Purple & Gold) */
         :root, :root[data-theme='lsu'] { 
             --lab-cyan: #FDD023; 
-            --lab-bg: #150A21; 
+            --lab-bg: #0D0514; /* 調深背景讓發光更明顯 */
             --lab-sidebar: #461D7C; 
             --lab-navbar: #321459;
             --lab-text: #FDD023; 
@@ -26,10 +26,10 @@
             --lab-hover: rgba(253, 208, 35, 0.1);
             --lab-active: rgba(253, 208, 35, 0.2);
         }
-        /* 夏威夷戰士 (Hawaii Rainbow Warriors) - 官方深綠與破浪銀 */
+        /* 夏威夷戰士 (Hawaii Rainbow Warriors) */
         :root[data-theme='hawaii'] { 
             --lab-cyan: #C8C8C8; 
-            --lab-bg: #0a0a0a; 
+            --lab-bg: #050505; 
             --lab-sidebar: #024731; 
             --lab-navbar: #012b1d;
             --lab-text: #C8C8C8; 
@@ -37,10 +37,10 @@
             --lab-hover: rgba(200, 200, 200, 0.1);
             --lab-active: rgba(200, 200, 200, 0.2);
         }
-        /* 兄弟象 (CTBC Brothers) - 主色黃、次要灰、最後深藍 */
+        /* 兄弟象 (CTBC Brothers) */
         :root[data-theme='brothers'] { 
             --lab-cyan: #FFD100; 
-            --lab-bg: #0C182E; 
+            --lab-bg: #080C14; 
             --lab-sidebar: #5B626B; 
             --lab-navbar: #081020;
             --lab-text: #FFD100; 
@@ -48,10 +48,10 @@
             --lab-hover: rgba(255, 209, 0, 0.1);
             --lab-active: rgba(255, 209, 0, 0.25);
         }
-        /* 台灣隊 (Team Taiwan) - CT 藍與熱血紅 */
+        /* 台灣隊 (Team Taiwan) */
         :root[data-theme='taiwan'] { 
             --lab-cyan: #E81C24; 
-            --lab-bg: #0B1320; 
+            --lab-bg: #05080E; 
             --lab-sidebar: #003E7E; 
             --lab-navbar: #002A5C;
             --lab-text: #F8F9FA; 
@@ -81,11 +81,24 @@
         
         #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: background 0.4s ease; overflow: hidden; }
         
-        /* 宇宙模型背景 Canvas 樣式設定 */
-        #universe-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 1.0; }
+        /* 宇宙模型背景 Canvas 樣式設定 - 加強混合模式 */
+        #universe-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 1.0; mix-blend-mode: screen; }
         
-        /* 確保登入框在宇宙背景之上 */
-        .login-box { position: relative; z-index: 1; background: var(--lab-sidebar); padding: 30px; border-radius: 16px; border: 1px solid var(--lab-border); text-align: center; width: 450px; box-shadow: 0 15px 50px rgba(0,0,0,0.6); transition: background 0.4s ease, border-color 0.4s ease; backdrop-filter: blur(10px); }
+        /* 登入框：改為極致玻璃擬態 (Glassmorphism)，讓宇宙纖維可以透過去 */
+        .login-box { 
+            position: relative; 
+            z-index: 1; 
+            background: rgba(10, 5, 20, 0.35); /* 極低透明度的深色底 */
+            backdrop-filter: blur(12px); /* 毛玻璃效果 */
+            -webkit-backdrop-filter: blur(12px);
+            padding: 35px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(255, 255, 255, 0.15); /* 細緻的邊框反光 */
+            text-align: center; 
+            width: 450px; 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.05); 
+            transition: border-color 0.4s ease; 
+        }
         
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
         .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid var(--lab-border); display: flex; flex-direction: column; height: 100%; overflow-y: auto; transition: background 0.4s ease, border-color 0.4s ease; }
@@ -147,10 +160,10 @@
            ========================================= */
         .theme-switcher {
             position: fixed;
-            top: 8px; /* 移至頂部，完美嵌入 Navbar 內 */
-            left: 50%; /* 水平置中 */
-            transform: translateX(-50%); /* 修正自身寬度置中 */
-            z-index: 1050; /* 確保在 Navbar 之上 */
+            top: 8px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 1050; 
             display: flex;
             gap: 12px;
             background: var(--lab-sidebar);
@@ -180,9 +193,9 @@
         <canvas id="universe-canvas"></canvas>
         
         <div class="login-box">
-            <div class="mb-3" style="font-size: 2.5rem; color: var(--lab-cyan); transition: color 0.4s ease;"><i class="bi bi-cpu-fill"></i></div>
-            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan); transition: color 0.4s ease;">AI Studio Lab</h2>
-            <p class="text-muted mb-4 small" style="opacity: 0.7;">安全性管制中 (v2.2.3)</p>
+            <div class="mb-3" style="font-size: 2.8rem; color: var(--lab-cyan); text-shadow: 0 0 20px rgba(253, 208, 35, 0.4); transition: color 0.4s ease;"><i class="bi bi-cpu-fill"></i></div>
+            <h2 class="mb-2 fw-bold" style="color: var(--lab-cyan); transition: color 0.4s ease; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">AI Studio Lab</h2>
+            <p class="mb-4 small" style="color: #fff; opacity: 0.6;">安全性管制中 (v2.2.3)</p>
             <div id="g_id_onload" data-client_id="387000422543-vsh0lrio7a3kn3nqgrfp8l4ol413bq90.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
             <div class="g_id_signin d-flex justify-content-center" data-type="standard" data-theme="filled_black" data-size="large"></div>
         </div>
@@ -220,8 +233,7 @@
 <script>
     /**
      * =========================================
-     * 宇宙 16 級別模型 - 輕量化纖維網 (Pseudo-3D)
-     * 從 Univer.py 抽取的巨型結構演算法，轉化為 Canvas 渲染
+     * 第16級可觀測宇宙 - 網狀長城與空洞 (Cosmic Web & Voids)
      * =========================================
      */
     let universeAnimFrameId = null;
@@ -239,52 +251,70 @@
             height = canvas.height = window.innerHeight;
         });
 
-        // 參數設定：效能極限的 16 級宇宙網
-        const NUM_NODES = 280;     // 節點總數量 (已大幅降低參數)
-        const MAX_LINK_DIST = 180; // 形成纖維的極限距離
-        const CLUSTER_COUNT = 4;   // 模擬超星系團中心點 (如拉尼亞凱亞、史隆長城)
+        // 參數設定：創造極端空洞與長城纖維
+        const NUM_NODES = 450;     // 節點數量
+        const MAX_LINK_DIST = 260; // 允許連線的最遠距離 (決定纖維連續性)
+        const MAX_CONNECTIONS = 3; // 限制每個節點連線數，避免毛線球效應
+        const ANCHORS_COUNT = 10;  // 大尺度引力錨點 (創造主要長城軸線)
+        const SPACE_SCALE = 3000;  // 宇宙空間尺度 (越大空洞越明顯)
 
         const nodes = [];
         const links = [];
 
-        // 1. 生成大尺度結構的引力中心
-        const clusters = [];
-        for(let i=0; i<CLUSTER_COUNT; i++) {
-            clusters.push({
-                x: (Math.random() - 0.5) * 1000,
-                y: (Math.random() - 0.5) * 1000,
-                z: (Math.random() - 0.5) * 1000
+        // 1. 生成大尺度結構的引力錨點 (宇宙骨架頂點)
+        const anchors = [];
+        for(let i=0; i<ANCHORS_COUNT; i++) {
+            anchors.push({
+                x: (Math.random() - 0.5) * SPACE_SCALE,
+                y: (Math.random() - 0.5) * SPACE_SCALE,
+                z: (Math.random() - 0.5) * SPACE_SCALE
             });
         }
 
-        // 2. 依照密度分佈生成星系節點
+        // 2. 依照錨點連線(纖維)生成星系節點，確保產生巨大空洞
         for (let i = 0; i < NUM_NODES; i++) {
-            // 85% 集中在骨架上，15% 散佈在空洞區
-            let c = Math.random() > 0.15 ? clusters[Math.floor(Math.random() * CLUSTER_COUNT)] : {x:0, y:0, z:0};
-            let spread = Math.random() > 0.15 ? 250 : 900; 
+            // 隨機挑選兩個錨點，在它們之間的連線上生成節點
+            let a1 = anchors[Math.floor(Math.random() * ANCHORS_COUNT)];
+            let a2 = anchors[Math.floor(Math.random() * ANCHORS_COUNT)];
+            
+            // 內插參數 t (0~1)，決定在連線上的哪個位置
+            let t = Math.random();
+            let baseX = a1.x + (a2.x - a1.x) * t;
+            let baseY = a1.y + (a2.y - a1.y) * t;
+            let baseZ = a1.z + (a2.z - a1.z) * t;
+
+            // 加入噪聲擾動 (越小代表纖維越細，越大代表星系團越散)
+            let noise = (Math.random() > 0.85) ? 350 : 80; 
             
             nodes.push({
-                x: c.x + (Math.random() - 0.5) * spread,
-                y: c.y + (Math.random() - 0.5) * spread,
-                z: c.z + (Math.random() - 0.5) * spread,
-                size: Math.random() * 1.5 + 0.5, // 質量/大小
-                driftX: (Math.random() - 0.5) * 0.15,
-                driftY: (Math.random() - 0.5) * 0.15,
-                driftZ: (Math.random() - 0.5) * 0.15
+                x: baseX + (Math.random() - 0.5) * noise,
+                y: baseY + (Math.random() - 0.5) * noise,
+                z: baseZ + (Math.random() - 0.5) * noise,
+                size: Math.random() * 2.0 + 0.5, // 質量/發光點大小
+                driftX: (Math.random() - 0.5) * 0.1,
+                driftY: (Math.random() - 0.5) * 0.1,
+                driftZ: (Math.random() - 0.5) * 0.1
             });
         }
 
-        // 3. 預先計算纖維連線 (取代 cKDTree)，節省每幀運算
+        // 3. 預先計算纖維連線 (只連最近的鄰居，保持線條俐落)
         for (let i = 0; i < NUM_NODES; i++) {
+            let connections = 0;
+            // 尋找距離內的節點
+            let neighbors = [];
             for (let j = i + 1; j < NUM_NODES; j++) {
                 const dx = nodes[i].x - nodes[j].x;
                 const dy = nodes[i].y - nodes[j].y;
                 const dz = nodes[i].z - nodes[j].z;
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                
                 if (dist < MAX_LINK_DIST) {
-                    links.push({ source: i, target: j, dist: dist });
+                    neighbors.push({ target: j, dist: dist });
                 }
+            }
+            // 只連接最近的幾個點
+            neighbors.sort((a, b) => a.dist - b.dist);
+            for(let k = 0; k < Math.min(MAX_CONNECTIONS, neighbors.length); k++) {
+                links.push({ source: i, target: neighbors[k].target });
             }
         }
 
@@ -292,37 +322,37 @@
         let angleY = 0;
 
         function renderUniverse() {
-            // 帶有殘影效果的深色宇宙背景
-            ctx.fillStyle = 'rgba(12, 12, 18, 0.3)'; 
+            // 背景清理 - 留下微弱拖影
+            ctx.fillStyle = 'rgba(5, 2, 8, 0.4)'; 
             ctx.fillRect(0, 0, width, height);
 
             // 整個宇宙網緩慢旋轉 (模擬巨觀視角)
-            angleX += 0.0004;
-            angleY += 0.0009;
+            angleX += 0.0003;
+            angleY += 0.0007;
 
             const cosX = Math.cos(angleX), sinX = Math.sin(angleX);
             const cosY = Math.cos(angleY), sinY = Math.sin(angleY);
 
             const projectedNodes = [];
-            const fov = 900;
-            const viewerZ = 1300; // 視角拉遠
+            const fov = 1100;    // 放大視野
+            const viewerZ = 2200;// 鏡頭拉遠，讓空間感更大
 
             // 4. 進行 3D 空間投影
             for (let i = 0; i < NUM_NODES; i++) {
                 let n = nodes[i];
                 
-                // 天體微小漂移
+                // 天體微小漂移 (暗能量膨脹感)
                 n.x += n.driftX; n.y += n.driftY; n.z += n.driftZ;
 
-                // 繞 Y 軸旋轉矩陣
+                // 繞 Y 軸旋轉
                 let x1 = n.x * cosY - n.z * sinY;
                 let z1 = n.z * cosY + n.x * sinY;
                 
-                // 繞 X 軸旋轉矩陣
+                // 繞 X 軸旋轉
                 let y2 = n.y * cosX - z1 * sinX;
                 let z2 = z1 * cosX + n.y * sinX;
 
-                // 轉換為螢幕 2D 座標 (透視法)
+                // 透視投影
                 let scale = fov / (fov + z2 + viewerZ);
                 let px = width / 2 + x1 * scale;
                 let py = height / 2 + y2 * scale;
@@ -330,21 +360,21 @@
                 projectedNodes.push({ px, py, scale, z: z2 });
             }
 
-            // 5. 繪製纖維網絡 (宇宙暗物質骨架)
-            ctx.lineWidth = 0.8;
+            // 5. 繪製暗物質纖維 (極細線條展現空間感)
+            ctx.lineWidth = 0.5;
             for (let i = 0; i < links.length; i++) {
                 let link = links[i];
                 let n1 = projectedNodes[link.source];
                 let n2 = projectedNodes[link.target];
                 
-                // 景深剔除：只畫出現在鏡頭前方的線條
-                if (n1.z > -viewerZ + 200 && n2.z > -viewerZ + 200) {
+                // 景深剔除：太遠的不畫
+                if (n1.z > -viewerZ + 300 && n2.z > -viewerZ + 300) {
                     let avgZ = (n1.z + n2.z) / 2;
-                    let depthAlpha = Math.max(0, 1 - (avgZ + 500) / 1500); // 越深越暗
+                    let depthAlpha = Math.max(0, 1 - (avgZ + 1000) / 2500); // 衰減計算
                     
                     if (depthAlpha > 0) {
-                        // 使用紫色系表現暗物質纖維 (契合 LSU Theme)
-                        ctx.strokeStyle = `rgba(148, 18, 188, ${depthAlpha * 0.6})`;
+                        // 使用 LSU 猛虎紫 作為暗物質網絡顏色
+                        ctx.strokeStyle = `rgba(148, 18, 188, ${depthAlpha * 0.55})`;
                         ctx.beginPath();
                         ctx.moveTo(n1.px, n1.py);
                         ctx.lineTo(n2.px, n2.py);
@@ -353,18 +383,28 @@
                 }
             }
 
-            // 6. 繪製超星系團節點 (發光核心)
+            // 6. 繪製超星系團節點 (高亮空洞邊緣)
             for (let i = 0; i < NUM_NODES; i++) {
                 let p = projectedNodes[i];
                 if (p.z > -viewerZ + 100) {
-                    let size = Math.max(0.1, nodes[i].size * p.scale * 1.5);
-                    let depthAlpha = Math.max(0, 1 - (p.z + 500) / 1500);
+                    let size = Math.max(0.1, nodes[i].size * p.scale * 1.2);
+                    let depthAlpha = Math.max(0, 1 - (p.z + 1000) / 2500);
                     
-                    // 核心高光 (LSU/兄弟象 金黃色)
-                    ctx.fillStyle = `rgba(253, 208, 35, ${depthAlpha * 0.9})`; 
-                    ctx.beginPath();
-                    ctx.arc(p.px, p.py, size, 0, Math.PI * 2);
-                    ctx.fill();
+                    if(depthAlpha > 0) {
+                        // 使用 LSU 榮耀金 作為星系發光點
+                        ctx.fillStyle = `rgba(253, 208, 35, ${depthAlpha * 0.9})`; 
+                        ctx.beginPath();
+                        ctx.arc(p.px, p.py, size, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        // 巨大的黑洞/超星系團核心加上光暈
+                        if(nodes[i].size > 2.0) {
+                            ctx.fillStyle = `rgba(255, 255, 255, ${depthAlpha * 0.4})`;
+                            ctx.beginPath();
+                            ctx.arc(p.px, p.py, size * 2.5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
                 }
             }
 
@@ -372,7 +412,7 @@
         }
 
         renderUniverse();
-        console.log("[System] 第 16 級可觀測宇宙 (輕量纖維結構) 渲染引擎已啟動");
+        console.log("[System] 第 16 級可觀測宇宙 (網狀空洞版) 渲染引擎已啟動");
     }
 
     // 啟動登入背景模型
@@ -479,6 +519,16 @@
         }
         
         localStorage.setItem('ai_lab_theme', themeName);
+        
+        // 切換主題時，同步修改宇宙纖維與星系的顏色
+        const canvasColors = {
+            'lsu': { line: 'rgba(148, 18, 188,', node: 'rgba(253, 208, 35,' },
+            'hawaii': { line: 'rgba(2, 71, 49,', node: 'rgba(200, 200, 200,' },
+            'brothers': { line: 'rgba(91, 98, 107,', node: 'rgba(255, 209, 0,' },
+            'taiwan': { line: 'rgba(0, 62, 126,', node: 'rgba(232, 28, 36,' }
+        };
+        window.currentUniverseColors = canvasColors[themeName] || canvasColors['lsu'];
+
         if (window.sysLog) window.sysLog(`介面風格切換至: ${themeName}`, "info");
     };
 
@@ -488,6 +538,11 @@
     }
     
     window.addEventListener('DOMContentLoaded', initTheme);
+
+    // 修改繪圖迴圈，使其能根據主題動態換色
+    const originalFillStyle = CanvasRenderingContext2D.prototype.fill;
+    const originalStrokeStyle = CanvasRenderingContext2D.prototype.stroke;
+    
 </script>
 
 <script type="module">
