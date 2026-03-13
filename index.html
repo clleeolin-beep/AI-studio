@@ -148,17 +148,18 @@
         }
 
         /* =========================================
-           5. 風格切換按鈕容器 (Theme Switcher)
+           5. 風格切換按鈕容器 (Theme Switcher)          
            ========================================= */
         .theme-switcher {
             position: fixed;
-            left: 20px;
-            bottom: 20px;
-            z-index: 999;
+            top: 8px; /* 移至頂部，完美嵌入 Navbar 內 */
+            left: 50%; /* 水平置中 */
+            transform: translateX(-50%); /* 修正自身寬度置中 */
+            z-index: 1050; /* 確保在 Navbar 之上 */
             display: flex;
             gap: 12px;
             background: var(--lab-sidebar);
-            padding: 10px 16px;
+            padding: 8px 16px;
             border-radius: 30px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             border: 1px solid var(--lab-border);
@@ -172,6 +173,7 @@
             border: 2px solid transparent;
             transition: transform 0.2s ease, border-color 0.2s ease;
             opacity: 0.8;
+            box-sizing: border-box;
         }
         .theme-btn:hover { transform: scale(1.15); opacity: 1; }
         .theme-btn.active { border-color: var(--lab-text); transform: scale(1.15); opacity: 1; }
@@ -396,6 +398,7 @@
 </script>
 </body>
 </html>
+
 
 
 
