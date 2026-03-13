@@ -12,22 +12,11 @@
     
     <style>
         /* =========================================
-           1. 系統主題變數定義 (四款深度客製化風格)
+           1. 系統主題變數定義 (精選四款運動風/大學風格)
            ========================================= */
         
-        /* 簡約商務 (Clean Light) - 惇陽企業識別與高對比文書環境 */
-        :root[data-theme='light'] { 
-            --lab-cyan: #ff8c00; 
-            --lab-bg: #f4f6f8; 
-            --lab-sidebar: #ffffff; 
-            --lab-navbar: #ffffff;
-            --lab-text: #ff8c00; 
-            --lab-border: rgba(0, 0, 0, 0.08);
-            --lab-hover: rgba(255, 140, 0, 0.05);
-            --lab-active: rgba(255, 140, 0, 0.1);
-        }
-        /* LSU 猛虎紫金 (LSU Purple & Gold) - Live is gold, love is purple */
-        :root[data-theme='lsu'] { 
+        /* 預設：LSU 猛虎紫金 (LSU Purple & Gold) - Live is gold, love is purple */
+        :root, :root[data-theme='lsu'] { 
             --lab-cyan: #FDD023; 
             --lab-bg: #150A21; 
             --lab-sidebar: #461D7C; 
@@ -37,7 +26,7 @@
             --lab-hover: rgba(253, 208, 35, 0.1);
             --lab-active: rgba(253, 208, 35, 0.2);
         }
-        /* 夏威夷戰士 (Hawaii Rainbow Warriors) - 官方深綠與銀色 */
+        /* 夏威夷戰士 (Hawaii Rainbow Warriors) - 官方深綠與破浪銀 */
         :root[data-theme='hawaii'] { 
             --lab-cyan: #C8C8C8; 
             --lab-bg: #0a0a0a; 
@@ -48,16 +37,16 @@
             --lab-hover: rgba(200, 200, 200, 0.1);
             --lab-active: rgba(200, 200, 200, 0.2);
         }
-        /* 兄弟象 (CTBC Brothers) - 黃衫軍與藏青 */
+        /* 兄弟象 (CTBC Brothers) - 主色黃、次要灰、最後深藍 */
         :root[data-theme='brothers'] { 
-            --lab-cyan: #FFCC00; 
-            --lab-bg: #111111; 
-            --lab-sidebar: #08102B; 
-            --lab-navbar: #0A1438;
-            --lab-text: #FFCC00; 
-            --lab-border: rgba(255, 204, 0, 0.15);
-            --lab-hover: rgba(255, 204, 0, 0.1);
-            --lab-active: rgba(255, 204, 0, 0.2);
+            --lab-cyan: #FFD100; 
+            --lab-bg: #0C182E; 
+            --lab-sidebar: #5B626B; 
+            --lab-navbar: #081020;
+            --lab-text: #FFD100; 
+            --lab-border: rgba(255, 209, 0, 0.2);
+            --lab-hover: rgba(255, 209, 0, 0.1);
+            --lab-active: rgba(255, 209, 0, 0.25);
         }
         /* 台灣隊 (Team Taiwan) - CT 藍與熱血紅 */
         :root[data-theme='taiwan'] { 
@@ -215,13 +204,9 @@
     </div>
 
     <div class="theme-switcher">
-        <div class="theme-btn active" style="background: #1B400D;" onclick="changeTheme('green', this)" title="森林綠 (預設)"></div>
-        <div class="theme-btn" style="background: #9412BC;" onclick="changeTheme('purple', this)" title="深夜極客"></div>
-        <div class="theme-btn" style="background: #BB9A88;" onclick="changeTheme('gold', this)" title="尊爵琥珀"></div>
-        <div class="theme-btn" style="background: #ffffff; border: 1px solid #ccc;" onclick="changeTheme('light', this)" title="簡約商務"></div>
-        <div class="theme-btn" style="background: #461D7C; border: 2px solid #FDD023;" onclick="changeTheme('lsu', this)" title="猛虎紫金 (LSU)"></div>
+        <div class="theme-btn active" style="background: #461D7C; border: 2px solid #FDD023;" onclick="changeTheme('lsu', this)" title="猛虎紫金 (LSU)"></div>
         <div class="theme-btn" style="background: #024731; border: 2px solid #C8C8C8;" onclick="changeTheme('hawaii', this)" title="夏威夷戰士 (Hawaii)"></div>
-        <div class="theme-btn" style="background: #08102B; border: 2px solid #FFCC00;" onclick="changeTheme('brothers', this)" title="兄弟象 (Brothers)"></div>
+        <div class="theme-btn" style="background: #5B626B; border: 2px solid #FFD100;" onclick="changeTheme('brothers', this)" title="兄弟象 (Brothers)"></div>
         <div class="theme-btn" style="background: #003E7E; border: 2px solid #E81C24;" onclick="changeTheme('taiwan', this)" title="台灣隊 (Team Taiwan)"></div>
     </div>
 
@@ -323,7 +308,7 @@
 
     /**
      * 切換系統主題風格
-     * @param {string} themeName 主題名稱 (green, purple, gold, light, lsu, hawaii, brothers, taiwan)
+     * @param {string} themeName 主題名稱 (lsu, hawaii, brothers, taiwan)
      * @param {HTMLElement} el 點擊的元素
      */
     window.changeTheme = function(themeName, el) {
@@ -345,7 +330,7 @@
 
     // 主題初始化
     async function initTheme() {
-        const savedTheme = localStorage.getItem('ai_lab_theme') || 'green'; // 預設森林綠
+        const savedTheme = localStorage.getItem('ai_lab_theme') || 'lsu'; // 預設 LSU
         window.changeTheme(savedTheme);
     }
     
@@ -403,4 +388,3 @@
 </script>
 </body>
 </html>
-
