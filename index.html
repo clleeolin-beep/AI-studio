@@ -12,7 +12,7 @@
     
     <style>
         /* =========================================
-           1. 系統主題變數定義 (四款深度客製化風格)
+           1. 系統主題變數定義 (六款深度客製化風格)
            ========================================= */
         
         /* 預設：森林綠 (Eco Green) - 植栽與大地意象 */
@@ -26,27 +26,27 @@
             --lab-hover: rgba(255, 255, 255, 0.05);
             --lab-active: rgba(203, 196, 56, 0.15);
         }
-/* 猛虎紫金 (LSU Go Tiger) - Live is gold, love is purple */
-        :root[data-theme='lsu'] { 
-            --lab-cyan: #FDD023; 
-            --lab-bg: #150A21; 
-            --lab-sidebar: #461D7C; 
-            --lab-navbar: #321459;
-            --lab-text: #FDD023; 
-            --lab-border: rgba(253, 208, 35, 0.15);
-            --lab-hover: rgba(253, 208, 35, 0.1);
-            --lab-active: rgba(253, 208, 35, 0.2);
-        }
         /* 深夜極客 (Midnight Purple) - 靜謐深空與開發者氛圍 */
         :root[data-theme='purple'] { 
             --lab-cyan: #e2e8f0; 
             --lab-bg: #1F0737; 
-            --lab-sidebar: #e2e8f0; 
+            --lab-sidebar: #9412BC; 
             --lab-navbar: #3E74AE;
-            --lab-text: #9412BC; 
+            --lab-text: #e2e8f0; 
             --lab-border: rgba(255, 255, 255, 0.15);
             --lab-hover: rgba(255, 255, 255, 0.1);
             --lab-active: rgba(255, 255, 255, 0.2);
+        }
+        /* 尊爵琥珀 (Industrial Gold) - 大地岩石與低彩度石材 */
+        :root[data-theme='gold'] { 
+            --lab-cyan: #979D6E; 
+            --lab-bg: #2d2a28; 
+            --lab-sidebar: #BB9A88; 
+            --lab-navbar: #CAC6BD;
+            --lab-text: #979D6E; 
+            --lab-border: rgba(0, 0, 0, 0.1);
+            --lab-hover: rgba(0, 0, 0, 0.05);
+            --lab-active: rgba(151, 157, 110, 0.15);
         }
         /* 簡約商務 (Clean Light) - 惇陽企業識別與高對比文書環境 */
         :root[data-theme='light'] { 
@@ -59,7 +59,18 @@
             --lab-hover: rgba(255, 140, 0, 0.05);
             --lab-active: rgba(255, 140, 0, 0.1);
         }
-/* 夏威夷戰士 (Hawaii Rainbow Warriors) - 官方深綠與銀色 */
+        /* LSU 猛虎紫金 (LSU Purple & Gold) - Live is gold, love is purple */
+        :root[data-theme='lsu'] { 
+            --lab-cyan: #FDD023; 
+            --lab-bg: #150A21; 
+            --lab-sidebar: #461D7C; 
+            --lab-navbar: #321459;
+            --lab-text: #FDD023; 
+            --lab-border: rgba(253, 208, 35, 0.15);
+            --lab-hover: rgba(253, 208, 35, 0.1);
+            --lab-active: rgba(253, 208, 35, 0.2);
+        }
+        /* 夏威夷戰士 (Hawaii Rainbow Warriors) - 官方深綠與銀色 */
         :root[data-theme='hawaii'] { 
             --lab-cyan: #C8C8C8; 
             --lab-bg: #0a0a0a; 
@@ -70,6 +81,7 @@
             --lab-hover: rgba(200, 200, 200, 0.1);
             --lab-active: rgba(200, 200, 200, 0.2);
         }
+
         /* =========================================
            2. 核心佈局與全域樣式
            ========================================= */
@@ -148,7 +160,7 @@
         }
 
         /* =========================================
-           5. 風格切換按鈕容器 (Theme Switcher)          
+           5. 風格切換按鈕容器 (Theme Switcher)
            ========================================= */
         .theme-switcher {
             position: fixed;
@@ -218,6 +230,8 @@
         <div class="theme-btn" style="background: #9412BC;" onclick="changeTheme('purple', this)" title="深夜極客"></div>
         <div class="theme-btn" style="background: #BB9A88;" onclick="changeTheme('gold', this)" title="尊爵琥珀"></div>
         <div class="theme-btn" style="background: #ffffff; border: 1px solid #ccc;" onclick="changeTheme('light', this)" title="簡約商務"></div>
+        <div class="theme-btn" style="background: #461D7C; border: 2px solid #FDD023;" onclick="changeTheme('lsu', this)" title="猛虎紫金 (LSU)"></div>
+        <div class="theme-btn" style="background: #024731; border: 2px solid #C8C8C8;" onclick="changeTheme('hawaii', this)" title="夏威夷戰士 (Hawaii)"></div>
     </div>
 
 <script>
@@ -318,7 +332,7 @@
 
     /**
      * 切換系統主題風格
-     * @param {string} themeName 主題名稱 (green, purple, gold, light)
+     * @param {string} themeName 主題名稱 (green, purple, gold, light, lsu, hawaii)
      * @param {HTMLElement} el 點擊的元素
      */
     window.changeTheme = function(themeName, el) {
@@ -398,9 +412,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
-
