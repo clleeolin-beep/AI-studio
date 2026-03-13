@@ -11,17 +11,53 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <style>
-        :root { --lab-cyan: #00f2ff; --lab-bg: #0f172a; --lab-sidebar: #1e293b; }
-        body, html { background: var(--lab-bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; }
+        /* 定義主題變數 */
+        /* 預設：森林綠 (Eco Green) */
+        :root, :root[data-theme='green'] { 
+            --lab-cyan: #00ff88; 
+            --lab-bg: #051610; 
+            --lab-sidebar: #0a261d; 
+            --lab-text: #ffffff; 
+        }
+        /* 惇陽橘 (Tun-Yang Orange) */
+        :root[data-theme='orange'] { 
+            --lab-cyan: #ff8c00; 
+            --lab-bg: #1a0f00; 
+            --lab-sidebar: #2d1a00; 
+            --lab-text: #ffffff; 
+        }
+        /* 深夜極客 (Midnight Purple) */
+        :root[data-theme='purple'] { 
+            --lab-cyan: #bc13fe; 
+            --lab-bg: #1a1a2e; 
+            --lab-sidebar: #16213e; 
+            --lab-text: #ffffff; 
+        }
+        /* 尊爵琥珀 (Industrial Gold) */
+        :root[data-theme='gold'] { 
+            --lab-cyan: #ffcc00; 
+            --lab-bg: #1c1c1c; 
+            --lab-sidebar: #2d2d2d; 
+            --lab-text: #ffffff; 
+        }
+        /* 簡約商務 (Clean Light) */
+        :root[data-theme='light'] { 
+            --lab-cyan: #0d6efd; 
+            --lab-bg: #f8f9fa; 
+            --lab-sidebar: #ffffff; 
+            --lab-text: #212529; 
+        }
+
+        body, html { background: var(--lab-bg); color: var(--lab-text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; transition: background 0.3s, color 0.3s; }
         
-        .navbar { background: #000 !important; border-bottom: 1px solid #334155; height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; }
+        .navbar { background: #000 !important; border-bottom: 1px solid rgba(255,255,255,0.1); height: 56px; padding: 0 20px; flex-shrink: 0; display: flex; align-items: center; }
         .navbar-brand { color: var(--lab-cyan) !important; font-weight: 800; text-decoration: none; }
         
         #auth-overlay { position: fixed; inset: 0; background: var(--lab-bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .login-box { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .login-box { background: var(--lab-sidebar); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); text-align: center; width: 450px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
         
         #main-layout { display: none; height: calc(100vh - 56px); width: 100%; overflow: hidden; }
-        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid #334155; display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
+        .sidebar { width: 280px; min-width: 280px; background: var(--lab-sidebar); border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; height: 100%; overflow-y: auto; }
 
         /* 偵錯視窗樣式 */
         #debug-log-window { 
@@ -31,7 +67,7 @@
             backdrop-filter: blur(10px);
         }
         #debug-header { 
-            padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid #334155;
+            padding: 8px 15px; background: var(--lab-sidebar); border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex; justify-content: space-between; align-items: center; cursor: move; border-radius: 10px 10px 0 0;
         }
         #debug-log { 
@@ -39,19 +75,44 @@
             padding: 10px; overflow-y: auto; word-break: break-all;
         }
 
-        .content-area { flex-grow: 1; background: #000; position: relative; }
+        .content-area { flex-grow: 1; background: var(--lab-bg); position: relative; }
         iframe { width: 100%; height: 100%; border: none; display: block; }
 
         /* 選單與收合樣式 */
-        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: #cbd5e1; font-weight: 600; font-size: 13px; }
+        .category-item { cursor: pointer; padding: 12px 20px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; color: var(--lab-text); opacity: 0.8; font-weight: 600; font-size: 13px; }
         .module-group { max-height: 1000px; overflow: hidden; transition: max-height 0.4s ease-out; }
         .module-group.collapsed { max-height: 0; }
         .bi-chevron-down { transition: transform 0.3s; font-size: 10px; }
         .collapsed .bi-chevron-down { transform: rotate(-90deg); }
 
-        .nav-link { color: #94a3b8; padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; }
-        .nav-link:hover { color: var(--lab-cyan); background: rgba(0,242,255,0.05); }
-        .nav-link.active { color: var(--lab-cyan); background: rgba(0,242,255,0.1); border-left: 4px solid var(--lab-cyan); }
+        .nav-link { color: var(--lab-text); opacity: 0.7; padding: 10px 20px 10px 45px; display: flex; align-items: center; transition: 0.3s; text-decoration: none; cursor: pointer; border-left: 4px solid transparent; font-size: 14px; }
+        .nav-link:hover { color: var(--lab-cyan); background: rgba(255,255,255,0.05); opacity: 1; }
+        .nav-link.active { color: var(--lab-cyan); background: rgba(255,255,255,0.1); border-left: 4px solid var(--lab-cyan); opacity: 1; }
+
+        /* 風格切換按鈕容器樣式 */
+        .theme-switcher {
+            position: fixed;
+            left: 20px;
+            bottom: 20px;
+            z-index: 999;
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 15px;
+            border-radius: 30px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .theme-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.2); }
+        .theme-btn.active { border-color: white; box-shadow: 0 0 8px var(--lab-cyan); }
     </style>
 </head>
 <body>
@@ -69,7 +130,7 @@
     <nav class="navbar navbar-dark">
         <a class="navbar-brand me-auto" href="#"><i class="bi bi-intersect me-2"></i>AI STUDIO <span class="badge bg-dark border border-info ms-2" id="sys-version" style="color:var(--lab-cyan)">--</span></a>
         <div class="d-flex align-items-center">
-            <button class="btn btn-sm btn-outline-info me-3" onclick="toggleDebugWindow()"><i class="bi bi-terminal me-1"></i>偵錯</button>
+            <button class="btn btn-sm btn-outline-info me-3" onclick="toggleDebugWindow()" style="color: var(--lab-cyan); border-color: var(--lab-cyan);"><i class="bi bi-terminal me-1"></i>偵錯</button>
             <span id="user-display" class="me-3 small text-muted font-monospace"></span>
             <button class="btn btn-sm btn-outline-danger border-0" onclick="logout()"><i class="bi bi-box-arrow-right"></i></button>
         </div>
@@ -86,6 +147,14 @@
     <div id="main-layout" class="d-flex">
         <aside class="sidebar"><div id="menu-container"></div></aside>
         <main class="content-area"><iframe id="main-frame" name="main-frame" src="about:blank"></iframe></main>
+    </div>
+
+    <div class="theme-switcher">
+        <div class="theme-btn active" style="background: #00ff88;" onclick="changeTheme('green', this)" title="森林綠 (預設)"></div>
+        <div class="theme-btn" style="background: #ff8c00;" onclick="changeTheme('orange', this)" title="惇陽橘"></div>
+        <div class="theme-btn" style="background: #bc13fe;" onclick="changeTheme('purple', this)" title="深夜極客"></div>
+        <div class="theme-btn" style="background: #ffcc00;" onclick="changeTheme('gold', this)" title="尊爵琥珀"></div>
+        <div class="theme-btn" style="background: #ffffff; border: 1px solid #ccc;" onclick="changeTheme('light', this)" title="簡約商務"></div>
     </div>
 
 <script>
@@ -106,7 +175,7 @@
         const logBox = document.getElementById('debug-log');
         if (logBox) {
             const div = document.createElement('div');
-            const colors = { err: '#ff4b4b', error: '#ff4b4b', success: '#00f2ff', warn: '#ffbb33', info: '#00ff00' };
+            const colors = { err: '#ff4b4b', error: '#ff4b4b', success: 'var(--lab-cyan)', warn: '#ffbb33', info: '#00ff00' };
             div.style.color = colors[type.toLowerCase()] || '#0f0';
             div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
             div.style.padding = '2px 0';
@@ -183,6 +252,36 @@
         isDragging = false;
         dragHeader.style.cursor = 'move';
     });
+
+    /**
+     * 切換系統主題風格
+     * @param {string} themeName 主題名稱
+     * @param {HTMLElement} el 點擊的元素
+     */
+    window.changeTheme = function(themeName, el) {
+        document.documentElement.setAttribute('data-theme', themeName);
+        
+        // 更新 UI 狀態
+        document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+        if (el) {
+            el.classList.add('active');
+        } else {
+            // 初始化時根據名稱找按鈕
+            const target = document.querySelector(`.theme-btn[onclick*='${themeName}']`);
+            if (target) target.classList.add('active');
+        }
+        
+        localStorage.setItem('ai_lab_theme', themeName);
+        if (window.sysLog) window.sysLog(`介面風格切換至: ${themeName}`, "success");
+    };
+
+    // 主題初始化
+    async function initTheme() {
+        const savedTheme = localStorage.getItem('ai_lab_theme') || 'green';
+        window.changeTheme(savedTheme);
+    }
+    
+    window.addEventListener('DOMContentLoaded', initTheme);
 </script>
 
 <script type="module">
@@ -193,21 +292,21 @@
      * [核心啟動程序]
      * 對接全域 startSystem 供 Auth 回調使用
      */
-// 確保 DebugInstance 為單例模式，並能接收來自 iframe 的訊息
-window.startSystem = function() {
-    document.getElementById('auth-overlay').style.display = 'none';
-    document.getElementById('main-layout').style.display = 'flex';
-    document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
-    
-    // 將 core/DebugSystem.js 的實例掛載至全域
-    window.DebugInstance = debugSystem; 
-    window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
-    
-    if (AppLoader && window.appConfig) {
-        const loader = new AppLoader(window.appConfig);
-        loader.renderMenu('menu-container');
-    }
-};
+    // 確保 DebugInstance 為單例模式，並能接收來自 iframe 的訊息
+    window.startSystem = function() {
+        document.getElementById('auth-overlay').style.display = 'none';
+        document.getElementById('main-layout').style.display = 'flex';
+        document.getElementById('user-display').innerText = sessionStorage.getItem('user_email');
+        
+        // 將 core/DebugSystem.js 的實例掛載至全域
+        window.DebugInstance = debugSystem; 
+        window.sysLog("系統核心解鎖成功 (Kernel Active)", "success");
+        
+        if (AppLoader && window.appConfig) {
+            const loader = new AppLoader(window.appConfig);
+            loader.renderMenu('menu-container');
+        }
+    };
 
     // 初始化檢測
     async function init() {
