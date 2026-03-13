@@ -14,13 +14,14 @@
             --blue: #2980b9; --orange: #e67e22; --border: #ddd; 
             --danger: #d32f2f; --auth: #8e44ad;
         }
-        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        /* 全局預設微軟正黑體 */
+        body { font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif; margin: 0; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
         /* 頂部工具列 */
         .header { background: #fff; padding: 12px 25px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; }
         .header h3 { margin: 0; color: var(--primary); display: flex; align-items: center; gap: 10px; }
         .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .btn { padding: 8px 15px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; gap: 5px; font-size: 13px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 6px; color: white; cursor: pointer; font-weight: bold; transition: all 0.2s; display: flex; align-items: center; gap: 5px; font-size: 13px; font-family: "Microsoft JhengHei", sans-serif; }
         .btn:hover { opacity: 0.85; transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .btn-blue { background: var(--blue); }
         .btn-green { background: var(--accent); }
@@ -33,15 +34,15 @@
         
         /* 左側：植栽資料庫目錄 */
         .catalog-panel { width: 380px; background: #fff; padding: 15px; overflow-y: auto; box-shadow: 2px 0 15px rgba(0,0,0,0.05); flex-shrink: 0; display: flex; flex-direction: column; z-index: 5; border-right: 1px solid var(--border); }
-        .search-box { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; }
+        .search-box { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; font-family: "Microsoft JhengHei", sans-serif; }
         
         .plant-card { border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fafafa; display: flex; gap: 10px; align-items: center; transition: 0.2s; }
         .plant-card:hover { border-color: var(--accent); background: #f1f8e9; }
         .plant-card img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; background: #ddd; }
         .plant-card-info { flex: 1; min-width: 0; }
         .plant-card-info h4 { margin: 0 0 4px 0; font-size: 15px; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .plant-card-info p { margin: 0; font-size: 12px; color: #666; font-family: 'Times New Roman', serif; font-style: italic; }
-        .btn-add { background: #fff; border: 1px solid var(--accent); color: var(--accent); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .plant-card-info p { margin: 0; font-size: 12px; color: #666; font-family: 'Times New Roman', "Microsoft JhengHei", sans-serif; font-style: italic; }
+        .btn-add { background: #fff; border: 1px solid var(--accent); color: var(--accent); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: "Microsoft JhengHei", sans-serif; }
         .btn-add:hover { background: var(--accent); color: #fff; }
 
         /* 右側：專案看板與預覽 */
@@ -58,24 +59,36 @@
         .basket-item { display: flex; align-items: center; gap: 15px; padding: 10px; border-bottom: 1px dashed #eee; }
         .basket-item:last-child { border-bottom: none; }
         .basket-item img { width: 50px; height: 50px; border-radius: 4px; object-fit: cover; }
-        .basket-item select, .basket-item input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        .basket-item select, .basket-item input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-family: "Microsoft JhengHei", sans-serif; }
         
-        /* A4 紙張預覽區 (強制鎖定尺寸以利 html2canvas) */
-        .page-a4-landscape { 
-            width: 297mm; min-height: 210mm; background: #fff; padding: 15mm 20mm; 
+        /* A4 直式紙張預覽區 */
+        .page-a4-portrait { 
+            width: 210mm; min-height: 297mm; background: #fff; padding: 15mm; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.15); box-sizing: border-box; 
-            font-family: "標楷體", serif; position: relative; flex-shrink: 0;
+            font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; position: relative; flex-shrink: 0;
         }
         
         /* 表格樣式 */
-        .doc-title { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 15px; }
-        .doc-table { width: 100%; border-collapse: collapse; font-size: 11pt; text-align: center; }
+        .doc-title { text-align: center; font-size: 18pt; font-weight: bold; margin-bottom: 15px; color: #000; }
+        .doc-table { width: 100%; border-collapse: collapse; font-size: 11pt; text-align: center; color: #000; }
         .doc-table th, .doc-table td { border: 1px solid black; padding: 8px; vertical-align: middle; }
         .doc-table th { background: #f2f2f2; font-weight: bold; }
-        
-        /* 色譜表甘特圖樣式 */
-        .gantt-cell { width: calc(100% / 12); position: relative; border-left: 1px dotted #ccc; }
-        .color-bar { height: 20px; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-family: sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.3); text-shadow: 0 0 2px rgba(0,0,0,0.8); }
+
+        /* 色譜表連續跨欄特效 (黑字白邊) */
+        .gantt-span-cell {
+            color: black;
+            font-weight: bold;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 10pt;
+            text-shadow: 
+                1px 1px 0px #fff, 
+               -1px -1px 0px #fff, 
+                1px -1px 0px #fff, 
+               -1px  1px 0px #fff,
+                0px  0px 3px #fff;
+            box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
+        }
 
         #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999; display: none; justify-content: center; align-items: center; color: white; font-size: 20px; font-weight: bold; flex-direction: column; backdrop-filter: blur(3px); }
     </style>
@@ -87,9 +100,9 @@
 </div>
 
 <div class="header">
-    <h3>🌿 AI Studio - 植栽專案配置平台</h3>
+    <h3>🌿 AI Studio - 植栽專案配置平台 (A4直式版)</h3>
     <div class="btn-group">
-        <input type="text" id="projNameInput" value="錦和運動公園 - 森林區配置" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 220px; font-weight: bold;" onchange="updateProjectName(this.value)" placeholder="請輸入專案名稱">
+        <input type="text" id="projNameInput" value="錦和運動公園 - 森林區配置" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 220px; font-weight: bold; font-family: 'Microsoft JhengHei';" onchange="updateProjectName(this.value)" placeholder="請輸入專案名稱">
         <div style="width:1px; background:#ddd; height:20px; margin:0 5px;"></div>
         
         <input type="file" id="fileInput" accept=".json" onchange="importJSON(event)" style="display:none;">
@@ -114,8 +127,7 @@
             <div class="tab-btn" onclick="switchTab('table', this)">📄 植栽說明表 (預覽)</div>
             <div class="tab-btn" onclick="switchTab('gantt', this)">📊 季節色譜表 (預覽)</div>
         </div>
-        <div class="preview-content" id="previewContainer">
-            </div>
+        <div class="preview-content" id="previewContainer"></div>
     </div>
 </div>
 
@@ -131,17 +143,20 @@
     let dataStore = [];
     let colMap = {};
     
-    // 專案狀態物件 (支援 JSON 匯出入)
+    // 分類排序權重 (確保說明表的群組順序)
+    const categoryWeight = { '喬木': 1, '灌木': 2, '地被草花': 3, '水生植物': 4 };
+
+    // 專案狀態物件 (移除 spec，僅保留 qty 用於內部紀錄，說明表不顯示)
     let projectState = {
         projectName: "錦和運動公園 - 森林區配置",
-        items: [] // 格式: { id: "T001", photoType: "sim", qty: 1, spec: "預設規格" }
+        items: [] 
     };
 
-    // Base64 圖片快取，避免重複轉碼
     let base64Cache = {}; 
     let currentTab = 'basket';
 
-    const PAGE_ROWS_LIMIT = 5; // A4 橫式表格容納行數
+    // A4 直式表格容納行數 (稍作調整以適應直式頁面)
+    const PAGE_ROWS_LIMIT = 6; 
 
     window.onload = () => {
         showLoading("連線至雲端植栽資料庫...");
@@ -225,7 +240,7 @@
             };
             img.onerror = () => {
                 console.warn("Base64轉換失敗 (CORS或網址失效):", url);
-                resolve(""); // 失敗回傳空值，避免卡死
+                resolve(""); 
             };
             img.src = url;
         });
@@ -235,16 +250,46 @@
     function parseColorStr(str) {
         const match = String(str || "").match(/^(#[0-9A-Fa-f]{3,6})\s*\((.*)\)$/);
         if (match) return { hex: match[1], name: match[2] };
-        return { hex: "#ffffff", name: str };
+        return { hex: "", name: "" }; // 解析失敗或為空時回傳空值
     }
 
-    // 判斷月份是否在週期內 (包含跨年處理，如 11月 到 2月)
-    function isMonthInPeriod(m, start, end) {
-        if (!start || !end) return false;
+    /**
+     * 計算跨欄 (colspan) 並生成 HTML 儲存格字串
+     */
+    function generateColspanCells(start, end, labelPrefix, colorData) {
+        if (!colorData || !colorData.hex || !start || !end) {
+            return Array(12).fill('<td></td>').join('');
+        }
+        
         let s = parseInt(start), e = parseInt(end);
-        if (isNaN(s) || isNaN(e)) return false;
-        if (s <= e) return m >= s && m <= e;
-        else return m >= s || m <= e; // 跨年邏輯
+        let active = new Array(13).fill(false);
+        if (!isNaN(s) && !isNaN(e) && s > 0 && e > 0) {
+            if (s <= e) {
+                for (let i = s; i <= e; i++) active[i] = true;
+            } else {
+                for (let i = s; i <= 12; i++) active[i] = true;
+                for (let i = 1; i <= e; i++) active[i] = true;
+            }
+        }
+
+        let cells = [];
+        let i = 1;
+        while (i <= 12) {
+            let isActive = active[i];
+            let span = 1;
+            // 尋找連續相同的狀態
+            while (i + span <= 12 && active[i + span] === isActive) {
+                span++;
+            }
+            if (isActive) {
+                const text = `${labelPrefix} ${colorData.name}`;
+                cells.push(`<td colspan="${span}" class="gantt-span-cell" style="background-color:${colorData.hex};">${text}</td>`);
+            } else {
+                for(let k = 0; k < span; k++) cells.push(`<td></td>`);
+            }
+            i += span;
+        }
+        return cells.join('');
     }
 
     /**
@@ -283,13 +328,12 @@
             alert("該植物已在專案清單中！"); return;
         }
         
-        // 預設抓取模擬圖，若無則用真實圖
         const p = dataStore.find(d => d.id === id)._raw;
         const defaultType = p[colMap.urlSim] ? "sim" : "real";
 
-        projectState.items.push({ id: id, photoType: defaultType, qty: 1, spec: "依圖面規定" });
+        // 移除規格，保留數量用於內部邏輯擴充
+        projectState.items.push({ id: id, photoType: defaultType, qty: 1 });
         
-        // 提早觸發 Base64 轉換緩存
         const url = cleanDriveUrl(p[defaultType === 'sim' ? colMap.urlSim : colMap.urlReal]);
         getBase64Image(url);
 
@@ -308,7 +352,7 @@
             if(field === 'photoType') {
                 const p = dataStore.find(d => d.id === id)._raw;
                 const url = cleanDriveUrl(p[value === 'sim' ? colMap.urlSim : colMap.urlReal]);
-                getBase64Image(url).then(() => renderPreview()); // 更新照片時重新轉碼並渲染
+                getBase64Image(url).then(() => renderPreview()); 
             } else {
                 renderPreview();
             }
@@ -318,6 +362,19 @@
     function updateProjectName(val) {
         projectState.projectName = val || "未命名專案";
         renderPreview();
+    }
+
+    /**
+     * =========================================================
+     * 排序與資料整理 Helper
+     * =========================================================
+     */
+    function getSortedItems() {
+        return [...projectState.items].sort((a, b) => {
+            const catA = dataStore.find(d => d.id === a.id)._raw[colMap.category] || "其他";
+            const catB = dataStore.find(d => d.id === b.id)._raw[colMap.category] || "其他";
+            return (categoryWeight[catA] || 99) - (categoryWeight[catB] || 99);
+        });
     }
 
     /**
@@ -353,14 +410,13 @@
                     <div class="basket-item">
                         <img src="${imgUrl}">
                         <div style="flex:1;">
-                            <strong>${p[colMap.name]}</strong> <span style="font-size:12px;color:#888;">(${item.id})</span>
+                            <strong>${p[colMap.name]}</strong> <span style="font-size:12px;color:#888;">(${p[colMap.category] || '無分類'})</span>
                         </div>
                         <select onchange="updateItemData('${item.id}', 'photoType', this.value)">
                             <option value="sim" ${item.photoType==='sim'?'selected':''}>✨ 模擬圖</option>
                             <option value="real" ${item.photoType==='real'?'selected':''}>📷 真實圖</option>
                         </select>
-                        <input type="text" placeholder="規格" value="${item.spec}" onchange="updateItemData('${item.id}', 'spec', this.value)" style="width:120px;">
-                        <input type="number" placeholder="數量" value="${item.qty}" min="1" onchange="updateItemData('${item.id}', 'qty', this.value)" style="width:60px;">
+                        <input type="number" placeholder="數量" value="${item.qty}" min="1" onchange="updateItemData('${item.id}', 'qty', this.value)" style="width:70px;" title="內部數量註記">
                         <button class="btn btn-danger" onclick="removeFromProject('${item.id}')">移除</button>
                     </div>`;
             }
@@ -379,49 +435,62 @@
         if(projectState.items.length === 0) return;
         let html = '';
         
+        // 取得依據類型排序的資料
+        const sortedItems = getSortedItems();
+
         // 處理分頁
         const chunks = [];
-        for (let i = 0; i < projectState.items.length; i += PAGE_ROWS_LIMIT) {
-            chunks.push(projectState.items.slice(i, i + PAGE_ROWS_LIMIT));
+        for (let i = 0; i < sortedItems.length; i += PAGE_ROWS_LIMIT) {
+            chunks.push(sortedItems.slice(i, i + PAGE_ROWS_LIMIT));
         }
 
         for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
             const chunk = chunks[cIdx];
-            html += `<div class="page-a4-landscape">
+            html += `<div class="page-a4-portrait">
                         <h2 class="doc-title">${projectState.projectName} - 植栽說明表 (第 ${cIdx+1} 頁)</h2>
                         <table class="doc-table">
                             <thead>
                                 <tr>
-                                    <th width="8%">編號</th>
-                                    <th width="20%">參考照片</th>
-                                    <th width="15%">植物名稱</th>
-                                    <th width="20%">規格</th>
-                                    <th width="8%">數量</th>
-                                    <th width="29%">景觀特徵</th>
+                                    <th width="12%">植物類型</th>
+                                    <th width="33%">植物照片</th>
+                                    <th width="25%">植物名稱/學名</th>
+                                    <th width="30%">特性</th>
                                 </tr>
                             </thead>
                             <tbody>`;
             
+            // 計算此分頁內的 rowspan
+            let catCounts = {};
+            chunk.forEach(item => {
+                let cat = dataStore.find(d => d.id === item.id)._raw[colMap.category] || "其他";
+                catCounts[cat] = (catCounts[cat] || 0) + 1;
+            });
+
+            let renderedCats = {};
             for (let item of chunk) {
                 const p = dataStore.find(d => d.id === item.id)._raw;
+                const cat = p[colMap.category] || "其他";
                 const url = cleanDriveUrl(p[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]);
-                // 強制取得 Base64 用於預覽，保證導出時已經存在記憶體
                 const b64 = await getBase64Image(url); 
                 const imgSrc = b64 || 'https://via.placeholder.com/150?text=No+Image';
 
-                html += `<tr style="height:110px;">
-                            <td>${p[colMap.id]}</td>
-                            <td><img src="${imgSrc}" style="width:140px; height:100px; object-fit:cover; border-radius:4px;"></td>
-                            <td><b style="font-size:14pt;">${p[colMap.name]}</b><br><i style="font-family:serif;font-size:10pt;">${p[colMap.scientific]}</i></td>
-                            <td>${item.spec}</td>
-                            <td>${item.qty}</td>
-                            <td style="text-align:left; font-size:10pt;">${(p[colMap.tags] || "").replace(/ /g, '<br>')}</td>
+                html += `<tr style="height:120px;">`;
+                
+                // 類型跨列處理
+                if (!renderedCats[cat]) {
+                    html += `<td rowspan="${catCounts[cat]}" style="font-weight:bold; font-size:16pt;">${cat}</td>`;
+                    renderedCats[cat] = true;
+                }
+
+                html += `   <td><img src="${imgSrc}" style="width:160px; height:110px; object-fit:cover; border-radius:4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></td>
+                            <td><b style="font-size:14pt;">${p[colMap.name]}</b><br><i style="font-family:serif;font-size:11pt;color:#555;">${p[colMap.scientific]}</i></td>
+                            <td style="text-align:left; font-size:10.5pt; line-height:1.4;">${(p[colMap.tags] || "").replace(/ /g, '<br>')}</td>
                          </tr>`;
             }
 
             // 補齊空白列以維持 A4 高度
             for(let i = 0; i < (PAGE_ROWS_LIMIT - chunk.length); i++) {
-                html += `<tr style="height:110px;"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                html += `<tr style="height:120px;"><td></td><td></td><td></td><td></td></tr>`;
             }
 
             html += `</tbody></table></div>`;
@@ -432,45 +501,41 @@
     function renderColorGantt(container) {
         if(projectState.items.length === 0) return;
         
-        let html = `<div class="page-a4-landscape">
+        const sortedItems = getSortedItems();
+        
+        let html = `<div class="page-a4-portrait">
             <h2 class="doc-title">${projectState.projectName} - 季節花期/變葉色譜排程表</h2>
             <table class="doc-table">
                 <thead>
                     <tr>
-                        <th width="15%">植物名稱</th>
+                        <th width="10%">類型</th>
+                        <th width="18%">植物名稱</th>
                         ${Array.from({length:12}, (_,i) => `<th width="6%">${i+1}月</th>`).join('')}
-                        <th width="13%">特徵說明</th>
                     </tr>
                 </thead>
                 <tbody>`;
 
-        projectState.items.forEach(item => {
+        // 每個植物渲染兩列：上列為名稱+花期、下列為果葉期
+        sortedItems.forEach(item => {
             const p = dataStore.find(d => d.id === item.id)._raw;
-            const bS = p[colMap.bloomS], bE = p[colMap.bloomE];
-            const cS = p[colMap.colorS], cE = p[colMap.colorE];
-            
             const bData = parseColorStr(p[colMap.bloomColor]);
             const cData = parseColorStr(p[colMap.colorColor]);
 
-            html += `<tr style="height:45px;">
-                        <td><b>${p[colMap.name]}</b></td>`;
-            
-            for(let m = 1; m <= 12; m++) {
-                html += `<td>`;
-                if(isMonthInPeriod(m, bS, bE)) {
-                    html += `<div class="color-bar" style="background:${bData.hex}; margin-bottom:2px;">花 ${bData.name}</div>`;
-                }
-                if(isMonthInPeriod(m, cS, cE)) {
-                    html += `<div class="color-bar" style="background:${cData.hex};">葉果 ${cData.name}</div>`;
-                }
-                // 若兩者皆無，顯示常綠狀態 (選填)
-                if(!isMonthInPeriod(m, bS, bE) && !isMonthInPeriod(m, cS, cE)) {
-                    html += `<div style="width:100%; height:4px; background:#e8f5e9; border-radius:2px;"></div>`;
-                }
-                html += `</td>`;
-            }
-            
-            html += `<td style="font-size:9pt; text-align:left;">${p[colMap.category]}</td></tr>`;
+            // 取得對應跨欄的 <td> 字串
+            const bloomCells = generateColspanCells(p[colMap.bloomS], p[colMap.bloomE], "花", bData);
+            const colorCells = generateColspanCells(p[colMap.colorS], p[colMap.colorE], "葉/果", cData);
+
+            // 第一列：類型 (跨2列)、名稱 (跨2列)、花期 12 個月欄位
+            html += `
+                <tr style="height:35px;">
+                    <td rowspan="2" style="font-weight:bold;">${p[colMap.category] || "其他"}</td>
+                    <td rowspan="2" style="font-weight:bold;">${p[colMap.name]}</td>
+                    ${bloomCells}
+                </tr>
+                <tr style="height:35px;">
+                    ${colorCells}
+                </tr>
+            `;
         });
 
         html += `</tbody></table></div>`;
@@ -501,7 +566,6 @@
                     projectState = loaded;
                     document.getElementById('projNameInput').value = projectState.projectName;
                     
-                    // 預先載入所有圖片的 Base64
                     showLoading("解析情境並編碼圖片...");
                     Promise.all(projectState.items.map(item => {
                         const p = dataStore.find(d => d.id === item.id);
@@ -511,7 +575,7 @@
                         }
                     })).then(() => {
                         hideLoading();
-                        switchTab('basket', document.querySelector('.tab-btn')); // 切回清單
+                        switchTab('basket', document.querySelector('.tab-btn'));
                         alert("情境載入成功！");
                     });
                 }
@@ -526,7 +590,7 @@
         if (currentTab === 'basket') { alert("請先切換至【植栽表】或【色譜表】預覽畫面，才能匯出圖片！"); return; }
         
         showLoading("產生高畫質圖檔中...");
-        const pages = document.querySelectorAll('.page-a4-landscape');
+        const pages = document.querySelectorAll('.page-a4-portrait');
         
         for (let i = 0; i < pages.length; i++) {
             const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
@@ -542,44 +606,58 @@
         if(projectState.items.length === 0) { alert("專案為空，無法匯出！"); return; }
         showLoading("編碼圖片並產生 Word 文件...");
 
+        const sortedItems = getSortedItems();
         let bodyHtml = `<div class="Section1">`;
         
         // --- 產生植栽表 HTML ---
         const chunks = [];
-        for (let i = 0; i < projectState.items.length; i += PAGE_ROWS_LIMIT) { chunks.push(projectState.items.slice(i, i + PAGE_ROWS_LIMIT)); }
+        for (let i = 0; i < sortedItems.length; i += PAGE_ROWS_LIMIT) { 
+            chunks.push(sortedItems.slice(i, i + PAGE_ROWS_LIMIT)); 
+        }
 
         for (let cIdx = 0; cIdx < chunks.length; cIdx++) {
             const chunk = chunks[cIdx];
             if (cIdx > 0) bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
             
             bodyHtml += `
-                <h2 align="center" style="font-size:18pt; font-family:標楷體;">${projectState.projectName} - 植栽說明表</h2>
-                <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:12pt; font-family:標楷體; text-align:center;">
+                <h2 align="center" style="font-size:18pt; font-family:'Microsoft JhengHei', sans-serif;">${projectState.projectName} - 植栽說明表</h2>
+                <table border="1" cellpadding="8" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt; font-family:'Microsoft JhengHei', sans-serif; text-align:center;">
                     <thead>
                         <tr style="background:#f2f2f2;">
-                            <th width="10%">編號</th><th width="20%">參考照片</th><th width="15%">植物名稱</th><th width="20%">規格</th><th width="10%">數量</th><th width="25%">景觀特徵</th>
+                            <th width="12%">植物類型</th><th width="33%">植物照片</th><th width="25%">植物名稱/學名</th><th width="30%">特性</th>
                         </tr>
                     </thead>
                     <tbody>`;
             
+            let catCounts = {};
+            chunk.forEach(item => {
+                let cat = dataStore.find(d => d.id === item.id)._raw[colMap.category] || "其他";
+                catCounts[cat] = (catCounts[cat] || 0) + 1;
+            });
+
+            let renderedCats = {};
             for (let item of chunk) {
                 const p = dataStore.find(d => d.id === item.id)._raw;
+                const cat = p[colMap.category] || "其他";
                 const url = cleanDriveUrl(p[item.photoType === 'sim' ? colMap.urlSim : colMap.urlReal]);
-                const b64 = await getBase64Image(url); // 等待編碼
+                const b64 = await getBase64Image(url); 
+
+                bodyHtml += `<tr style="height:120pt;">`;
+                
+                if (!renderedCats[cat]) {
+                    bodyHtml += `<td rowspan="${catCounts[cat]}" style="font-weight:bold; font-size:16pt;">${cat}</td>`;
+                    renderedCats[cat] = true;
+                }
 
                 bodyHtml += `
-                    <tr style="height:120pt;">
-                        <td>${p[colMap.id]}</td>
-                        <td><img src="${b64}" width="150" height="110"></td>
-                        <td><b>${p[colMap.name]}</b><br><i style="font-family:serif;">${p[colMap.scientific]}</i></td>
-                        <td>${item.spec}</td>
-                        <td>${item.qty}</td>
+                        <td><img src="${b64}" width="180" height="120"></td>
+                        <td><b>${p[colMap.name]}</b><br><br><i style="font-family:serif; color:#555;">${p[colMap.scientific]}</i></td>
                         <td align="left">${(p[colMap.tags] || "").replace(/ /g, '<br>')}</td>
                     </tr>`;
             }
             
             for(let i = 0; i < (PAGE_ROWS_LIMIT - chunk.length); i++) {
-                bodyHtml += `<tr style="height:120pt;"><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                bodyHtml += `<tr style="height:120pt;"><td></td><td></td><td></td><td></td></tr>`;
             }
             bodyHtml += `</tbody></table>`;
         }
@@ -587,38 +665,39 @@
         // --- 產生色譜表 HTML (附加在下一頁) ---
         bodyHtml += `<br clear=all style='mso-special-character:line-break;page-break-before:always'>`;
         bodyHtml += `
-            <h2 align="center" style="font-size:18pt; font-family:標楷體;">${projectState.projectName} - 季節花期/變葉色譜排程表</h2>
-            <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:11pt; font-family:標楷體; text-align:center;">
+            <h2 align="center" style="font-size:18pt; font-family:'Microsoft JhengHei', sans-serif;">${projectState.projectName} - 季節花期/變葉色譜排程表</h2>
+            <table border="1" cellpadding="5" cellspacing="0" style="width:100%; border-collapse:collapse; font-size:10pt; font-family:'Microsoft JhengHei', sans-serif; text-align:center;">
                 <thead>
                     <tr style="background:#f2f2f2;">
-                        <th width="15%">植物名稱</th>
+                        <th width="10%">類型</th>
+                        <th width="18%">植物名稱</th>
                         ${Array.from({length:12}, (_,i) => `<th width="6%">${i+1}月</th>`).join('')}
-                        <th width="13%">特徵說明</th>
                     </tr>
                 </thead>
                 <tbody>`;
         
-        projectState.items.forEach(item => {
+        sortedItems.forEach(item => {
             const p = dataStore.find(d => d.id === item.id)._raw;
-            const bS = p[colMap.bloomS], bE = p[colMap.bloomE];
-            const cS = p[colMap.colorS], cE = p[colMap.colorE];
             const bData = parseColorStr(p[colMap.bloomColor]);
             const cData = parseColorStr(p[colMap.colorColor]);
 
-            bodyHtml += `<tr style="height:40pt;"><td><b>${p[colMap.name]}</b></td>`;
-            
-            for(let m = 1; m <= 12; m++) {
-                let bgStyle = ""; let text = "";
-                if(isMonthInPeriod(m, bS, bE)) { bgStyle = `background-color:${bData.hex}; color:white; font-weight:bold;`; text = "花"; }
-                else if(isMonthInPeriod(m, cS, cE)) { bgStyle = `background-color:${cData.hex}; color:white; font-weight:bold;`; text = "葉"; }
-                bodyHtml += `<td style="${bgStyle}">${text}</td>`;
-            }
-            bodyHtml += `<td align="left">${p[colMap.category]}</td></tr>`;
+            // CSS 特效相容字串 (Word 中 text-shadow 可能不支援，預設會退化顯示)
+            const spanStyle = (hex) => `background-color:${hex}; color:black; font-weight:bold; text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;`;
+
+            bodyHtml += `
+                <tr style="height:35pt;">
+                    <td rowspan="2" style="font-weight:bold;">${p[colMap.category] || "其他"}</td>
+                    <td rowspan="2" style="font-weight:bold;">${p[colMap.name]}</td>
+                    ${generateColspanCells(p[colMap.bloomS], p[colMap.bloomE], "花", bData).replace(/class="gantt-span-cell" style="background-color:([^"]+);"/g, `style="${spanStyle('$1')}"`)}
+                </tr>
+                <tr style="height:35pt;">
+                    ${generateColspanCells(p[colMap.colorS], p[colMap.colorE], "葉/果", cData).replace(/class="gantt-span-cell" style="background-color:([^"]+);"/g, `style="${spanStyle('$1')}"`)}
+                </tr>`;
         });
         bodyHtml += `</tbody></table></div>`;
 
-        // 封裝為 MS Word 格式
-        const style = `@page Section1 { size: 841.9pt 595.3pt; mso-page-orientation: landscape; margin: 1.5cm; } div.Section1 { page: Section1; }`;
+        // 封裝為 MS Word 格式，設定直式 A4 (portrait)
+        const style = `@page Section1 { size: 595.3pt 841.9pt; mso-page-orientation: portrait; margin: 1.5cm; } div.Section1 { page: Section1; }`;
         const htmlContent = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
             <head><meta charset='utf-8'><style>${style}</style></head>
