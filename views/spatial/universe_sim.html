@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多尺度宇宙動力學 - 動態巨引源與角動量漩渦版</title>
+    <title>多尺度宇宙動力學 - 真實觀測海綿拓樸版</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050A14; color: white; display: flex; }
@@ -65,7 +65,7 @@
             <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>重要天體與黑洞標註</span></label>
             <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場、角動量漩渦與軌道</span></label>
             <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>背景微星體粒子</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網/分水嶺網格</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質海綿網/分水嶺網格</span></label>
             <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>宇宙膨脹流向箭頭</span></label>
         </div>
 
@@ -97,8 +97,7 @@
 
 <script>
 /**
- * 多尺度宇宙動力學 - 引力流體即時積分引擎 (Real-time Gravitational Fluid Engine)
- * 核心升級：巨引源具備真實軌道，引力勢線具備三維外積計算的「角動量漩渦」。
+ * 多尺度宇宙動力學 - 引力流體即時積分引擎 (真實海綿拓樸版)
  */
 
 const LEVELS = [
@@ -109,7 +108,7 @@ const LEVELS = [
     "09. 室女座超星系團局部 (M87*)", "10. 室女座超星系團骨架 (引力角動量漩渦)",
     "11. 拉尼亞凱亞次級網絡", "12. 拉尼亞凱亞核心 (動態巨引源)",
     "13. 拉尼亞凱亞全貌 (動態分水嶺轉移)", "14. 周邊超星系團 (暗能量介入)",
-    "15. 巨型宇宙網 (多核錨點拉扯)", "16. 可觀測宇宙 (極端哈伯擴張)"
+    "15. 巨型宇宙網 (海綿泡沫結構)", "16. 可觀測宇宙 (極端哈伯擴張)"
 ];
 
 const BLACK_HOLES = [
@@ -127,7 +126,6 @@ const BLACK_HOLES = [
 
 const SCALE_LIMITS = [5, 50, 50, 25, 35, 35, 60, 100, 100, 150, 280, 280, 280, 1000, 2500, 3000];
 
-// 快取系統：不再快取整條引力線，而是快取「積分起點(Seeds)」，確保流線在播放時可以像水草一樣擺動。
 const CACHE = { seeds: {}, webs: {}, cones: {} };
 
 function hexToRgba(hex, opacity = 1) {
@@ -223,7 +221,6 @@ class UniverseEngine {
         return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: 1.5, color: this.particleColor}, hoverinfo: 'none', showlegend: false };
     }
 
-    // --- 突破性功能：即時動態引力流體積分 ---
     getSeeds(key, center, max_scale, point_density) {
         if(CACHE.seeds[key]) return CACHE.seeds[key];
         let seeds = [];
@@ -240,7 +237,6 @@ class UniverseEngine {
         CACHE.seeds[key] = seeds; return seeds;
     }
 
-    // 每一幀重新計算勢線，實現角動量漩渦與動態軌道拉扯
     calcDynamicStreamlines(seeds, max_scale, attractors, isExpansion) {
         let streams = [], steps = 30, dt = max_scale / (steps * 1.2);
         
@@ -258,19 +254,16 @@ class UniverseEngine {
                         let attr = attractors[a];
                         let dx = attr.pos[0]-cx, dy = attr.pos[1]-cy, dz = attr.pos[2]-cz;
                         let dist = Math.hypot(dx, dy, dz) + 1e-5;
-                        let pull = attr.mass / Math.pow(dist, 1.5); // 引力大小
+                        let pull = attr.mass / Math.pow(dist, 1.5); 
                         
-                        // 基本向心引力
                         gx += (dx/dist)*pull; gy += (dy/dist)*pull; gz += (dz/dist)*pull;
                         
-                        // 角動量漩渦效應 (三維外積)
                         if(attr.spin && attr.axis) {
                             let ax = attr.axis[0], ay = attr.axis[1], az = attr.axis[2];
                             let vpx = (dy/dist)*az - (dz/dist)*ay;
                             let vpy = (dz/dist)*ax - (dx/dist)*az;
                             let vpz = (dx/dist)*ay - (dy/dist)*ax;
                             
-                            // 漩渦力隨著接近核心而增強
                             let spin_force = attr.spin * pull * 0.6;
                             gx += vpx * spin_force; gy += vpy * spin_force; gz += vpz * spin_force;
                         }
@@ -322,30 +315,68 @@ class UniverseEngine {
         return traces;
     }
 
+    /**
+     * 真實海綿狀宇宙網演算法 (Cosmic Web Foam)
+     * 利用 3D Gyroid 干涉波函數產生真實的宇宙空洞與纖維
+     */
     precalcDensityWeb(key, center, radius, num_halos, anchor_arrays) {
         if(CACHE.webs[key]) return CACHE.webs[key];
         let halos = [];
+
+        // 1. 均向性海綿結構 (Cosmic Web Foam) - 75% 星系
+        let freq = radius / 3.5;
+        let target_bg = Math.floor(num_halos * 0.75);
+        let attempt = 0;
+
+        while(halos.length < target_bg && attempt < 15000) {
+            let px = (Math.random() - 0.5) * 2 * radius;
+            let py = (Math.random() - 0.5) * 2 * radius;
+            let pz = (Math.random() - 0.5) * 2 * radius;
+
+            // 確保分布在球體內 (可視宇宙邊界)
+            if (px*px + py*py + pz*pz > radius*radius) { attempt++; continue; }
+
+            // 3D 密度干涉函數 (模擬暗物質纖維與巨大空洞)
+            let density = Math.sin(px/freq)*Math.cos(py/freq) + Math.sin(py/freq)*Math.cos(pz/freq) + Math.sin(pz/freq)*Math.cos(px/freq);
+
+            // 保留纖維上的點，偶爾在空洞中散落孤立星系
+            if (density > 0.3 || Math.random() > 0.97) {
+                halos.push([center[0] + px, center[1] + py, center[2] + pz]);
+            }
+            attempt++;
+        }
+
+        // 2. 已知超大質量結構錨點 (長城) - 25% 星系
         if(anchor_arrays && anchor_arrays.length > 0) {
-            let halos_per_anchor = Math.floor((num_halos * 1.5) / anchor_arrays.length);
+            let halos_per_anchor = Math.floor((num_halos * 0.25) / anchor_arrays.length);
             anchor_arrays.forEach(cp => {
-                for(let i=0; i<halos_per_anchor; i++) halos.push([cp[0] + randn()*radius*0.25, cp[1] + randn()*radius*0.25, cp[2] + randn()*radius*0.25]);
+                for(let i=0; i<halos_per_anchor; i++) {
+                    halos.push([cp[0] + randn()*radius*0.12, cp[1] + randn()*radius*0.12, cp[2] + randn()*radius*0.12]);
+                }
             });
-        } else {
-            for(let i=0; i<num_halos; i++) halos.push([center[0] + rand(-radius, radius), center[1] + rand(-radius, radius), center[2] + rand(-radius, radius)]);
         }
         
         let line_x=[], line_y=[], line_z=[], px=[], py=[], pz=[], psize=[];
+        let max_link_dist = radius * 0.25; // 限制連線距離，避免穿越巨大空洞
+
         for(let i=0; i<halos.length; i++) {
-            let h = halos[i]; px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%3) + 2); 
+            let h = halos[i];
+            px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%2) + 1.5); 
+            
             let dists = [];
             for(let j=0; j<halos.length; j++) {
                 if(i === j) continue;
-                dists.push({idx: j, d: Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2])});
+                let d = Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2]);
+                if (d < max_link_dist) dists.push({idx: j, d: d});
             }
             dists.sort((a,b) => a.d - b.d);
-            for(let k=0; k<Math.min(4, dists.length); k++) {
+            
+            // 每個節點最多連 3 條線，形成典型的纖維網
+            for(let k=0; k<Math.min(3, dists.length); k++) {
                 let neighbor = halos[dists[k].idx];
-                line_x.push(h[0], neighbor[0], null); line_y.push(h[1], neighbor[1], null); line_z.push(h[2], neighbor[2], null);
+                line_x.push(h[0], neighbor[0], null);
+                line_y.push(h[1], neighbor[1], null);
+                line_z.push(h[2], neighbor[2], null);
             }
         }
         CACHE.webs[key] = {line: {x:line_x, y:line_y, z:line_z}, points: {x:px, y:py, z:pz, size:psize}};
@@ -356,7 +387,7 @@ class UniverseEngine {
         let tf_line = TransformEngine.apply(webData.line.x, webData.line.y, webData.line.z, scale);
         let tf_pts = TransformEngine.apply(webData.points.x, webData.points.y, webData.points.z, scale);
         return [
-            { type: 'scatter3d', x: tf_line.x, y: tf_line.y, z: tf_line.z, mode: 'lines', line: {color: 'rgba(180, 50, 255, 0.35)', width: 1.5}, hoverinfo: 'none', showlegend: false },
+            { type: 'scatter3d', x: tf_line.x, y: tf_line.y, z: tf_line.z, mode: 'lines', line: {color: 'rgba(180, 50, 255, 0.45)', width: 1.5}, hoverinfo: 'none', showlegend: false },
             { type: 'scatter3d', x: tf_pts.x, y: tf_pts.y, z: tf_pts.z, mode: 'markers', marker: {size: webData.points.size, color: 'rgba(255, 255, 150, 0.9)'}, hoverinfo: 'none', showlegend: false }
         ];
     }
@@ -373,7 +404,7 @@ class UniverseEngine {
             virgo: [60 + 15*Math.cos(time*0.05), 40 + 15*Math.sin(time*0.05), 20],
             ga: [150 + 30*Math.cos(time*0.03), -50 + 30*Math.sin(time*0.03), 40 + 10*Math.sin(time*0.02)],
             perseus: [-100 + 20*Math.sin(time*0.04), 80 + 20*Math.cos(time*0.04), -40],
-            shapley: [300, -150, 100], // 錨定點
+            shapley: [300, -150, 100], 
             sloan: [600, 400, -200], hcb: [2000, 1500, -1000]
         };
         
@@ -392,7 +423,6 @@ class UniverseEngine {
         }
 
         if (level_idx <= 2) {
-            // Level 1: 太陽系局域動力學
             let W_earth = 0.15, W_moon = 2.09, W_merc = 0.6, W_venus = 0.25, W_mars = 0.08, W_jup = 0.03, W_sat = 0.01;
             let e_x = 1.0 * Math.cos(time * W_earth), e_y = 1.0 * Math.sin(time * W_earth);
             let m_x = e_x + 0.08 * Math.cos(time * W_moon), m_y = e_y + 0.08 * Math.sin(time * W_moon);
@@ -423,7 +453,6 @@ class UniverseEngine {
             if(vis.particles) t.push(this.createBackgroundParticles(1000, 25, [0,0,0], 1.0));
             if(vis.streams) {
                 let seeds = this.getSeeds(`L${level_idx}`, dyn.mw, 25.0, 150);
-                // 銀河系賦予強烈的 Z 軸旋轉角動量
                 let attractors = [{pos: dyn.mw, mass: 2.0, axis: [0,0,1], spin: 1.5}];
                 let streams = this.calcDynamicStreamlines(seeds, 25.0, attractors, false);
                 t.push(...this.drawStreamlines(streams, 'rgba(0,255,255,0.4)', 1.0));
@@ -436,7 +465,6 @@ class UniverseEngine {
             }
             if(vis.streams) {
                 let seeds = this.getSeeds(`L${level_idx}`, [0,0,0], 100.0, 180);
-                // 室女座超星系團具備巨大引力與微弱角動量
                 let attractors = level_idx < 8 ? 
                     [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.5}, {pos: dyn.m31, mass: 1.5, axis:[0.2,0,1], spin:0.5}] : 
                     [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.1}, {pos: dyn.virgo, mass: 20.0, axis:[-0.5,0.8,1], spin: 1.2}];
@@ -453,7 +481,6 @@ class UniverseEngine {
             }
             if(vis.streams) {
                 let seeds = this.getSeeds(`L10`, [50, -20, 20], 280.0, 200);
-                // 巨引源與英仙座產生劇烈的流體拉扯
                 let attractors = [
                     {pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, 
                     {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, 
@@ -490,14 +517,14 @@ class UniverseEngine {
                     t.push(this.createLandmark([1500, -800, 600], '#AAAAAA', '英仙-雙魚座超星系團', 5, 'circle', expandFactor));
                 }
                 if(vis.web) {
-                    // 全面恢復多節點錨定的巨型宇宙網
+                    // 海綿狀宇宙網 (Spongy Cosmic Web)
                     let anchors = [[0,0,0], dyn.sloan, dyn.hcb, dyn.shapley, dyn.perseus, [1500, -800, 600], [-1200, 1000, -500]];
-                    let webData = this.precalcDensityWeb(`L14`, [0,0,0], sim_scale, 700, anchors);
+                    let webData = this.precalcDensityWeb(`L14_Spongy`, [0,0,0], sim_scale, 1000, anchors);
                     t.push(...this.drawDensityWeb(webData, expandFactor));
                 }
                 if(vis.streams) {
-                    let seeds = this.getSeeds(`L14`, [0,0,0], sim_scale, 250);
-                    let streams = this.calcDynamicStreamlines(seeds, sim_scale, null, true); // true = expansion mode
+                    let seeds = this.getSeeds(`L14_EXP`, [0,0,0], sim_scale, 250);
+                    let streams = this.calcDynamicStreamlines(seeds, sim_scale, null, true); 
                     t.push(...this.drawStreamlines(streams, 'rgba(100,150,255,0.4)', expandFactor));
                 }
             }
@@ -533,7 +560,6 @@ function drawFrame(forceResetCamera = false) {
     
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
     
-    // 【終極防抖動鎖】：將視角軸範圍強制鎖定在最大膨脹邊界
     let max_limit = SCALE_LIMITS[idx] * 2.2; 
     let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-max_limit, max_limit] };
     
@@ -545,7 +571,7 @@ function drawFrame(forceResetCamera = false) {
         paper_bgcolor: engine.bgColor, plot_bgcolor: engine.bgColor,
         scene: { bgcolor: engine.bgColor, xaxis: axis_config, yaxis: axis_config, zaxis: axis_config },
         margin: { l: 0, r: 0, b: 0, t: 50 },
-        uirevision: 'true' // 相機完全鎖定，不隨資料更新而重置
+        uirevision: 'true' 
     };
 
     if (forceResetCamera || isFirstRender) {
