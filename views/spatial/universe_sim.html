@@ -132,7 +132,7 @@
 
 <script>
 // ============================================================================
-// 基礎防禦性與數學公用函式庫 (上一版遺漏的關鍵演算法，全數補回)
+// 基礎防禦性與數學公用函式庫
 // ============================================================================
 const safeVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
 const safeCheck = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
@@ -141,22 +141,40 @@ function hexToRgba(hex, opacity = 1) {
     let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16); 
     return `rgba(${r}, ${g}, ${b}, ${opacity})`; 
 }
+
 function rand(min, max) { return Math.random() * (max - min) + min; }
+
 function randn() { 
     let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); 
     return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); 
 }
+
 function simpleNoise(x, y, z=0) { 
     let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; 
     return n - Math.floor(n); 
 }
+
+function latLonToLocal(lat, lon, radius) {
+    let phi = (90 - lat) * (Math.PI / 180);
+    let theta = (lon + 180) * (Math.PI / 180);
+    let x = -(radius * Math.sin(phi) * Math.cos(theta));
+    let z = (radius * Math.sin(phi) * Math.sin(theta));
+    let y = (radius * Math.cos(phi));
+    return {x, y, z};
+}
+
 function solveKepler(M, e) { 
-    let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); 
+    let E = M; 
+    for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); 
     return E; 
 }
+
 function getKeplerPos(a, e, i_angle, time, T) { 
-    let M = time * T; let E = solveKepler(M, e); let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); 
-    let r = a * (1 - e * Math.cos(E)); let px = r * Math.cos(v), py = r * Math.sin(v); 
+    let M = time * T; 
+    let E = solveKepler(M, e); 
+    let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); 
+    let r = a * (1 - e * Math.cos(E)); 
+    let px = r * Math.cos(v), py = r * Math.sin(v); 
     return {x: px, y: py * Math.cos(i_angle), z: py * Math.sin(i_angle)}; 
 }
 
@@ -186,6 +204,74 @@ class TransformEngine {
         return {u: outU, v: outV, w: outW};
     }
 }
+
+// ============================================================================
+// 數據庫與劇情腳本
+// ============================================================================
+const EARTH_POIS = [
+    {name: '台北 AI Studio', lat: 25.032969, lon: 121.565418, color: '#00FFFF'},
+    {name: '東京', lat: 35.6895, lon: 139.6917, color: '#FF00FF'},
+    {name: '紐約', lat: 40.7128, lon: -74.0060, color: '#FFFF00'}
+];
+
+const MOON_LANDINGS = [
+    {name: '阿波羅 11 號 (靜海)', lat: 0.674, lon: 23.472, color: '#FFD700'},
+    {name: '嫦娥四號 (馮·卡門坑)', lat: -45.444, lon: 177.599, color: '#FF4500'}
+];
+
+const LEVELS = [
+    "01. 地月系統 (Three.js 真實影像與衛星網)",
+    "02. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
+    "03. 太陽系行進軌跡 (太陽系螺旋衝浪)",
+    "04. 銀河系核心 (引力吸積與費米泡)", 
+    "05. 本星系群局部 (雙軸鞍點)",
+    "06. 本星系群全貌 (Local Group)", 
+    "07. 周邊星系群 (Local Sheet)",
+    "08. 室女座超星系團局部 (M87*)", 
+    "09. 室女座超星系團骨架 (角動量引力漩渦)",
+    "10. 拉尼亞凱亞次級網絡", 
+    "11. 拉尼亞凱亞核心 (動態巨引源)",
+    "12. 拉尼亞凱亞全貌 (引力流域分水嶺)", 
+    "13. 周邊超星系團 (暗能量介入)",
+    "14. 巨型宇宙網 (高斯塌縮骨架)", 
+    "15. 可觀測宇宙 (哈伯空間膨脹)"
+];
+
+const STORY_SCRIPT = [
+    { title: "L1. 雙引擎切換：地月系", content: "您現在正體驗 AI Studio 首創的雙引擎無縫架構。此層級由 WebGL (Three.js) 渲染真實的 4K 地球紋理與大氣雲層。您可以清晰看見地球與月球上的歷史登陸點標記，以及 ISS 國際太空站正以極快速度環繞。(請啟動左側時空演化)" },
+    { title: "L2. 太陽系與克卜勒力學", content: "系統已自動切換回 Plotly 幾何引擎。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且具高離心率的特殊軌道。" },
+    { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是以每秒 230 公里的速度繞行銀河中心。行星受太陽引力拖曳，在星際空間中畫出壯觀的彈簧狀時空軌跡。" },
+    { title: "L4. 銀河系核心動態", content: "進入百萬光年尺度。這裡的線條展現了向中心超大質量黑洞墜落的『引力吸積軌跡』，以及垂直於盤面的巨大高能費米泡。" },
+    { title: "L5~L8. 本星系群與室女座", content: "我們的銀河系與仙女座星系 (M31) 正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。" },
+    { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
+    { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
+];
+const STORY_MAP = [0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6];
+
+const PLANETS = [
+    {id: 'mercury', name: '水星', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3, isDwarf: false, i: 0.12},
+    {id: 'venus', name: '金星', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4, isDwarf: false, i: 0.05},
+    {id: 'earth', name: '地球', a: 1.0, e: 0.016, T: 1.0, c: '#1E90FF', s: 4.5, isDwarf: false, i: 0.0},
+    {id: 'mars', name: '火星', a: 1.52, e: 0.093, T: 0.53, c: '#FF4500', s: 3.5, isDwarf: false, i: 0.03},
+    {id: 'ceres', name: '谷神星', a: 2.77, e: 0.075, T: 0.21, c: '#A9A9A9', s: 2.5, isDwarf: true, i: 0.18},
+    {id: 'jupiter', name: '木星', a: 5.2, e: 0.048, T: 0.084, c: '#DEB887', s: 8, isDwarf: false, i: 0.02},
+    {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7, isDwarf: false, hasRing: true, i: 0.04},
+    {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5, isDwarf: false, hasRing: true, i: 0.01},
+    {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5, isDwarf: false, i: 0.03},
+    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29}
+];
+
+const BLACK_HOLES = [
+    {id: 'mw', dist_scale: 15, name: '人馬座 A*', desc: '430萬太陽質量', is_mega: false},
+    {id: 'm31', dist_scale: 35, name: 'M31* (仙女座)', desc: '1.4億太陽質量', is_mega: false},
+    {id: 'virgo', dist_scale: 120, name: 'M87*', desc: '65億太陽質量', is_mega: false},
+    {id: 'ga', dist_scale: 280, name: 'Abell 3627', desc: '巨引源', is_mega: false},
+    {id: 'shapley', dist_scale: 500, name: '夏普力超星系團', desc: '暗流核心', is_mega: false},
+    {id: 'sloan', dist_scale: 1000, name: '史隆長城節點', desc: '宇宙長城', is_mega: false, offset: [600, 400, -200]}
+];
+
+const SCALE_LIMITS = [1.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
+const CACHE = { orbits: {}, streams: {}, webs: {}, arms: {}, cones: {}, bubbles: {}, seeds: {} };
 
 // ============================================================================
 // 引擎 1：Three.js 照片級地球渲染器 (專屬 L1 地月系統)
@@ -233,6 +319,16 @@ class RealEarthEngine {
             shininess: 15
         });
         this.objects.earth = new THREE.Mesh(earthGeo, earthMat);
+        
+        EARTH_POIS.forEach(poi => {
+            let pos = latLonToLocal(poi.lat, poi.lon, 1.01);
+            let geo = new THREE.SphereGeometry(0.015, 16, 16);
+            let mat = new THREE.MeshBasicMaterial({color: poi.color});
+            let mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(pos.x, pos.y, pos.z);
+            this.objects.earth.add(mesh);
+        });
+
         this.scene.add(this.objects.earth);
 
         const cloudGeo = new THREE.SphereGeometry(1.015, 64, 64);
@@ -243,6 +339,7 @@ class RealEarthEngine {
         this.objects.clouds = new THREE.Mesh(cloudGeo, cloudMat);
         this.scene.add(this.objects.clouds);
 
+        this.objects.moonGroup = new THREE.Group();
         const moonGeo = new THREE.SphereGeometry(0.27, 32, 32);
         const moonMat = new THREE.MeshPhongMaterial({
             map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'),
@@ -250,7 +347,18 @@ class RealEarthEngine {
             bumpScale: 0.02
         });
         this.objects.moon = new THREE.Mesh(moonGeo, moonMat);
-        this.scene.add(this.objects.moon);
+        
+        MOON_LANDINGS.forEach(poi => {
+            let pos = latLonToLocal(poi.lat, poi.lon, 0.275);
+            let geo = new THREE.SphereGeometry(0.008, 16, 16);
+            let mat = new THREE.MeshBasicMaterial({color: poi.color});
+            let mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(pos.x, pos.y, pos.z);
+            this.objects.moon.add(mesh);
+        });
+
+        this.objects.moonGroup.add(this.objects.moon);
+        this.scene.add(this.objects.moonGroup);
 
         const issGeo = new THREE.BoxGeometry(0.05, 0.05, 0.05);
         const issMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
@@ -288,8 +396,8 @@ class RealEarthEngine {
         
         let moonDist = 5.0; 
         let moonAngle = time * 1.5;
-        this.objects.moon.position.set(moonDist * Math.cos(moonAngle), 0, moonDist * Math.sin(moonAngle));
-        this.objects.moon.rotation.y = -moonAngle + Math.PI/2; 
+        this.objects.moonGroup.position.set(moonDist * Math.cos(moonAngle), 0, moonDist * Math.sin(moonAngle));
+        this.objects.moonGroup.rotation.y = -moonAngle + Math.PI/2; 
 
         let issAngle = time * 7.6;
         let issH = 1.15;
@@ -304,67 +412,10 @@ class RealEarthEngine {
         }
     }
 }
-const threeEngine = new RealEarthEngine('threejs-container');
-
 
 // ============================================================================
 // 引擎 2：Plotly 宇宙動力學引擎 (專屬 L2 ~ L15 數據與流體渲染)
 // ============================================================================
-
-const LEVELS = [
-    "01. 地月系統 (Three.js 真實影像與衛星網)",
-    "02. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
-    "03. 太陽系行進軌跡 (太陽系螺旋衝浪)",
-    "04. 銀河系核心 (引力吸積與費米泡)", 
-    "05. 本星系群局部 (雙軸鞍點)",
-    "06. 本星系群全貌 (Local Group)", 
-    "07. 周邊星系群 (Local Sheet)",
-    "08. 室女座超星系團局部 (M87*)", 
-    "09. 室女座超星系團骨架 (角動量引力漩渦)",
-    "10. 拉尼亞凱亞次級網絡", 
-    "11. 拉尼亞凱亞核心 (動態巨引源)",
-    "12. 拉尼亞凱亞全貌 (引力流域分水嶺)", 
-    "13. 周邊超星系團 (暗能量介入)",
-    "14. 巨型宇宙網 (高斯塌縮骨架)", 
-    "15. 可觀測宇宙 (哈伯空間膨脹)"
-];
-
-const STORY_SCRIPT = [
-    { title: "L1. 雙引擎切換：地月系", content: "您現在正體驗 AI Studio 首創的雙引擎無縫架構。此層級由 WebGL (Three.js) 渲染真實的 4K 地球紋理與大氣雲層。您可以清晰看見 ISS 國際太空站正以極快速度環繞。(請啟動左側時空演化)" },
-    { title: "L2. 太陽系與克卜勒力學", content: "系統已自動切換回 Plotly 幾何引擎。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且具高離心率的特殊軌道。" },
-    { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是以每秒 230 公里的速度繞行銀河中心。行星受太陽引力拖曳，在星際空間中畫出壯觀的彈簧狀時空軌跡。" },
-    { title: "L4. 銀河系核心動態", content: "進入百萬光年尺度。這裡的線條展現了向中心超大質量黑洞墜落的『引力吸積軌跡』，以及垂直於盤面的巨大高能費米泡。" },
-    { title: "L5~L8. 本星系群與室女座", content: "我們的銀河系與仙女座星系 (M31) 正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。" },
-    { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
-    { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
-];
-const STORY_MAP = [0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6];
-
-const PLANETS = [
-    {id: 'mercury', name: '水星', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3, isDwarf: false, i: 0.12},
-    {id: 'venus', name: '金星', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4, isDwarf: false, i: 0.05},
-    {id: 'earth', name: '地球', a: 1.0, e: 0.016, T: 1.0, c: '#1E90FF', s: 4.5, isDwarf: false, i: 0.0},
-    {id: 'mars', name: '火星', a: 1.52, e: 0.093, T: 0.53, c: '#FF4500', s: 3.5, isDwarf: false, i: 0.03},
-    {id: 'ceres', name: '谷神星', a: 2.77, e: 0.075, T: 0.21, c: '#A9A9A9', s: 2.5, isDwarf: true, i: 0.18},
-    {id: 'jupiter', name: '木星', a: 5.2, e: 0.048, T: 0.084, c: '#DEB887', s: 8, isDwarf: false, i: 0.02},
-    {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7, isDwarf: false, hasRing: true, i: 0.04},
-    {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5, isDwarf: false, hasRing: true, i: 0.01},
-    {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5, isDwarf: false, i: 0.03},
-    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29}
-];
-
-const BLACK_HOLES = [
-    {id: 'mw', dist_scale: 15, name: '人馬座 A*', desc: '430萬太陽質量', is_mega: false},
-    {id: 'm31', dist_scale: 35, name: 'M31* (仙女座)', desc: '1.4億太陽質量', is_mega: false},
-    {id: 'virgo', dist_scale: 120, name: 'M87*', desc: '65億太陽質量', is_mega: false},
-    {id: 'ga', dist_scale: 280, name: 'Abell 3627', desc: '巨引源', is_mega: false},
-    {id: 'shapley', dist_scale: 500, name: '夏普力超星系團', desc: '暗流核心', is_mega: false},
-    {id: 'sloan', dist_scale: 1000, name: '史隆長城節點', desc: '宇宙長城', is_mega: false, offset: [600, 400, -200]}
-];
-
-const SCALE_LIMITS = [1.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
-const CACHE = { orbits: {}, streams: {}, webs: {}, arms: {}, cones: {}, bubbles: {}, seeds: {} };
-
 class UniverseEngine {
     constructor() { this.textColor = '#FFFF00'; }
     
@@ -597,7 +648,7 @@ class UniverseEngine {
         }
 
         if (level_idx === 0) { 
-            return []; // L1 交由 Three.js 引擎接管，回傳空陣列
+            return []; // L1 交由 Three.js 引擎接管
         }
         else if (level_idx === 1) { // 太陽系全貌
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
@@ -681,13 +732,17 @@ class UniverseEngine {
     }
 }
 
-// === UI 與動態迴圈控制 ===
+// ============================================================================
+// UI 與動態迴圈控制
+// ============================================================================
 const selLevel = document.getElementById('level-select');
 if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
 
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, isUserInteracting = false; 
 const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
+const threeEngine = new RealEarthEngine('threejs-container');
 
+// 相機卡死修復：精確攔截使用者的相機互動操作
 window.addEventListener('mousedown', (e) => { if(e.target.closest('#engine-container')) isUserInteracting = true; }, true);
 window.addEventListener('mouseup', () => { isUserInteracting = false; }, true);
 window.addEventListener('touchstart', (e) => { if(e.target.closest('#engine-container')) isUserInteracting = true; }, {capture: true, passive: true});
