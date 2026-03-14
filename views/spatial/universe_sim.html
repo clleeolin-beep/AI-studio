@@ -46,15 +46,21 @@
         .toggle-row:hover { color: #FFFFFF; }
         .toggle-row input[type="checkbox"] { margin-right: 10px; cursor: pointer; width: 16px; height: 16px; accent-color: #E74C3C; }
         
+        .color-picker-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); }
+        .color-picker-row span { font-size: 12px; }
+        input[type="color"] { border: 1px solid rgba(255,255,255,0.5); width: 35px; height: 25px; padding: 0; cursor: pointer; background: transparent; border-radius: 3px; }
+
         input[type="range"] { width: 100%; cursor: pointer; accent-color: #00FFFF; }
         .range-val { font-size: 12px; float: right; color: #00FFFF; font-weight: bold; }
         
         button.action-btn { width: 100%; background-color: #2C3E50; color: #00FFFF; font-weight: bold; border: 1px solid #00FFFF; padding: 12px; border-radius: 5px; cursor: pointer; transition: all 0.3s; font-size: 14px; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
-        button.action-btn:hover { background-color: #00FFFF; color: #000; box-shadow: 0 0 10px rgba(0,255,255,0.5); }
+        button.action-btn:hover { background: #00FFFF; color: #000; box-shadow: 0 0 10px rgba(0,255,255,0.5); }
         button#play-btn { background-color: #E74C3C; color: white; border-color: #E74C3C; margin-top: 15px; }
         button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); }
 
         #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: #00FFFF; z-index: 100; backdrop-filter: blur(8px); display: none; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0,255,255,0.2); border-top-color: #00FFFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -89,11 +95,18 @@
             <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環、柯伊伯帶與星塵</span></label>
         </div>
 
+        <h3>🎨 視覺調色盤</h3>
+        <div class="control-group">
+            <div class="color-picker-row"><span>宇宙深空背景</span><input type="color" id="color-bg" value="#050A14"></div>
+            <div class="color-picker-row"><span>引力網格顏色</span><input type="color" id="color-grid" value="#00FFFF"></div>
+            <div class="color-picker-row"><span>背景星體顏色</span><input type="color" id="color-particle" value="#C8C8C8"></div>
+        </div>
+
         <button id="render-btn" class="action-btn">🔄 重置相機與物理快取</button>
     </div>
 
     <div id="engine-container">
-        <div id="loading-overlay"><span>時空跳躍中...</span></div>
+        <div id="loading-overlay"><div class="spinner"></div><span>時空跳躍中...</span></div>
         <div id="threejs-container"></div>
         <div id="plotly-div"></div>
         
@@ -107,22 +120,22 @@
 <script>
 /**
  * 核心引擎層：包含 Plotly 現行邏輯與 Three.js 預留接口
+ * [修正]: 導入 safeVal/safeCheck 防禦性取值，解決 AppLoader 動態注入時的 DOM Race Condition
  */
 
-// 1. 預留給 Phase 2 的 Three.js 接口 (架構轉換預備)
+const safeVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+const safeCheck = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
+
+// 1. 預留給 Phase 2 的 Three.js 接口
 class FutureThreeJSEngine {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.isActive = false;
         console.log("Three.js 引擎接口已就緒。百萬級湍流渲染將掛載於此。");
     }
-    init() {
-        // 未來這裡將實例化 THREE.WebGLRenderer, THREE.Scene, THREE.Camera
-        // 以及使用 WebGLComputeShader 處理百萬粒子的 N-body 引力
-    }
     activate() {
-        document.getElementById('plotly-div').style.display = 'none';
-        this.container.style.display = 'block';
+        if(document.getElementById('plotly-div')) document.getElementById('plotly-div').style.display = 'none';
+        if(this.container) this.container.style.display = 'block';
         this.isActive = true;
     }
 }
@@ -134,12 +147,12 @@ const STORY_SCRIPT = [
     { title: "L2. 地月系與歷史刻痕", content: "跨越38萬公里，月球因為潮汐鎖定永遠以同一面朝向我們。仔細看，月表上銘刻著阿波羅與嫦娥探月工程的著陸點，而鵲橋衛星正懸浮於 L2 拉格朗日點中繼訊號。" },
     { title: "L3. 太陽系與克卜勒力學", content: "縮小視角，我們看見了完整的太陽系。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且極具離心率的特殊軌道，以及外圍半透明的柯伊伯帶。" },
     { title: "L4. 太陽螺旋衝浪", content: "這才是宇宙的真實樣貌！太陽並非靜止，而是以每秒 230 公里的速度帶領我們在銀河中衝浪。行星被太陽的引力拖曳，在宇宙中畫出壯觀的彈簧狀時空殘影。" },
-    { title: "L5. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』。*(未來我們將在此導入百萬級 WebGL 粒子，還原真實的星系氣體碰撞)*。" },
+    { title: "L5. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』。*(準備就緒後，我們將在此導入百萬級 WebGL 粒子，還原真實的星系氣體碰撞)*。" },
     { title: "L6~L16. 大尺度宇宙網", content: "隨著我們繼續躍遷，本星系群、室女座超星系團、直到拉尼亞凱亞的黃金分水嶺。宇宙在大尺度下呈現出如海綿般的暗物質纖維網與絕對空洞。" }
 ];
 
 const LEVELS = [
-    "01. 地球防禦圈 (GIS 國界、衛星網與地表設施)", "02. 地月系與潮汐鎖定 (歷史登月任務與鵲橋)",
+    "01. 地球防禦圈 (GIS 國界、衛星網與設施)", "02. 地月系與潮汐鎖定 (歷史登月任務與鵲橋)",
     "03. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", "04. 太陽系螺旋衝浪 (左前向量與時空殘影)",
     "05. 銀河系核心 (湍流吸積與費米泡)", "06. 本星系群局部 (雙軸鞍點)",
     "07. 本星系群全貌 (Local Group)", "08. 周邊星系群 (Local Sheet)",
@@ -320,32 +333,36 @@ class UniverseEngine {
 
 // === UI 與動態迴圈引擎 ===
 const selLevel = document.getElementById('level-select');
-LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); });
+if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
 
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, isUserInteracting = false; 
-
 const plotContainer = document.getElementById('engine-container'), renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
-plotContainer.addEventListener('mousedown', () => isUserInteracting = true); plotContainer.addEventListener('mouseup', () => isUserInteracting = false);
+if(plotContainer) { plotContainer.addEventListener('mousedown', () => isUserInteracting = true); plotContainer.addEventListener('mouseup', () => isUserInteracting = false); }
 
 // 故事導覽邏輯
 const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
 function updateTour() {
+    if(!toggleTour || !tourPanel || !selLevel) return;
     if(!toggleTour.checked) { tourPanel.style.display = 'none'; return; }
     let idx = parseInt(selLevel.value);
-    let storyIdx = Math.min(idx, 5); // L6以上共用同一個劇本
-    tourTitle.innerText = STORY_SCRIPT[storyIdx].title;
-    tourContent.innerHTML = STORY_SCRIPT[storyIdx].content;
+    let storyIdx = Math.min(idx, 5);
+    if(tourTitle) tourTitle.innerText = STORY_SCRIPT[storyIdx].title;
+    if(tourContent) tourContent.innerHTML = STORY_SCRIPT[storyIdx].content;
     tourPanel.style.display = 'block';
-    nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
+    if(nextTourBtn) nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
 }
-toggleTour.addEventListener('change', updateTour);
-nextTourBtn.addEventListener('click', () => { selLevel.value = parseInt(selLevel.value) + 1; selLevel.dispatchEvent(new Event('change')); });
+if(toggleTour) toggleTour.addEventListener('change', updateTour);
+if(nextTourBtn) nextTourBtn.addEventListener('click', () => { selLevel.value = parseInt(selLevel.value) + 1; selLevel.dispatchEvent(new Event('change')); });
 
 function drawFrame(forceResetCamera = false) {
-    let conf = { colors: { bg: document.getElementById('color-bg').value, grid: document.getElementById('color-grid').value, particle: document.getElementById('color-particle').value }, opacities: { bg: 100, grid: 20 }, vis: { landmarks: document.getElementById('toggle-landmarks').checked, streams: document.getElementById('toggle-streams').checked, particles: document.getElementById('toggle-particles').checked } };
+    let conf = { 
+        colors: { bg: safeVal('color-bg', '#050A14'), grid: safeVal('color-grid', '#00FFFF'), particle: safeVal('color-particle', '#C8C8C8') }, 
+        opacities: { bg: 100, grid: 20 }, 
+        vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true) } 
+    };
     let engine = new UniverseEngine(conf.colors, conf.opacities);
-    let idx = parseInt(selLevel.value);
+    let idx = selLevel ? parseInt(selLevel.value) : 0; if(isNaN(idx)) idx = 0;
     
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
     let limit = SCALE_LIMITS[idx]; 
@@ -353,8 +370,11 @@ function drawFrame(forceResetCamera = false) {
     
     let layout = { title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(2)}s)</span>`, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', scene: { bgcolor: 'rgba(0,0,0,0)', xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' }, margin: { l: 0, r: 0, b: 0, t: 50 }, uirevision: 'true' };
 
-    if (forceResetCamera || isFirstRender) { layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8} }; isFirstRender = false; Plotly.newPlot('plotly-div', traces, layout); } 
-    else { Plotly.react('plotly-div', traces, layout); }
+    let div = document.getElementById('plotly-div');
+    if (div) {
+        if (forceResetCamera || isFirstRender) { layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8} }; isFirstRender = false; Plotly.newPlot(div, traces, layout); } 
+        else { Plotly.react(div, traces, layout); }
+    }
     updateTour();
 }
 
@@ -364,39 +384,50 @@ function animatePhysics(timestamp) {
     let dt = (timestamp - lastTimestamp) / 1000; lastTimestamp = timestamp;
     if(dt > 0.1) dt = 0.016; 
     if (isUserInteracting) return;
-    globalTime += dt * (document.getElementById('op-speed').value * 0.1);
+    let speed = parseFloat(safeVal('op-speed', 10));
+    globalTime += dt * (speed * 0.1);
     drawFrame(false); 
 }
 
-playBtn.addEventListener('click', () => {
-    isPlaying = !isPlaying;
-    if (isPlaying) { playBtn.innerText = "⏸ 暫停時空演化"; playBtn.classList.add('playing'); lastTimestamp = performance.now(); animReq = requestAnimationFrame(animatePhysics); } 
-    else { playBtn.innerText = "▶ 啟動時空演化"; playBtn.classList.remove('playing'); cancelAnimationFrame(animReq); drawFrame(false); }
+if(playBtn) {
+    playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) { playBtn.innerText = "⏸ 暫停時空演化"; playBtn.classList.add('playing'); lastTimestamp = performance.now(); animReq = requestAnimationFrame(animatePhysics); } 
+        else { playBtn.innerText = "▶ 啟動時空演化"; playBtn.classList.remove('playing'); cancelAnimationFrame(animReq); drawFrame(false); }
+    });
+}
+
+if(renderBtn) renderBtn.addEventListener('click', () => { globalTime = 0; drawFrame(true); });
+
+if(selLevel) {
+    selLevel.addEventListener('change', () => {
+        let overlay = document.getElementById('loading-overlay');
+        if(overlay) overlay.style.display = "flex";
+        setTimeout(() => { globalTime = 0; drawFrame(true); if(overlay) overlay.style.display = "none"; }, 100);
+    });
+}
+
+// 解決 AppLoader 動態載入時 window.onload 不觸發的問題
+setTimeout(() => {
+    const statusText = document.getElementById('loading-status');
+    const startBtn = document.getElementById('start-btn');
+    if(statusText) { statusText.innerText = "系統就緒 (System Ready)"; statusText.style.color = "#2ECC71"; }
+    if(startBtn) startBtn.classList.add('ready');
+}, 1500);
+
+let startBtn = document.getElementById('start-btn');
+if(startBtn) {
+    startBtn.addEventListener('click', () => {
+        let splash = document.getElementById('splash-screen');
+        if(splash) splash.style.opacity = '0';
+        setTimeout(() => { if(splash) splash.style.display = 'none'; drawFrame(true); }, 1000);
+    });
+}
+
+['toggle-landmarks', 'toggle-streams', 'toggle-particles'].forEach(id => { 
+    let el = document.getElementById(id); 
+    if(el) el.addEventListener('change', () => drawFrame(false)); 
 });
-
-selLevel.addEventListener('change', () => {
-    document.getElementById('loading-overlay').style.display = "flex";
-    setTimeout(() => { globalTime = 0; drawFrame(true); document.getElementById('loading-overlay').style.display = "none"; }, 100);
-});
-
-// 加載畫面邏輯 (Mock 預計算時間)
-window.onload = () => {
-    setTimeout(() => {
-        document.getElementById('loading-status').innerText = "系統就緒 (System Ready)";
-        document.getElementById('loading-status').style.color = "#2ECC71";
-        document.getElementById('start-btn').classList.add('ready');
-    }, 1500); // 模擬加載 1.5 秒
-};
-
-document.getElementById('start-btn').addEventListener('click', () => {
-    document.getElementById('splash-screen').style.opacity = '0';
-    setTimeout(() => {
-        document.getElementById('splash-screen').style.display = 'none';
-        drawFrame(true); // 進入時才渲染 Plotly，提升流暢度
-    }, 1000);
-});
-
-['toggle-landmarks', 'toggle-streams', 'toggle-particles'].forEach(id => { document.getElementById(id).addEventListener('change', () => drawFrame(false)); });
 </script>
 </body>
 </html>
