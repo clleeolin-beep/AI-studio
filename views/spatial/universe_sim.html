@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 15級宇宙動力學模擬器 (流暢相機與L1/L2合併版)</title>
+    <title>AI Studio - 15級宇宙動力學模擬器 (科學精確版)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; color: white; display: flex; }
@@ -64,9 +64,9 @@
 
     <div id="splash-screen">
         <h1>AI STUDIO</h1>
-        <p>惇陽實績地圖與空間模擬實驗室 - 宇宙動力學引擎</p>
-        <div id="loading-status" class="loading-text">矩陣快取與天文資料預載入中...</div>
-        <button id="start-btn">進入空間實驗室</button>
+        <p>惇陽空間模擬實驗室 - 多尺度宇宙引擎</p>
+        <div id="loading-status" class="loading-text">天文軌道參數預載入中...</div>
+        <button id="start-btn">進入觀測模式</button>
     </div>
 
     <div id="control-panel">
@@ -75,13 +75,13 @@
             <select id="level-select"></select>
         </div>
         <div class="control-group">
-            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟實驗室故事導覽</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟天文導覽資訊</span></label>
         </div>
 
-        <h3>⏱️ 宇宙動力學引擎</h3>
+        <h3>⏱️ 物理動態引擎</h3>
         <div class="control-group">
             <button id="play-btn" class="action-btn">▶ 啟動時空演化</button>
-            <label style="margin-top: 15px;">流逝速率 (第一宇宙速度): <span id="val-speed" class="range-val">0.1x</span></label>
+            <label style="margin-top: 15px;">時間流逝倍率: <span id="val-speed" class="range-val">0.1x</span></label>
             <input type="range" id="op-speed" min="1" max="100" value="1">
             <p style="font-size: 11px; color: #888; line-height: 1.4; margin-top: 8px;">
                 * 動畫期間支援滑鼠自由拖曳旋轉，鬆開後自動繼續推演。
@@ -90,32 +90,32 @@
 
         <h3>👁️ 觀測圖層控制</h3>
         <div class="control-group">
-            <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體與設施標註 (LOD)</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場、螺旋軌道與暗流</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環、柯伊伯帶與微星體</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網/分水嶺網格</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>宇宙膨脹流向箭頭</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體與探測器標註</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>軌道線與引力場勢</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環與宇宙微星體</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網格</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>空間膨脹向量</span></label>
         </div>
 
         <h3>🎨 視覺調色盤</h3>
         <div class="control-group">
-            <div class="color-picker-row"><span>宇宙深空背景</span><input type="color" id="color-bg" value="#050A14"></div>
+            <div class="color-picker-row"><span>深空背景顏色</span><input type="color" id="color-bg" value="#050A14"></div>
             <div class="color-picker-row"><span>引力網格顏色</span><input type="color" id="color-grid" value="#00FFFF"></div>
-            <div class="color-picker-row"><span>背景星體顏色</span><input type="color" id="color-particle" value="#C8C8C8"></div>
+            <div class="color-picker-row"><span>背景星塵顏色</span><input type="color" id="color-particle" value="#C8C8C8"></div>
         </div>
 
-        <button id="render-btn" class="action-btn">🔄 重置相機與物理快取</button>
+        <button id="render-btn" class="action-btn">🔄 重置相機與快取</button>
     </div>
 
     <div id="engine-container">
-        <div id="loading-overlay"><div class="spinner"></div><span>時空跳躍中...</span></div>
+        <div id="loading-overlay"><div class="spinner"></div><span>時空座標重新映射中...</span></div>
         <div id="threejs-container"></div>
         <div id="plotly-div"></div>
         
         <div id="tour-panel">
             <h4 id="tour-title">標題</h4>
             <div id="tour-content">內容</div>
-            <button id="next-tour-btn">進行下一次時空躍遷 (Next Scale)</button>
+            <button id="next-tour-btn">進行下一次尺度躍遷 (Next Scale)</button>
         </div>
     </div>
 
@@ -127,7 +127,6 @@ class FutureThreeJSEngine {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.isActive = false;
-        console.log("Three.js 引擎接口已就緒。");
     }
     activate() {
         if(document.getElementById('plotly-div')) document.getElementById('plotly-div').style.display = 'none';
@@ -137,33 +136,33 @@ class FutureThreeJSEngine {
 }
 const threeEngine = new FutureThreeJSEngine('threejs-container');
 
-// 更新為 15 個層級 (合併 L1/L2)
+// 15 個層級 (移除了形容詞，回歸科學命名)
 const LEVELS = [
-    "01. 地月系防禦圈 (地球GIS、衛星網與歷史登月)",
+    "01. 地月系統 (人造衛星網與歷史登月)",
     "02. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
-    "03. 太陽系螺旋衝浪 (左前向量與時空殘影)",
-    "04. 銀河系核心 (湍流吸積與費米泡)", 
+    "03. 太陽系行進軌跡 (太陽系螺旋衝浪)",
+    "04. 銀河系核心 (引力吸積與費米泡)", 
     "05. 本星系群局部 (雙軸鞍點)",
     "06. 本星系群全貌 (Local Group)", 
     "07. 周邊星系群 (Local Sheet)",
     "08. 室女座超星系團局部 (M87*)", 
-    "09. 室女座超星系團骨架 (引力角動量漩渦)",
+    "09. 室女座超星系團骨架 (角動量引力漩渦)",
     "10. 拉尼亞凱亞次級網絡", 
     "11. 拉尼亞凱亞核心 (動態巨引源)",
-    "12. 拉尼亞凱亞全貌 (動態拉扯與黃金分水嶺)", 
+    "12. 拉尼亞凱亞全貌 (引力流域分水嶺)", 
     "13. 周邊超星系團 (暗能量介入)",
-    "14. 巨型宇宙網 (高斯塌縮宇宙骨架)", 
-    "15. 可觀測宇宙 (極端哈伯擴張)"
+    "14. 巨型宇宙網 (高斯塌縮骨架)", 
+    "15. 可觀測宇宙 (哈伯空間膨脹)"
 ];
 
 const STORY_SCRIPT = [
-    { title: "L1. 地月系防禦圈與歷史刻痕", content: "歡迎來到 AI Studio 空間實驗室。在我們的家園外圍，國際太空站(ISS)、天宮與福衛系列正以第一宇宙速度巡航。跨越38萬公里，月球因潮汐鎖定以同一面朝向我們，上面銘刻著阿波羅與嫦娥探月工程的著陸點，鵲橋衛星則懸浮於 L2 點。(請啟動左側『時空演化』，並利用滑鼠自由旋轉視角)" },
-    { title: "L2. 太陽系與克卜勒力學", content: "縮小視角，我們看見了完整的太陽系。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且極具離心率的特殊軌道，以及外圍半透明的柯伊伯帶。" },
-    { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是以每秒 230 公里的速度帶領我們在銀河中衝浪。行星被太陽的引力拖曳，在宇宙中畫出壯觀的彈簧狀時空殘影。" },
-    { title: "L4. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』，以及垂直於盤面的巨大費米泡。" },
+    { title: "L1. 地月系統與觀測網", content: "在地球近地軌道上，國際太空站(ISS)、天宮與福衛系列正以第一宇宙速度運航。跨越38萬公里，月球因潮汐鎖定以同一面朝向我們，上面精確銘刻著阿波羅與嫦娥工程的著陸點，以及懸浮於L2點的鵲橋衛星。(請啟動左側『時空演化』觀察)" },
+    { title: "L2. 太陽系與克卜勒力學", content: "縮小視角，我們看見了完整的太陽系。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且具高離心率的特殊軌道，以及外圍半透明的柯伊伯帶。" },
+    { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是以每秒 230 公里的速度繞行銀河中心。行星受太陽引力拖曳，在星際空間中畫出壯觀的彈簧狀時空軌跡。" },
+    { title: "L4. 銀河系核心動態", content: "進入百萬光年尺度。這裡的線條展現了向中心超大質量黑洞墜落的『引力吸積軌跡』，以及垂直於盤面的巨大高能費米泡。" },
     { title: "L5~L8. 本星系群與室女座", content: "我們的銀河系與仙女座星系 (M31) 正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。" },
-    { title: "L9~L12. 拉尼亞凱亞超星系團", content: "『無盡的天堂』。數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
-    { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到了數十億光年。我們採用了高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』、『絕對空洞』。同時，您將觀察到哈伯擴張帶來的空間膨脹(流向箭頭)。" }
+    { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
+    { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
 ];
 const STORY_MAP = [0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6];
 
@@ -226,7 +225,6 @@ const MOON_LANDINGS = [
     {name: '嫦娥六號 (南極)', lat: -41.6, lon: -153.9, c: '#FF3333', s: 4}
 ];
 
-// 已移除原本的 L1 (2.5), 改為從 15.0 (地月系) 起跳，總計 15 級
 const SCALE_LIMITS = [15.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
 const CACHE = { structures: {}, orbits: {}, streams: {}, webs: {}, arms: {}, cones: {}, bubbles: {}, seeds: {} };
 
@@ -234,17 +232,33 @@ function hexToRgba(hex, opacity = 1) { let r = parseInt(hex.substring(1, 3), 16)
 function rand(min, max) { return Math.random() * (max - min) + min; }
 function randn() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); }
 function simpleNoise(x, y, z=0) { let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return n - Math.floor(n); }
-function latLonToCartesian(lat, lon, R) { let phi = (90 - lat) * (Math.PI / 180), theta = (lon + 180) * (Math.PI / 180); return { x: -(R * Math.sin(phi) * Math.cos(theta)), y: (R * Math.sin(phi) * Math.sin(theta)), z: (R * Math.cos(phi)) }; }
+
+// 【修正核心】統一經緯度轉三維座標系，保證標籤與 Mesh 完美重合
+function latLonToLocal(lat, lon, r) {
+    let latRad = lat * Math.PI / 180;
+    let lonRad = lon * Math.PI / 180;
+    return [
+        r * Math.cos(latRad) * Math.cos(lonRad),
+        r * Math.cos(latRad) * Math.sin(lonRad),
+        r * Math.sin(latRad)
+    ];
+}
+
 function solveKepler(M, e) { let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); return E; }
 function getKeplerPos(a, e, i_angle, time, T) { let M = time * T; let E = solveKepler(M, e); let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); let r = a * (1 - e * Math.cos(E)); let px = r * Math.cos(v), py = r * Math.sin(v); return {x: px, y: py * Math.cos(i_angle), z: py * Math.sin(i_angle)}; }
 
 class TransformEngine {
-    static apply(arrX, arrY, arrZ, angle, scale) {
+    static apply(arrX, arrY, arrZ, angle, scale, tx=0, ty=0, tz=0) {
         let len = arrX.length; let outX = new Array(len), outY = new Array(len), outZ = new Array(len);
         let cosA = Math.cos(angle), sinA = Math.sin(angle);
         for(let i=0; i<len; i++) {
             if (arrX[i] === null) { outX[i] = null; outY[i] = null; outZ[i] = null; } 
-            else { let sx = arrX[i] * scale, sy = arrY[i] * scale; outX[i] = sx * cosA - sy * sinA; outY[i] = sx * sinA + sy * cosA; outZ[i] = arrZ[i] * scale; }
+            else { 
+                let sx = arrX[i] * scale, sy = arrY[i] * scale; 
+                outX[i] = sx * cosA - sy * sinA + tx; 
+                outY[i] = sx * sinA + sy * cosA + ty; 
+                outZ[i] = arrZ[i] * scale + tz; 
+            }
         }
         return {x: outX, y: outY, z: outZ};
     }
@@ -263,39 +277,50 @@ class UniverseEngine {
         this.textColor = '#FFFF00';
     }
     
-    createLabel(pos, color, name, size, symbol, angle=0, scale=1.0) { 
-        let tf = TransformEngine.apply([pos[0]], [pos[1]], [pos[2]], angle, scale);
-        return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
+    createLabel(pos, color, name, size, symbol) { 
+        return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
     }
     
-    precalcEarthGIS(key, radius, detail) {
+    precalcSphere(key, radius, detail) {
+        if(CACHE.structures[key]) return CACHE.structures[key];
+        let x=[], y=[], z=[], i=[], j=[], k=[];
+        for(let latStep=0; latStep<=detail; latStep++) {
+            let latRad = Math.PI * (latStep/detail) - Math.PI/2;
+            for(let lonStep=0; lonStep<=detail; lonStep++) {
+                let lonRad = 2 * Math.PI * (lonStep/detail);
+                x.push(radius * Math.cos(latRad) * Math.cos(lonRad));
+                y.push(radius * Math.cos(latRad) * Math.sin(lonRad));
+                z.push(radius * Math.sin(latRad));
+            }
+        }
+        for(let latStep=0; latStep<detail; latStep++) { 
+            for(let lonStep=0; lonStep<detail; lonStep++) { 
+                let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; 
+                i.push(p1, p2); j.push(p2, p4); k.push(p3, p3); 
+            } 
+        }
+        CACHE.structures[key] = {x, y, z, i, j, k}; return CACHE.structures[key];
+    }
+
+    precalcMoonBase(key, radius, detail) {
         if(CACHE.structures[key]) return CACHE.structures[key];
         let x=[], y=[], z=[], i=[], j=[], k=[], intensity=[];
         for(let latStep=0; latStep<=detail; latStep++) {
-            let lat = Math.PI * (latStep/detail) - Math.PI/2;
+            let latRad = Math.PI * (latStep/detail) - Math.PI/2;
             for(let lonStep=0; lonStep<=detail; lonStep++) {
-                let lon = 2 * Math.PI * (lonStep/detail);
-                let px = radius * Math.cos(lat) * Math.cos(lon), py = radius * Math.cos(lat) * Math.sin(lon), pz = radius * Math.sin(lat);
-                x.push(px); y.push(py); z.push(pz);
-                intensity.push(simpleNoise(px*2, py*2, pz*2) > 0.3 ? 1.0 : 0.0);
+                let lonRad = 2 * Math.PI * (lonStep/detail); 
+                let px = radius * Math.cos(latRad) * Math.cos(lonRad), py = radius * Math.cos(latRad) * Math.sin(lonRad), pz = radius * Math.sin(latRad);
+                x.push(px); y.push(py); z.push(pz); 
+                intensity.push(simpleNoise(px*10, py*10, pz*10));
             }
         }
-        for(let latStep=0; latStep<detail; latStep++) { for(let lonStep=0; lonStep<detail; lonStep++) { let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; i.push(p1, p2); j.push(p2, p4); k.push(p3, p3); } }
+        for(let latStep=0; latStep<detail; latStep++) { 
+            for(let lonStep=0; lonStep<detail; lonStep++) { 
+                let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; 
+                i.push(p1, p2); j.push(p2, p4); k.push(p3, p3); 
+            } 
+        }
         CACHE.structures[key] = {x, y, z, i, j, k, intensity}; return CACHE.structures[key];
-    }
-
-    precalcMoonSurface(key, center, radius, detail, angleOffset) {
-        let x=[], y=[], z=[], intensity=[], i_arr=[], j_arr=[], k_arr=[];
-        for(let latStep=0; latStep<=detail; latStep++) {
-            let lat = Math.PI * (latStep/detail) - Math.PI/2;
-            for(let lonStep=0; lonStep<=detail; lonStep++) {
-                let lon = 2 * Math.PI * (lonStep/detail) + angleOffset; 
-                let px = radius * Math.cos(lat) * Math.cos(lon), py = radius * Math.cos(lat) * Math.sin(lon), pz = radius * Math.sin(lat);
-                x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + pz); intensity.push(simpleNoise(px*10, py*10, pz*10));
-            }
-        }
-        for(let latStep=0; latStep<detail; latStep++) { for(let lonStep=0; lonStep<detail; lonStep++) { let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; i_arr.push(p1, p2); j_arr.push(p2, p4); k_arr.push(p3, p3); } }
-        return { type: 'mesh3d', x, y, z, i: i_arr, j: j_arr, k: k_arr, intensity, colorscale: [['0', '#555555'], ['1', '#AAAAAA']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.6, diffuse: 0.8} };
     }
 
     precalcKeplerOrbit(key, a, e, i_angle) {
@@ -507,12 +532,11 @@ class UniverseEngine {
         return { type: 'cone', x: tf_pos.x, y: tf_pos.y, z: tf_pos.z, u: tf_vec.u, v: tf_vec.v, w: tf_vec.w, colorscale: 'Blues', sizemode: "absolute", sizeref: coneData.scale_val*0.1*scale, opacity: 0.7, showscale: false, hoverinfo: 'none' };
     }
 
-    // --- Main Level Builder ---
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
-        let rotationAngle = (isPlaying && level_idx <= 3) ? time * 0.15 : 0; 
+        let rotationAngle = (isPlaying && level_idx <= 2) ? time * 0.15 : 0; 
         let loopTime = time % 30.0;
-        let expandFactor = (level_idx >= 11 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
+        let expandFactor = (level_idx >= 10 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
 
         let dyn = {
             mw: [10*Math.cos(time*0.1), 10*Math.sin(time*0.1), 2*Math.sin(time*0.05)], m31: [25 - 5*Math.cos(time*0.1), 10 - 5*Math.sin(time*0.1), 5 - 2*Math.sin(time*0.05)],
@@ -525,40 +549,58 @@ class UniverseEngine {
             BLACK_HOLES.forEach(bh => { if (bh.dist_scale <= SCALE_LIMITS[level_idx] * 1.5) t.push(...this.createBlackHole(getDynBH(bh.id), bh.name, bh.desc, bh.is_mega, rotationAngle, expandFactor)); });
         }
 
-        if (level_idx === 0) { // 合併後的 L1 (地球與地月系)
-            let earth = this.precalcEarthGIS('earth_gis', 1.0, 30);
-            t.push({ type: 'mesh3d', x: earth.x, y: earth.y, z: earth.z, i: earth.i, j: earth.j, k: earth.k, intensity: earth.intensity, colorscale: [['0', '#000080'], ['1', '#228B22']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.7, diffuse: 0.9} });
+        if (level_idx === 0) { // L1: 地月系統 (修正：乾淨無噪聲的高科技地球、完美對齊的月面)
+            let earth_angle = time * 0.5; // 地球自轉
+            let earthBase = this.precalcSphere('earth_base', 1.0, 30);
+            let earthTf = TransformEngine.apply(earthBase.x, earthBase.y, earthBase.z, earth_angle, 1.0);
+            t.push({ type: 'mesh3d', x: earthTf.x, y: earthTf.y, z: earthTf.z, i: earthBase.i, j: earthBase.j, k: earthBase.k, color: '#0f52ba', hoverinfo: 'none', lighting: {ambient: 0.4, diffuse: 0.9, specular: 0.5, roughness: 0.1} });
             
             let moon_d = 12.0, moon_angle = time * 1.5; let mx = moon_d * Math.cos(moon_angle), my = moon_d * Math.sin(moon_angle);
-            t.push(this.precalcMoonSurface('moon_mesh', [mx, my, 0], 1.5, 20, moon_angle));
+            let moonBase = this.precalcMoonBase('moon_base', 1.5, 25);
+            let moonTf = TransformEngine.apply(moonBase.x, moonBase.y, moonBase.z, moon_angle, 1.0, mx, my, 0);
+            t.push({ type: 'mesh3d', x: moonTf.x, y: moonTf.y, z: moonTf.z, i: moonBase.i, j: moonBase.j, k: moonBase.k, intensity: moonBase.intensity, colorscale: [['0', '#555555'], ['1', '#AAAAAA']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.6, diffuse: 0.8} });
+
+            // 繪製月球公轉軌道虛線
+            if (vis.streams) {
+                let moonOrbitX = [], moonOrbitY = [];
+                for(let i=0; i<=100; i++) { let th = (i/100) * 2 * Math.PI; moonOrbitX.push(moon_d * Math.cos(th)); moonOrbitY.push(moon_d * Math.sin(th)); }
+                t.push({ type: 'scatter3d', x: moonOrbitX, y: moonOrbitY, z: Array(101).fill(0), mode: 'lines', line: {color: 'rgba(255,255,255,0.3)', dash: 'dot', width: 1.5}, hoverinfo: 'none', showlegend: false });
+            }
 
             if(vis.landmarks) {
-                EARTH_POIS.forEach(poi => { let pos = latLonToCartesian(poi.lat, poi.lon, 1.01); if (poi.label) t.push(this.createLabel([pos.x, pos.y, pos.z], poi.c, poi.name, poi.s, 'circle')); });
+                // 地球設施 (隨地球自轉)
+                EARTH_POIS.forEach(poi => { 
+                    let loc = latLonToLocal(poi.lat, poi.lon, 1.01);
+                    let tf = TransformEngine.apply([loc[0]], [loc[1]], [loc[2]], earth_angle, 1.0);
+                    if (poi.label) t.push(this.createLabel([tf.x[0], tf.y[0], tf.z[0]], poi.c, poi.name, poi.s, 'circle')); 
+                    if (poi.ray) {
+                        let tfRay = TransformEngine.apply([loc[0]*1.4], [loc[1]*1.4], [loc[2]*1.4], earth_angle, 1.0);
+                        t.push({ type: 'scatter3d', x: [tf.x[0], tfRay.x[0]], y: [tf.y[0], tfRay.y[0]], z: [tf.z[0], tfRay.z[0]], mode: 'lines+markers', line: {color: poi.c, width: 1}, marker:{size:2, color:poi.c}, hoverinfo: 'none', showlegend: false });
+                        t.push(this.createLabel([tfRay.x[0]*1.05, tfRay.y[0]*1.05, tfRay.z[0]*1.05], poi.c, poi.name, 1, 'circle'));
+                    }
+                });
                 
-                let iss_v = time * 7.6; let iss_pos = {x: 1.1*Math.cos(iss_v), y: 1.1*Math.sin(iss_v)*Math.cos(0.9), z: 1.1*Math.sin(iss_v)*Math.sin(0.9)};
+                // 衛星網
+                let iss_v = time * 7.6; let iss_pos = {x: 1.15*Math.cos(iss_v), y: 1.15*Math.sin(iss_v)*Math.cos(0.9), z: 1.15*Math.sin(iss_v)*Math.sin(0.9)};
                 t.push(this.createLabel([iss_pos.x, iss_pos.y, iss_pos.z], '#FFD700', '🛰️ ISS', 5, 'diamond'));
-                let tss_v = time * 7.8; let tss_pos = {x: 1.08*Math.cos(tss_v+2), y: 1.08*Math.sin(tss_v+2)*Math.cos(0.7), z: 1.08*Math.sin(tss_v+2)*Math.sin(0.7)};
+                let tss_v = time * 7.8; let tss_pos = {x: 1.12*Math.cos(tss_v+2), y: 1.12*Math.sin(tss_v+2)*Math.cos(0.7), z: 1.12*Math.sin(tss_v+2)*Math.sin(0.7)};
                 t.push(this.createLabel([tss_pos.x, tss_pos.y, tss_pos.z], '#FF4500', '🛰️ 天宮', 4, 'diamond'));
                 for(let k=0; k<6; k++) {
-                    let fs_v = time * 6.5 + (k * Math.PI/3); let fs_pos = {x: 1.25*Math.cos(fs_v), y: 1.25*Math.sin(fs_v)*Math.cos(0.4), z: 1.25*Math.sin(fs_v)*Math.sin(0.4)};
-                    t.push(this.createLabel([fs_pos.x, fs_pos.y, fs_pos.z], '#00FFFF', k===0?'福衛7號群':'', 2, 'square'));
+                    let fs_v = time * 6.5 + (k * Math.PI/3); let fs_pos = {x: 1.3*Math.cos(fs_v), y: 1.3*Math.sin(fs_v)*Math.cos(0.4), z: 1.3*Math.sin(fs_v)*Math.sin(0.4)};
+                    t.push(this.createLabel([fs_pos.x, fs_pos.y, fs_pos.z], '#00FFFF', k===0?'福衛7號':'', 2, 'square'));
                 }
 
+                // 歷史登月點 (完美貼附月表)
                 MOON_LANDINGS.forEach(ld => {
-                    let loc = latLonToCartesian(ld.lat, ld.lon, 1.52);
-                    let wx = mx + loc.x * Math.cos(moon_angle) - loc.y * Math.sin(moon_angle), wy = my + loc.x * Math.sin(moon_angle) + loc.y * Math.cos(moon_angle);
-                    t.push(this.createLabel([wx, wy, loc.z], ld.c, ld.name, ld.s, 'x'));
+                    let loc = latLonToLocal(ld.lat, ld.lon, 1.52);
+                    let tf = TransformEngine.apply([loc[0]], [loc[1]], [loc[2]], moon_angle, 1.0, mx, my, 0);
+                    t.push(this.createLabel([tf.x[0], tf.y[0], tf.z[0]], ld.c, ld.name, ld.s, 'x'));
                 });
+                // 鵲橋
                 t.push(this.createLabel([moon_d * 1.15 * Math.cos(moon_angle) + 0.8 * Math.cos(time * 5), moon_d * 1.15 * Math.sin(moon_angle), 0.8 * Math.sin(time * 5)], '#FF00FF', '🛰️ 鵲橋', 3, 'diamond'));
-                
-                if(vis.streams) {
-                    let apoX=[], apoY=[];
-                    for(let i=0; i<=100; i++) { let th = (i/100)*2*Math.PI, r = moon_d * Math.sin(th); apoX.push(r * Math.cos(th)); apoY.push(r * Math.sin(th)); }
-                    t.push({ type: 'scatter3d', x: apoX, y: apoY, z: Array(101).fill(0), mode: 'lines', line: {color: 'rgba(0,255,0,0.3)', dash: 'dot'}, hoverinfo:'none', showlegend:false });
-                }
             }
         }
-        else if (level_idx === 1) { // 太陽系
+        else if (level_idx === 1) { // 太陽系全貌
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
             PLANETS.forEach(p => {
                 let pos = getKeplerPos(p.a, p.e, p.i, time, p.T);
@@ -572,7 +614,7 @@ class UniverseEngine {
                 t.push({ type: 'scatter3d', x: bx, y: by, z: bz, mode: 'markers', marker: {size: 1.5, color: 'rgba(150, 200, 255, 0.2)'}, hoverinfo: 'none', showlegend: false });
             }
         }
-        else if (level_idx === 2) { // 太陽螺旋衝浪
+        else if (level_idx === 2) { // 太陽系螺旋衝浪
             let sunVec = [-4.0, -4.0, 2.0], sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
             if(vis.landmarks) t.push(this.createLabel([sunPos.x, sunPos.y, sunPos.z], '#FF5500', '太陽', 8, 'circle'));
             PLANETS.forEach(p => {
@@ -589,7 +631,7 @@ class UniverseEngine {
                 let bubbles = this.precalcFermiBubbles(`L${level_idx}_bubbles`, dyn.mw, 18.0, 6.0, 400); t.push(...this.drawFermiBubblesDynamic(bubbles, rotationAngle, 1.0));
             }
         }
-        else if (level_idx >= 4 && level_idx <= 7) { // 本星系群到室女座
+        else if (level_idx >= 4 && level_idx <= 7) { 
             if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 4, 'circle', 0, 1.0)); if (level_idx >= 6) t.push(this.createLabel(dyn.virgo, '#FFAA00', '室女座星系團', 5, 'circle', 0, 1.0)); }
             if(vis.streams) {
                 let seeds = this.getSeeds(`L${level_idx}`, [0,0,0], 100.0, 180);
@@ -599,7 +641,7 @@ class UniverseEngine {
                 t.push(...this.drawStreamlinesDynamic(streams, color, 0, 1.0));
             }
         }
-        else if (level_idx === 8 || level_idx === 9) { // 拉尼亞凱亞局部
+        else if (level_idx === 8 || level_idx === 9) { 
             if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 5, 'diamond', 0, 1.0)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '巨引源', 6, 'circle', 0, 1.0)); }
             if(vis.streams) {
                 let seeds = this.getSeeds(`L9`, [50, -20, 20], 280.0, 200);
@@ -608,12 +650,12 @@ class UniverseEngine {
                 t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, 1.0, vis.web));
             }
         }
-        else if (level_idx >= 10) { // 巨型宇宙網
+        else if (level_idx >= 10) { 
             let sim_scale = 2500.0;
             if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 5, 'diamond', 0, expandFactor)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '拉尼亞凱亞', 5, 'circle', 0, expandFactor)); }
             
             if (level_idx === 10 || level_idx === 11) {
-                if(vis.landmarks) t.push(this.createLabel(dyn.shapley, '#9900FF', '夏普力超星系團', 6, 'circle', 0, expandFactor));
+                if(vis.landmarks) t.push(this.createLabel(dyn.shapley, '#9900FF', '夏普力', 6, 'circle', 0, expandFactor));
                 if(vis.streams) {
                     let seeds = this.getSeeds(`L11`, [0,0,0], 1000.0, 200);
                     let attractors = [{pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, {pos: dyn.shapley, mass: 250.0, axis:[0,0,1], spin:1.0}];
@@ -632,7 +674,7 @@ class UniverseEngine {
             }
         }
         
-        if (vis.particles && level_idx >= 3) {
+        if (vis.particles && level_idx >= 2) {
             let px=[], py=[], pz=[]; for(let i=0; i<800; i++) { px.push(randn() * SCALE_LIMITS[level_idx]*0.8); py.push(randn() * SCALE_LIMITS[level_idx]*0.8); pz.push(randn() * SCALE_LIMITS[level_idx]*0.8); }
             t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.3)'}, hoverinfo: 'none', showlegend: false });
         }
@@ -646,17 +688,12 @@ if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('op
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, isUserInteracting = false; 
 const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
 
-// --- 修復核心：全局監聽 Capture Phase，優先攔截滑鼠動作，徹底解決相機拖曳卡頓 ---
-window.addEventListener('mousedown', (e) => {
-    if(e.target.closest('.js-plotly-plot') || e.target.closest('#plotly-div')) { isUserInteracting = true; }
-}, true);
+// 修復相機卡頓：在捕獲階段優先攔截所有滑鼠/觸控事件
+window.addEventListener('mousedown', (e) => { if(e.target.closest('.js-plotly-plot') || e.target.closest('#plotly-div')) isUserInteracting = true; }, true);
 window.addEventListener('mouseup', () => { isUserInteracting = false; }, true);
-window.addEventListener('touchstart', (e) => {
-    if(e.target.closest('.js-plotly-plot') || e.target.closest('#plotly-div')) { isUserInteracting = true; }
-}, {capture: true, passive: true});
+window.addEventListener('touchstart', (e) => { if(e.target.closest('.js-plotly-plot') || e.target.closest('#plotly-div')) isUserInteracting = true; }, {capture: true, passive: true});
 window.addEventListener('touchend', () => { isUserInteracting = false; }, {capture: true, passive: true});
 window.addEventListener('mouseleave', () => { isUserInteracting = false; }, true);
-// -------------------------------------------------------------------------
 
 const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
@@ -705,10 +742,7 @@ function animatePhysics(timestamp) {
     let speed = parseFloat(safeVal('op-speed', 10));
     globalTime += dt * (speed * 0.1);
 
-    // 關鍵修復：使用者互動(拖曳視角)時，暫停繪圖迴圈，避免跟 Plotly 底層衝突
-    if (!isUserInteracting) {
-        drawFrame(false); 
-    }
+    if (!isUserInteracting) drawFrame(false); 
 }
 
 if(playBtn) {
