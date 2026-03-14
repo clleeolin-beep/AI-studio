@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 16級宇宙動力學模擬器 (導覽與預加載版)</title>
+    <title>AI Studio - 16級宇宙動力學模擬器 (GIS與全宇宙動力學完整版)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; color: white; display: flex; }
         
-        /* 加載與啟動畫面 (KeepTrack 風格) */
         #splash-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 1s ease-out; }
         #splash-screen h1 { font-size: 3rem; color: #00FFFF; letter-spacing: 5px; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,255,0.5); }
         #splash-screen p { color: #888; letter-spacing: 2px; margin-bottom: 40px; }
@@ -25,11 +24,9 @@
         #engine-container { flex-grow: 1; height: 100vh; position: relative; cursor: grab; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); }
         #engine-container:active { cursor: grabbing; }
         
-        /* 預留給未來 Three.js 的畫布容器 */
         #threejs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none; }
         #plotly-div { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
 
-        /* 故事導覽面板 */
         #tour-panel { position: absolute; bottom: 30px; right: 30px; width: 350px; background: rgba(10, 17, 40, 0.85); border: 1px solid #00FFFF; border-radius: 10px; padding: 20px; box-shadow: 0 0 20px rgba(0,255,255,0.2); z-index: 100; backdrop-filter: blur(10px); display: none; }
         #tour-title { font-size: 18px; color: #FFD700; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
         #tour-content { font-size: 14px; color: #E0E0E0; line-height: 1.6; margin-bottom: 15px; }
@@ -91,8 +88,10 @@
         <h3>👁️ 觀測圖層控制</h3>
         <div class="control-group">
             <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體與設施標註 (LOD)</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場、螺旋軌道與航線</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環、柯伊伯帶與星塵</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場、螺旋軌道與暗流</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環、柯伊伯帶與微星體</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網/分水嶺網格</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>宇宙膨脹流向箭頭</span></label>
         </div>
 
         <h3>🎨 視覺調色盤</h3>
@@ -118,15 +117,9 @@
     </div>
 
 <script>
-/**
- * 核心引擎層：包含 Plotly 現行邏輯與 Three.js 預留接口
- * [修正]: 導入 safeVal/safeCheck 防禦性取值，解決 AppLoader 動態注入時的 DOM Race Condition
- */
-
 const safeVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
 const safeCheck = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
 
-// 1. 預留給 Phase 2 的 Three.js 接口
 class FutureThreeJSEngine {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -141,14 +134,15 @@ class FutureThreeJSEngine {
 }
 const threeEngine = new FutureThreeJSEngine('threejs-container');
 
-// 2. 故事導覽腳本庫
 const STORY_SCRIPT = [
-    { title: "L1. 地球防禦圈與觀測網", content: "歡迎來到 AI Studio 空間實驗室。在我們的家園外圍，國際太空站(ISS)、天宮與福衛系列正以第一宇宙速度巡航。請啟動左側『時空演化』觀察它們的軌跡。*(註：目前地球為 Plotly 幾何模擬，未來將透過 Three.js 升級為 KeepTrack 等級之照片級真實材質)*。" },
+    { title: "L1. 地球防禦圈與觀測網", content: "歡迎來到 AI Studio 空間實驗室。在我們的家園外圍，國際太空站(ISS)、天宮與福衛系列正以第一宇宙速度巡航。請啟動左側『時空演化』觀察它們的軌跡。" },
     { title: "L2. 地月系與歷史刻痕", content: "跨越38萬公里，月球因為潮汐鎖定永遠以同一面朝向我們。仔細看，月表上銘刻著阿波羅與嫦娥探月工程的著陸點，而鵲橋衛星正懸浮於 L2 拉格朗日點中繼訊號。" },
     { title: "L3. 太陽系與克卜勒力學", content: "縮小視角，我們看見了完整的太陽系。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且極具離心率的特殊軌道，以及外圍半透明的柯伊伯帶。" },
     { title: "L4. 太陽螺旋衝浪", content: "這才是宇宙的真實樣貌！太陽並非靜止，而是以每秒 230 公里的速度帶領我們在銀河中衝浪。行星被太陽的引力拖曳，在宇宙中畫出壯觀的彈簧狀時空殘影。" },
-    { title: "L5. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』。*(準備就緒後，我們將在此導入百萬級 WebGL 粒子，還原真實的星系氣體碰撞)*。" },
-    { title: "L6~L16. 大尺度宇宙網", content: "隨著我們繼續躍遷，本星系群、室女座超星系團、直到拉尼亞凱亞的黃金分水嶺。宇宙在大尺度下呈現出如海綿般的暗物質纖維網與絕對空洞。" }
+    { title: "L5. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』，以及垂直於盤面的巨大費米泡。" },
+    { title: "L6~L9. 本星系群與室女座", content: "我們的銀河系與仙女座星系 (M31) 正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。" },
+    { title: "L10~L13. 拉尼亞凱亞超星系團", content: "『無盡的天堂』。這裡實作了真實的引力流體尋訪演算法，數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
+    { title: "L14~L16. 可觀測宇宙骨架", content: "尺度來到了數十億光年。我們採用了高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』、『絕對空洞』。同時，您將觀察到哈伯擴張帶來的空間膨脹(流向箭頭)。" }
 ];
 
 const LEVELS = [
@@ -172,18 +166,53 @@ const PLANETS = [
     {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7, isDwarf: false, hasRing: true, i: 0.04},
     {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5, isDwarf: false, hasRing: true, i: 0.01},
     {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5, isDwarf: false, i: 0.03},
-    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29}
+    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29},
+    {id: 'orcus', name: '亡神星', a: 39.4, e: 0.225, T: 0.004, c: '#778899', s: 2, isDwarf: true, i: 0.35},
+    {id: 'haumea', name: '妊神星', a: 43.3, e: 0.191, T: 0.0035, c: '#E0E0E0', s: 2, isDwarf: true, i: 0.49},
+    {id: 'quaoar', name: '創神星', a: 43.6, e: 0.038, T: 0.0034, c: '#B0C4DE', s: 2, isDwarf: true, i: 0.14},
+    {id: 'makemake', name: '鳥神星', a: 45.8, e: 0.159, T: 0.0032, c: '#FFA07A', s: 2, isDwarf: true, i: 0.50},
+    {id: 'gonggong', name: '共工星', a: 67.5, e: 0.502, T: 0.0018, c: '#CD5C5C', s: 2, isDwarf: true, i: 0.53},
+    {id: 'eris', name: '鬩神星', a: 67.7, e: 0.440, T: 0.0018, c: '#F8F8FF', s: 2, isDwarf: true, i: 0.76},
+    {id: 'sedna', name: '賽德娜', a: 90.0, e: 0.855, T: 0.0005, c: '#8B0000', s: 1.5, isDwarf: true, i: 0.20}
+];
+
+const BLACK_HOLES = [
+    {id: 'mw', dist_scale: 15, name: '人馬座 A*', desc: '430萬太陽質量', is_mega: false},
+    {id: 'cyg', dist_scale: 15, name: '天鵝座 X-1', desc: '21倍太陽質量', is_mega: false, offset: [2, 2, 0.5]},
+    {id: 'm31', dist_scale: 35, name: 'M31* (仙女座)', desc: '1.4億太陽質量', is_mega: false},
+    {id: 'virgo', dist_scale: 120, name: 'M87*', desc: '65億太陽質量', is_mega: false},
+    {id: 'cenA', dist_scale: 120, name: '半人馬座 A', desc: '5500萬太陽質量', is_mega: false, offset: [-20, -50, -5]},
+    {id: 'perseus', dist_scale: 280, name: 'NGC 1277', desc: '170億太陽質量', is_mega: false},
+    {id: 'ga', dist_scale: 280, name: 'Abell 3627', desc: '巨引源核心', is_mega: false},
+    {id: 'shapley', dist_scale: 500, name: '夏普力主黑洞群', desc: '暗流核心', is_mega: false},
+    {id: 'sloan', dist_scale: 1000, name: '史隆長城節點', desc: '宇宙長城', is_mega: false, offset: [600, 400, -200]},
+    {id: 'hcb', dist_scale: 1500, name: '北冕座長城', desc: '巨型超星系團', is_mega: false, offset: [2000, 1500, -1000]},
+    {id: 'phoenix', dist_scale: 2500, name: '鳳凰座 A*', desc: '1000億太陽質量', is_mega: true, offset: [1200, -600, 400]},
+    {id: 'ton', dist_scale: 2500, name: 'TON 618', desc: '660億太陽質量', is_mega: true, offset: [-1500, 900, -1000]}
 ];
 
 const EARTH_POIS = [
     {name: '🇹🇼 台灣', lat: 23.5, lon: 121.0, c: '#FFFFFF', s: 4, label: true},
     {name: '🇺🇸 美國', lat: 38.0, lon: -97.0, c: '#FFFFFF', s: 4, label: true},
-    {name: '🛰️ FAST 天眼', lat: 25.6, lon: 106.8, c: '#FF00FF', s: 3, label: false, ray: true}
+    {name: '🇯🇵 日本', lat: 36.2, lon: 138.2, c: '#FFFFFF', s: 4, label: true},
+    {name: '🇦🇺 澳洲', lat: -25.2, lon: 133.7, c: '#FFFFFF', s: 4, label: true},
+    {name: '🛰️ FAST 天眼', lat: 25.6, lon: 106.8, c: '#FF00FF', s: 3, label: false, ray: true},
+    {name: '🛰️ ALMA 陣列', lat: -23.0, lon: -67.7, c: '#FF00FF', s: 3, label: false, ray: true},
+    {name: '🛰️ VLA 陣列', lat: 34.0, lon: -107.6, c: '#FF00FF', s: 3, label: false, ray: true},
+    {name: '🛰️ GLT 望遠鏡', lat: 76.5, lon: -68.7, c: '#FF00FF', s: 3, label: false, ray: true}
 ];
 
 const MOON_LANDINGS = [
     {name: 'Apollo 11 (靜海)', lat: 0.67, lon: 23.47, c: '#00FF00', s: 3},
-    {name: '嫦娥四號 (月背)', lat: -45.44, lon: 177.60, c: '#FF3333', s: 4}
+    {name: 'Apollo 12 (風暴洋)', lat: -3.01, lon: -23.42, c: '#00AA00', s: 2},
+    {name: 'Apollo 14 (弗拉毛羅)', lat: -3.64, lon: -17.47, c: '#00AA00', s: 2},
+    {name: 'Apollo 15 (哈德利)', lat: 26.13, lon: 3.63, c: '#00AA00', s: 2},
+    {name: 'Apollo 16 (笛卡爾)', lat: -8.97, lon: 15.50, c: '#00AA00', s: 2},
+    {name: 'Apollo 17 (陶拉斯)', lat: 20.19, lon: 30.77, c: '#00FF00', s: 3},
+    {name: '嫦娥三號 (虹灣)', lat: 44.12, lon: -19.51, c: '#FF0000', s: 3},
+    {name: '嫦娥四號 (月背)', lat: -45.44, lon: 177.60, c: '#FF3333', s: 4},
+    {name: '嫦娥五號 (呂姆克)', lat: 43.06, lon: -51.92, c: '#FF0000', s: 3},
+    {name: '嫦娥六號 (南極)', lat: -41.6, lon: -153.9, c: '#FF3333', s: 4}
 ];
 
 const SCALE_LIMITS = [2.5, 20.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
@@ -197,12 +226,36 @@ function latLonToCartesian(lat, lon, R) { let phi = (90 - lat) * (Math.PI / 180)
 function solveKepler(M, e) { let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); return E; }
 function getKeplerPos(a, e, i_angle, time, T) { let M = time * T; let E = solveKepler(M, e); let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); let r = a * (1 - e * Math.cos(E)); let px = r * Math.cos(v), py = r * Math.sin(v); return {x: px, y: py * Math.cos(i_angle), z: py * Math.sin(i_angle)}; }
 
+class TransformEngine {
+    static apply(arrX, arrY, arrZ, angle, scale) {
+        let len = arrX.length; let outX = new Array(len), outY = new Array(len), outZ = new Array(len);
+        let cosA = Math.cos(angle), sinA = Math.sin(angle);
+        for(let i=0; i<len; i++) {
+            if (arrX[i] === null) { outX[i] = null; outY[i] = null; outZ[i] = null; } 
+            else { let sx = arrX[i] * scale, sy = arrY[i] * scale; outX[i] = sx * cosA - sy * sinA; outY[i] = sx * sinA + sy * cosA; outZ[i] = arrZ[i] * scale; }
+        }
+        return {x: outX, y: outY, z: outZ};
+    }
+    static applyVector(arrU, arrV, arrW, angle) {
+        let len = arrU.length; let outU = new Array(len), outV = new Array(len), outW = new Array(len);
+        let cosA = Math.cos(angle), sinA = Math.sin(angle);
+        for(let i=0; i<len; i++) { outU[i] = arrU[i] * cosA - arrV[i] * sinA; outV[i] = arrU[i] * sinA + arrV[i] * cosA; outW[i] = arrW[i]; }
+        return {u: outU, v: outV, w: outW};
+    }
+}
+
 class UniverseEngine {
     constructor(colors, opacities) {
         this.bgColor = hexToRgba(colors.bg, 1);
         this.gridColor = hexToRgba(colors.grid, 0.2);
+        this.textColor = '#FFFF00';
     }
-    createLabel(pos, color, name, size, symbol) { return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; }
+    
+    // --- L1 to L4 Geometry Functions ---
+    createLabel(pos, color, name, size, symbol, angle=0, scale=1.0) { 
+        let tf = TransformEngine.apply([pos[0]], [pos[1]], [pos[2]], angle, scale);
+        return { type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
+    }
     
     precalcEarthGIS(key, radius, detail) {
         if(CACHE.structures[key]) return CACHE.structures[key];
@@ -244,6 +297,17 @@ class UniverseEngine {
         CACHE.orbits[key] = {x, y, z}; return CACHE.orbits[key];
     }
 
+    createPlanetaryRing(planetPos, inner_r, outer_r, count, colorHex, i_angle) {
+        let x=[], y=[], z=[], c=[];
+        for(let i=0; i<count; i++) {
+            let r = rand(inner_r, outer_r), theta = rand(0, 2*Math.PI);
+            let px = r * Math.cos(theta), py = r * Math.sin(theta);
+            x.push(planetPos.x + px); y.push(planetPos.y + py * Math.cos(i_angle)); z.push(planetPos.z + py * Math.sin(i_angle));
+            c.push(hexToRgba(colorHex, 0.4));
+        }
+        return { type: 'scatter3d', x, y, z, mode: 'markers', marker: {size: 1.0, color: c}, hoverinfo: 'none', showlegend: false };
+    }
+
     createSurfingTrail(planet, time, sunVelocityVec) {
         let x=[], y=[], z=[], c=[]; let tailLength = 20.0, steps = 100;
         for(let step=0; step<=steps; step++) {
@@ -256,26 +320,201 @@ class UniverseEngine {
         return { type: 'scatter3d', x, y, z, mode: 'lines', line: {color: c, width: 2.0}, hoverinfo: 'none', showlegend: false };
     }
 
+    // --- L5 to L16 Cosmic Web & Gravity Engines (RESTORED) ---
+    createBlackHole(pos, name, desc, is_mega, angle, scale) {
+        if(!pos) pos = [0,0,0]; let bh_size = is_mega ? 7 : 4; 
+        let core = { type: 'scatter3d', x: [pos[0]*scale], y: [pos[1]*scale], z: [pos[2]*scale], mode: 'markers+text', marker: { size: bh_size, color: '#000000', symbol: 'circle', line: {color: is_mega ? '#FFD700' : '#000000', width: 2} }, text: [is_mega ? `👑 ${name}` : `🕳️ ${name}`], textposition: "bottom right", textfont: {color: is_mega ? '#FFD700' : this.textColor, size: 10}, hoverinfo: 'none', showlegend: false };
+        let ring_x = [], ring_y = [], ring_z = []; let r = is_mega ? 1.0 : 0.5; 
+        for(let i=0; i<=40; i++) { let theta = (i / 40) * 2 * Math.PI; ring_x.push(pos[0] + r * Math.cos(theta)); ring_y.push(pos[1] + r * Math.sin(theta)); ring_z.push(pos[2]); }
+        let tf_ring = TransformEngine.apply(ring_x, ring_y, ring_z, angle, scale);
+        let ring = { type: 'scatter3d', x: tf_ring.x, y: tf_ring.y, z: tf_ring.z, mode: 'lines', line: {color: is_mega ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 0, 255, 0.6)', width: 2}, hoverinfo: 'none', showlegend: false };
+        return [core, ring];
+    }
+
+    precalcSpiralArms(key, center, max_radius, arms) {
+        if(CACHE.arms[key]) return CACHE.arms[key];
+        let all_x=[], all_y=[], all_z=[], bar_length = max_radius * 0.25;
+        for(let i=0; i<arms; i++) {
+            let offset = i * (2*Math.PI / arms);
+            for(let j=0; j<=300; j++) {
+                let t = j/300, theta = t * 4 * Math.PI; 
+                let r_base = bar_length + (max_radius - bar_length) * Math.pow(t, 0.8);
+                let turbulence = (simpleNoise(t * 10, offset) - 0.5) * (r_base * 0.15);
+                let r = r_base + turbulence;
+                let cx = r * Math.cos(theta + offset), cy = r * Math.sin(theta + offset);
+                let bar_weight = Math.exp(-t * 8), bar_x = (bar_length * t) * Math.cos(offset), bar_y = (bar_length * t) * Math.sin(offset);
+                let final_x = center[0] + cx * (1 - bar_weight) + bar_x * bar_weight;
+                let final_y = center[1] + cy * (1 - bar_weight) + bar_y * bar_weight;
+                let z_turbulence = (simpleNoise(final_x, final_y) - 0.5) * (max_radius * 0.01);
+                let final_z = center[2] + z_turbulence * Math.exp(-t * 2); 
+                all_x.push(final_x); all_y.push(final_y); all_z.push(final_z);
+            }
+            all_x.push(null); all_y.push(null); all_z.push(null);
+        }
+        CACHE.arms[key] = {x: all_x, y: all_y, z: all_z}; return CACHE.arms[key];
+    }
+
+    drawSpiralArmsDynamic(armData, color, angle, scale) {
+        let tf = TransformEngine.apply(armData.x, armData.y, armData.z, angle, scale);
+        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 2.0}, hoverinfo: 'none', showlegend: false }];
+    }
+
+    precalcFermiBubbles(key, center, height, width, density) {
+        if(CACHE.bubbles[key]) return CACHE.bubbles[key];
+        let x=[], y=[], z=[], c=[];
+        for(let i=0; i<density; i++) {
+            let h = rand(0, height), max_r = width * Math.sin(Math.PI * (h / height)), r = max_r * Math.sqrt(Math.random()), theta = rand(0, 2*Math.PI);
+            let px = r * Math.cos(theta), py = r * Math.sin(theta);
+            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + h + 0.5); c.push('rgba(140, 50, 255, 0.25)'); 
+            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] - h - 0.5); c.push('rgba(140, 50, 255, 0.25)');
+        }
+        CACHE.bubbles[key] = {x, y, z, c}; return CACHE.bubbles[key];
+    }
+    
+    drawFermiBubblesDynamic(bubbleData, angle, scale) {
+        let tf = TransformEngine.apply(bubbleData.x, bubbleData.y, bubbleData.z, angle, scale);
+        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: 2.5, color: bubbleData.c, opacity: 0.6}, hoverinfo: 'none', showlegend: false }];
+    }
+
     precalcTurbulentAccretion(key, center, max_scale, num_lines) {
         if(CACHE.streams[key]) return CACHE.streams[key];
-        let streams = [], steps = 60, dt = 0.1;
+        let streams = [], steps = 80, dt = 0.08;
         for(let i=0; i<num_lines; i++) {
             let r = max_scale * rand(0.6, 1.2), theta = rand(0, 2*Math.PI), z = rand(-max_scale*0.6, max_scale*0.6); 
             let cx = center[0] + r*Math.cos(theta), cy = center[1] + r*Math.sin(theta), cz = center[2] + z, path_x=[cx], path_y=[cy], path_z=[cz];
             for(let step=0; step<steps; step++) {
                 let dx = cx - center[0], dy = cy - center[1], dz = cz - center[2], current_r = Math.hypot(dx, dy) + 0.01;
-                let v_r = -0.8 * dx / current_r, v_theta = 1.5, v_z = -1.5 * dz / (Math.abs(dz) + 1.0); 
-                cx += (v_r * Math.cos(theta) - v_theta * Math.sin(theta)) * dt; cy += (v_r * Math.sin(theta) + v_theta * Math.cos(theta)) * dt; cz += v_z * dt; theta += (v_theta / current_r) * dt;
+                let v_r = -0.8 * dx / current_r, v_theta = 1.2, v_z = -1.5 * dz / (Math.abs(dz) + 1.0); 
+                let turb_x = (simpleNoise(cx, cy, cz) - 0.5) * 0.5, turb_y = (simpleNoise(cy, cz, cx) - 0.5) * 0.5;
+                cx += (v_r * Math.cos(theta) - v_theta * Math.sin(theta) + turb_x) * dt; cy += (v_r * Math.sin(theta) + v_theta * Math.cos(theta) + turb_y) * dt; cz += v_z * dt; theta += (v_theta / current_r) * dt;
                 path_x.push(cx); path_y.push(cy); path_z.push(cz);
                 if(current_r < 2.0 && Math.abs(cz) < 0.2) break;
             }
-            streams.push({x: path_x, y: path_y, z: path_z});
+            streams.push({path_x, path_y, path_z, basin_id: -1}); // 相容格式
         }
         CACHE.streams[key] = streams; return streams;
     }
 
+    getSeeds(key, center, max_scale, point_density) {
+        if(CACHE.seeds[key]) return CACHE.seeds[key]; let seeds = [];
+        for(let i=0; i<point_density; i++) {
+            let r = max_scale * Math.cbrt(((i*7.1)%100)/100), phi = ((i*11.3)%100)/100 * Math.PI, theta = ((i*19.7)%100)/100 * 2*Math.PI;
+            seeds.push([center[0] + r * Math.sin(phi) * Math.cos(theta), center[1] + r * Math.sin(phi) * Math.sin(theta), center[2] + r * Math.cos(phi)]);
+        }
+        CACHE.seeds[key] = seeds; return seeds;
+    }
+
+    calcDynamicStreamlines(seeds, max_scale, attractors, isExpansion) {
+        let streams = [], steps = 30, dt = max_scale / (steps * 1.2);
+        for(let i=0; i<seeds.length; i++) {
+            let cx = seeds[i][0], cy = seeds[i][1], cz = seeds[i][2], path_x=[cx], path_y=[cy], path_z=[cz], basin_id = -1;
+            for(let step=0; step<steps; step++) {
+                let gx=0, gy=0, gz=0;
+                if (isExpansion) { gx = cx * 0.05; gy = cy * 0.05; gz = cz * 0.05; } 
+                else if (attractors) {
+                    for(let a=0; a<attractors.length; a++) {
+                        let attr = attractors[a], dx = attr.pos[0]-cx, dy = attr.pos[1]-cy, dz = attr.pos[2]-cz, dist = Math.hypot(dx, dy, dz) + 1e-5, pull = attr.mass / Math.pow(dist, 1.5); 
+                        gx += (dx/dist)*pull; gy += (dy/dist)*pull; gz += (dz/dist)*pull;
+                        if(attr.spin && attr.axis) {
+                            let ax = attr.axis[0], ay = attr.axis[1], az = attr.axis[2], vpx = (dy/dist)*az - (dz/dist)*ay, vpy = (dz/dist)*ax - (dx/dist)*az, vpz = (dx/dist)*ay - (dy/dist)*ax, spin_force = attr.spin * pull * 0.6;
+                            gx += vpx * spin_force; gy += vpy * spin_force; gz += vpz * spin_force;
+                        }
+                    }
+                }
+                let f_mag = Math.hypot(gx, gy, gz) + 1e-10; cx += (gx/f_mag)*dt; cy += (gy/f_mag)*dt; cz += (gz/f_mag)*dt;
+                path_x.push(cx); path_y.push(cy); path_z.push(cz);
+                if (attractors && !isExpansion) { for(let a=0; a<attractors.length; a++) if (Math.hypot(cx-attractors[a].pos[0], cy-attractors[a].pos[1], cz-attractors[a].pos[2]) < dt*1.5) { basin_id = a; break; } }
+                if (basin_id !== -1) break;
+            }
+            streams.push({path_x, path_y, path_z, basin_id});
+        }
+        return streams;
+    }
+
+    drawStreamlinesDynamic(streams, color, angle, scale) {
+        let all_x=[], all_y=[], all_z=[]; streams.forEach(s => { all_x.push(...s.path_x, null); all_y.push(...s.path_y, null); all_z.push(...s.path_z, null); });
+        let tf = TransformEngine.apply(all_x, all_y, all_z, angle, scale);
+        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 1.5}, hoverinfo: 'none', showlegend: false }];
+    }
+
+    drawLaniakeaWatershedDynamic(streams, target_basin_id, angle, scale, drawMesh) {
+        let traces = [], target_x=[], target_y=[], target_z=[], outer_x=[], outer_y=[], outer_z=[], basin_x=[], basin_y=[], basin_z=[];
+        streams.forEach(stream => {
+            if (stream.basin_id === target_basin_id) { target_x.push(...stream.path_x, null); target_y.push(...stream.path_y, null); target_z.push(...stream.path_z, null);
+                if(drawMesh) for(let i=0; i<stream.path_x.length; i+=3) { basin_x.push(stream.path_x[i]); basin_y.push(stream.path_y[i]); basin_z.push(stream.path_z[i]); }
+            } else { outer_x.push(...stream.path_x, null); outer_y.push(...stream.path_y, null); outer_z.push(...stream.path_z, null); }
+        });
+        let tf_target = TransformEngine.apply(target_x, target_y, target_z, angle, scale), tf_outer = TransformEngine.apply(outer_x, outer_y, outer_z, angle, scale);
+        traces.push({ type: 'scatter3d', x: tf_target.x, y: tf_target.y, z: tf_target.z, mode: 'lines', line: {color: 'rgba(255, 204, 0, 0.6)', width: 1.5}, hoverinfo: 'none', showlegend: false });
+        traces.push({ type: 'scatter3d', x: tf_outer.x, y: tf_outer.y, z: tf_outer.z, mode: 'lines', line: {color: 'rgba(50, 150, 255, 0.35)', width: 1.5}, hoverinfo: 'none', showlegend: false });
+        if (drawMesh && basin_x.length > 10) { let tf_mesh = TransformEngine.apply(basin_x, basin_y, basin_z, angle, scale); traces.push({ type: 'mesh3d', x: tf_mesh.x, y: tf_mesh.y, z: tf_mesh.z, alphahull: 4, opacity: 0.15, color: 'goldenrod', hoverinfo: 'none', showlegend: false }); }
+        return traces;
+    }
+
+    precalcDensityWeb(key, center, radius, num_halos, anchors) {
+        if(CACHE.webs[key]) return CACHE.webs[key];
+        let halos = [], bg_count = Math.floor(num_halos * 0.3);
+        for(let i=0; i<bg_count; i++) halos.push([center[0] + rand(-radius, radius), center[1] + rand(-radius, radius), center[2] + rand(-radius, radius)]);
+        let cluster_count = num_halos - bg_count;
+        if(anchors && anchors.length > 0) {
+            let per_anchor = Math.floor(cluster_count / anchors.length);
+            anchors.forEach(anc => { for(let i=0; i<per_anchor; i++) halos.push([anc[0] + randn()*radius*0.2, anc[1] + randn()*radius*0.2, anc[2] + randn()*radius*0.2]); });
+        }
+        let line_x=[], line_y=[], line_z=[], px=[], py=[], pz=[], psize=[];
+        for(let i=0; i<halos.length; i++) {
+            let h = halos[i]; px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%3) + 2); 
+            let dists = [];
+            for(let j=0; j<halos.length; j++) { if(i === j) continue; dists.push({idx: j, d: Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2])}); }
+            dists.sort((a,b) => a.d - b.d);
+            for(let k=0; k<Math.min(4, dists.length); k++) {
+                if(dists[k].d < radius*0.3) { let neighbor = halos[dists[k].idx]; line_x.push(h[0], neighbor[0], null); line_y.push(h[1], neighbor[1], null); line_z.push(h[2], neighbor[2], null); }
+            }
+        }
+        CACHE.webs[key] = {line: {x:line_x, y:line_y, z:line_z}, points: {x:px, y:py, z:pz, size:psize}}; return CACHE.webs[key];
+    }
+
+    drawDensityWeb(webData, scale) {
+        let tf_line = TransformEngine.apply(webData.line.x, webData.line.y, webData.line.z, 0, scale), tf_pts = TransformEngine.apply(webData.points.x, webData.points.y, webData.points.z, 0, scale);
+        return [
+            { type: 'scatter3d', x: tf_line.x, y: tf_line.y, z: tf_line.z, mode: 'lines', line: {color: 'rgba(180, 50, 255, 0.45)', width: 1.5}, hoverinfo: 'none', showlegend: false },
+            { type: 'scatter3d', x: tf_pts.x, y: tf_pts.y, z: tf_pts.z, mode: 'markers', marker: {size: webData.points.size, color: 'rgba(255, 255, 150, 0.9)'}, hoverinfo: 'none', showlegend: false }
+        ];
+    }
+
+    precalcCones(key, scale_val, num) {
+        if(CACHE.cones[key]) return CACHE.cones[key];
+        let x=[], y=[], z=[], u=[], v=[], w=[];
+        for(let i=0; i<num; i++) {
+            let r = scale_val * (((i*11.1)%50+40)/100), phi = ((i*17.3)%100)/100 * Math.PI, theta = ((i*23.9)%100)/100 * 2*Math.PI;
+            let px = r * Math.sin(phi) * Math.cos(theta), py = r * Math.sin(phi) * Math.sin(theta), pz = r * Math.cos(phi);
+            x.push(px); y.push(py); z.push(pz); u.push(px); v.push(py); w.push(pz);
+        }
+        CACHE.cones[key] = {x, y, z, u, v, w, scale_val}; return CACHE.cones[key];
+    }
+
+    drawConesDynamic(coneData, angle, scale) {
+        let tf_pos = TransformEngine.apply(coneData.x, coneData.y, coneData.z, angle, scale), tf_vec = TransformEngine.applyVector(coneData.u, coneData.v, coneData.w, angle);
+        return { type: 'cone', x: tf_pos.x, y: tf_pos.y, z: tf_pos.z, u: tf_vec.u, v: tf_vec.v, w: tf_vec.w, colorscale: 'Blues', sizemode: "absolute", sizeref: coneData.scale_val*0.1*scale, opacity: 0.7, showscale: false, hoverinfo: 'none' };
+    }
+
+    // --- Main Level Builder ---
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
+        let rotationAngle = (isPlaying && level_idx <= 4) ? time * 0.15 : 0; 
+        let loopTime = time % 30.0;
+        let expandFactor = (level_idx >= 12 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
+
+        let dyn = {
+            mw: [10*Math.cos(time*0.1), 10*Math.sin(time*0.1), 2*Math.sin(time*0.05)], m31: [25 - 5*Math.cos(time*0.1), 10 - 5*Math.sin(time*0.1), 5 - 2*Math.sin(time*0.05)],
+            virgo: [60 + 15*Math.cos(time*0.05), 40 + 15*Math.sin(time*0.05), 20], ga: [150 + 30*Math.cos(time*0.03), -50 + 30*Math.sin(time*0.03), 40 + 10*Math.sin(time*0.02)],
+            perseus: [-100 + 20*Math.sin(time*0.04), 80 + 20*Math.cos(time*0.04), -40], shapley: [300, -150, 100], sloan: [600, 400, -200], hcb: [2000, 1500, -1000]
+        };
+        let getDynBH = (id) => { if(dyn[id]) return dyn[id]; let bh = BLACK_HOLES.find(b => b.id === id); return bh && bh.offset ? bh.offset : [0,0,0]; };
+
+        if (vis.landmarks && level_idx >= 4) {
+            BLACK_HOLES.forEach(bh => { if (bh.dist_scale <= SCALE_LIMITS[level_idx] * 1.5) t.push(...this.createBlackHole(getDynBH(bh.id), bh.name, bh.desc, bh.is_mega, rotationAngle, expandFactor)); });
+        }
+
         if (level_idx === 0) {
             let earth = this.precalcEarthGIS('earth_gis', 1.0, 30);
             t.push({ type: 'mesh3d', x: earth.x, y: earth.y, z: earth.z, i: earth.i, j: earth.j, k: earth.k, intensity: earth.intensity, colorscale: [['0', '#000080'], ['1', '#228B22']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.7, diffuse: 0.9} });
@@ -304,7 +543,13 @@ class UniverseEngine {
                 let pos = getKeplerPos(p.a, p.e, p.i, time, p.T);
                 if(vis.landmarks) t.push(this.createLabel([pos.x, pos.y, pos.z], p.c, p.name, p.s, 'circle'));
                 if(vis.streams) { let orb = this.precalcKeplerOrbit(`orb_${p.id}`, p.a, p.e, p.i); t.push({ type: 'scatter3d', x: orb.x, y: orb.y, z: orb.z, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: 1.0}, hoverinfo: 'none', showlegend: false }); }
+                if(p.hasRing && vis.particles) t.push(this.createPlanetaryRing(pos, p.s*0.15, p.s*0.35, 300, p.c, p.i));
             });
+            if (vis.particles) {
+                let k_belt = []; let bx=[], by=[], bz=[];
+                for(let i=0; i<2000; i++) { let r = rand(30, 48), th = rand(0, 2*Math.PI); bx.push(r*Math.cos(th)); by.push(r*Math.sin(th)); bz.push(randn()*2.0); }
+                t.push({ type: 'scatter3d', x: bx, y: by, z: bz, mode: 'markers', marker: {size: 1.5, color: 'rgba(150, 200, 255, 0.2)'}, hoverinfo: 'none', showlegend: false });
+            }
         }
         else if (level_idx === 3) {
             let sunVec = [-4.0, -4.0, 2.0], sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
@@ -315,17 +560,61 @@ class UniverseEngine {
                 if(vis.streams && isPlaying) t.push(this.createSurfingTrail(p, time, sunVec));
             });
         }
-        else if (level_idx >= 4) {
-            let center = [0,0,0];
-            if(vis.landmarks) t.push(this.createLabel(center, '#FF0000', '引力核心', 5, 'diamond'));
-            if (level_idx === 4 && vis.streams) {
-                let streams = this.precalcTurbulentAccretion('l5_accretion', center, 25, 100);
-                streams.forEach(s => t.push({ type: 'scatter3d', x: s.x, y: s.y, z: s.z, mode: 'lines', line: {color: 'rgba(100, 50, 255, 0.4)', width: 1.5}, hoverinfo: 'none', showlegend: false }));
+        else if (level_idx === 4) {
+            if(vis.landmarks) { t.push(this.createLabel([8,0,0], '#FF0000', '<上一層: 太陽系>', 4, 'circle', rotationAngle, 1.0)); t.push(this.createLabel([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0)); }
+            if(vis.streams) {
+                let arms = this.precalcSpiralArms(`L${level_idx}_arms`, dyn.mw, 16, 4); t.push(...this.drawSpiralArmsDynamic(arms, 'rgba(0, 255, 255, 0.6)', rotationAngle, 1.0));
+                let accretion = this.precalcTurbulentAccretion(`L${level_idx}_accretion`, dyn.mw, 25.0, 180); t.push(...this.drawStreamlinesDynamic(accretion, 'rgba(0, 100, 255, 0.35)', rotationAngle, 1.0));
+                let bubbles = this.precalcFermiBubbles(`L${level_idx}_bubbles`, dyn.mw, 18.0, 6.0, 400); t.push(...this.drawFermiBubblesDynamic(bubbles, rotationAngle, 1.0));
             }
-            if(vis.particles) {
-                let px=[], py=[], pz=[]; for(let i=0; i<800; i++) { px.push(randn() * SCALE_LIMITS[level_idx]*0.8); py.push(randn() * SCALE_LIMITS[level_idx]*0.8); pz.push(randn() * SCALE_LIMITS[level_idx]*0.8); }
-                t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.3)'}, hoverinfo: 'none', showlegend: false });
+        }
+        else if (level_idx >= 5 && level_idx <= 9) {
+            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 4, 'circle', 0, 1.0)); if (level_idx >= 7) t.push(this.createLabel(dyn.virgo, '#FFAA00', '室女座星系團', 5, 'circle', 0, 1.0)); }
+            if(vis.streams) {
+                let seeds = this.getSeeds(`L${level_idx}`, [0,0,0], 100.0, 180);
+                let attractors = level_idx < 8 ? [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.5}, {pos: dyn.m31, mass: 1.5, axis:[0.2,0,1], spin:0.5}] : [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.1}, {pos: dyn.virgo, mass: 20.0, axis:[-0.5,0.8,1], spin: 1.2}];
+                let streams = this.calcDynamicStreamlines(seeds, 100.0, attractors, false);
+                let color = level_idx < 8 ? 'rgba(0,255,100,0.4)' : 'rgba(200,50,255,0.4)';
+                t.push(...this.drawStreamlinesDynamic(streams, color, 0, 1.0));
             }
+        }
+        else if (level_idx === 10 || level_idx === 11) {
+            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 5, 'diamond', 0, 1.0)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '巨引源', 6, 'circle', 0, 1.0)); }
+            if(vis.streams) {
+                let seeds = this.getSeeds(`L10`, [50, -20, 20], 280.0, 200);
+                let attractors = [{pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, {pos: dyn.shapley, mass: 120.0, axis:[0,0,1], spin:0.2}];
+                let streams = this.calcDynamicStreamlines(seeds, 280.0, attractors, false);
+                t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, 1.0, vis.web));
+            }
+        }
+        else if (level_idx >= 12) {
+            let sim_scale = 2500.0;
+            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群 (我們)', 5, 'diamond', 0, expandFactor)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '拉尼亞凱亞', 5, 'circle', 0, expandFactor)); }
+            
+            if (level_idx === 12 || level_idx === 13) {
+                if(vis.landmarks) t.push(this.createLabel(dyn.shapley, '#9900FF', '夏普力超星系團', 6, 'circle', 0, expandFactor));
+                if(vis.streams) {
+                    let seeds = this.getSeeds(`L12`, [0,0,0], 1000.0, 200);
+                    let attractors = [{pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, {pos: dyn.shapley, mass: 250.0, axis:[0,0,1], spin:1.0}];
+                    let streams = this.calcDynamicStreamlines(seeds, 1000.0, attractors, false);
+                    t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, expandFactor, vis.web));
+                }
+                if(level_idx === 13 && vis.cones) { let cones = this.precalcCones(`L13`, 1000.0, 100); t.push(this.drawConesDynamic(cones, 0, expandFactor)); }
+            } else {
+                if(vis.landmarks) { t.push(this.createLabel(dyn.sloan, '#FF5500', '史隆長城', 6, 'circle', 0, expandFactor)); t.push(this.createLabel(dyn.hcb, '#FFFFFF', '北冕座長城', 6, 'diamond', 0, expandFactor)); t.push(this.createLabel([1500, -800, 600], '#AAAAAA', '英仙-雙魚座', 5, 'circle', 0, expandFactor)); }
+                if(vis.web) {
+                    let anchors = [[0,0,0], dyn.sloan, dyn.hcb, dyn.shapley, dyn.perseus, [1500, -800, 600], [-1200, 1000, -500]];
+                    let webData = this.precalcDensityWeb(`L14_Gaussian`, [0,0,0], sim_scale, 800, anchors); t.push(...this.drawDensityWeb(webData, expandFactor));
+                }
+                if(vis.streams) { let seeds = this.getSeeds(`L14_EXP`, [0,0,0], sim_scale, 250); let streams = this.calcDynamicStreamlines(seeds, sim_scale, null, true); t.push(...this.drawStreamlinesDynamic(streams, 'rgba(100,150,255,0.4)', 0, expandFactor)); }
+                if(vis.cones) { let cones = this.precalcCones(`L14_cone`, sim_scale, 150); t.push(this.drawConesDynamic(cones, 0, expandFactor)); }
+            }
+        }
+        
+        // 渲染通用背景粒子 (如果開啟粒子且沒有特定的渲染邏輯覆蓋)
+        if (vis.particles && level_idx >= 5) {
+            let px=[], py=[], pz=[]; for(let i=0; i<800; i++) { px.push(randn() * SCALE_LIMITS[level_idx]*0.8); py.push(randn() * SCALE_LIMITS[level_idx]*0.8); pz.push(randn() * SCALE_LIMITS[level_idx]*0.8); }
+            t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.3)'}, hoverinfo: 'none', showlegend: false });
         }
         return t;
     }
@@ -339,14 +628,13 @@ let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirs
 const plotContainer = document.getElementById('engine-container'), renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
 if(plotContainer) { plotContainer.addEventListener('mousedown', () => isUserInteracting = true); plotContainer.addEventListener('mouseup', () => isUserInteracting = false); }
 
-// 故事導覽邏輯
 const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
 function updateTour() {
     if(!toggleTour || !tourPanel || !selLevel) return;
     if(!toggleTour.checked) { tourPanel.style.display = 'none'; return; }
     let idx = parseInt(selLevel.value);
-    let storyIdx = Math.min(idx, 5);
+    let storyIdx = Math.min(idx, STORY_SCRIPT.length - 1);
     if(tourTitle) tourTitle.innerText = STORY_SCRIPT[storyIdx].title;
     if(tourContent) tourContent.innerHTML = STORY_SCRIPT[storyIdx].content;
     tourPanel.style.display = 'block';
@@ -359,7 +647,7 @@ function drawFrame(forceResetCamera = false) {
     let conf = { 
         colors: { bg: safeVal('color-bg', '#050A14'), grid: safeVal('color-grid', '#00FFFF'), particle: safeVal('color-particle', '#C8C8C8') }, 
         opacities: { bg: 100, grid: 20 }, 
-        vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true) } 
+        vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true), web: safeCheck('toggle-web', true), cones: safeCheck('toggle-cones', true) } 
     };
     let engine = new UniverseEngine(conf.colors, conf.opacities);
     let idx = selLevel ? parseInt(selLevel.value) : 0; if(isNaN(idx)) idx = 0;
@@ -407,7 +695,6 @@ if(selLevel) {
     });
 }
 
-// 解決 AppLoader 動態載入時 window.onload 不觸發的問題
 setTimeout(() => {
     const statusText = document.getElementById('loading-status');
     const startBtn = document.getElementById('start-btn');
@@ -424,7 +711,7 @@ if(startBtn) {
     });
 }
 
-['toggle-landmarks', 'toggle-streams', 'toggle-particles'].forEach(id => { 
+['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web', 'toggle-cones'].forEach(id => { 
     let el = document.getElementById(id); 
     if(el) el.addEventListener('change', () => drawFrame(false)); 
 });
