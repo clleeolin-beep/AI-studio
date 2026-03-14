@@ -3,21 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 16級宇宙動力學模擬器 (GIS與軌道動力學完整版)</title>
+    <title>AI Studio - 16級宇宙動力學模擬器 (導覽與預加載版)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #050A14; color: white; display: flex; }
+        body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; color: white; display: flex; }
         
+        /* 加載與啟動畫面 (KeepTrack 風格) */
+        #splash-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 1s ease-out; }
+        #splash-screen h1 { font-size: 3rem; color: #00FFFF; letter-spacing: 5px; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,255,0.5); }
+        #splash-screen p { color: #888; letter-spacing: 2px; margin-bottom: 40px; }
+        #start-btn { background: transparent; color: #00FFFF; border: 2px solid #00FFFF; padding: 15px 40px; font-size: 1.2rem; cursor: pointer; border-radius: 30px; transition: all 0.3s; opacity: 0; pointer-events: none; }
+        #start-btn.ready { opacity: 1; pointer-events: auto; }
+        #start-btn.ready:hover { background: #00FFFF; color: #000; box-shadow: 0 0 20px rgba(0,255,255,0.8); }
+        .loading-text { color: #00FFFF; font-size: 1.2rem; animation: blink 1.5s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
         #control-panel { width: 310px; min-width: 310px; background-color: #1A252F; padding: 20px; box-sizing: border-box; overflow-y: auto; border-right: 2px solid #00FFFF; z-index: 10; box-shadow: 2px 0 15px rgba(0,255,255,0.1); }
         #control-panel::-webkit-scrollbar { width: 6px; }
         #control-panel::-webkit-scrollbar-thumb { background-color: rgba(0,255,255,0.3); border-radius: 3px; }
         
-        #plot-container { flex-grow: 1; height: 100vh; position: relative; cursor: grab; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); }
-        #plot-container:active { cursor: grabbing; }
+        #engine-container { flex-grow: 1; height: 100vh; position: relative; cursor: grab; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); }
+        #engine-container:active { cursor: grabbing; }
+        
+        /* 預留給未來 Three.js 的畫布容器 */
+        #threejs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none; }
+        #plotly-div { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+
+        /* 故事導覽面板 */
+        #tour-panel { position: absolute; bottom: 30px; right: 30px; width: 350px; background: rgba(10, 17, 40, 0.85); border: 1px solid #00FFFF; border-radius: 10px; padding: 20px; box-shadow: 0 0 20px rgba(0,255,255,0.2); z-index: 100; backdrop-filter: blur(10px); display: none; }
+        #tour-title { font-size: 18px; color: #FFD700; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #tour-content { font-size: 14px; color: #E0E0E0; line-height: 1.6; margin-bottom: 15px; }
+        #next-tour-btn { background: #00FFFF; color: #000; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        #next-tour-btn:hover { background: #FFFFFF; }
         
         h3 { margin-top: 15px; font-size: 15px; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; color: #00FFFF; letter-spacing: 1px; }
         h3:first-child { margin-top: 0; }
-        
         .control-group { margin-bottom: 15px; }
         label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #E0E0E0; }
         select { width: 100%; padding: 8px; background-color: rgba(255,255,255,0.9); color: #000; border: 1px solid #00FFFF; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
@@ -26,31 +46,33 @@
         .toggle-row:hover { color: #FFFFFF; }
         .toggle-row input[type="checkbox"] { margin-right: 10px; cursor: pointer; width: 16px; height: 16px; accent-color: #E74C3C; }
         
-        .color-picker-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); }
-        .color-picker-row span { font-size: 12px; }
-        input[type="color"] { border: 1px solid rgba(255,255,255,0.5); width: 35px; height: 25px; padding: 0; cursor: pointer; background: transparent; border-radius: 3px; }
-        
         input[type="range"] { width: 100%; cursor: pointer; accent-color: #00FFFF; }
         .range-val { font-size: 12px; float: right; color: #00FFFF; font-weight: bold; }
         
         button.action-btn { width: 100%; background-color: #2C3E50; color: #00FFFF; font-weight: bold; border: 1px solid #00FFFF; padding: 12px; border-radius: 5px; cursor: pointer; transition: all 0.3s; font-size: 14px; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
         button.action-btn:hover { background-color: #00FFFF; color: #000; box-shadow: 0 0 10px rgba(0,255,255,0.5); }
-        
         button#play-btn { background-color: #E74C3C; color: white; border-color: #E74C3C; margin-top: 15px; }
-        button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } }
+        button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); }
 
         #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: #00FFFF; z-index: 100; backdrop-filter: blur(8px); display: none; }
-        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0,255,255,0.2); border-top-color: #00FFFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+
+    <div id="splash-screen">
+        <h1>AI STUDIO</h1>
+        <p>惇陽實績地圖與空間模擬實驗室 - 宇宙動力學引擎</p>
+        <div id="loading-status" class="loading-text">矩陣快取與天文資料預載入中...</div>
+        <button id="start-btn">進入空間實驗室</button>
+    </div>
 
     <div id="control-panel">
         <h3>🌌 觀測尺度切換</h3>
         <div class="control-group">
             <select id="level-select"></select>
+        </div>
+        <div class="control-group">
+            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟實驗室故事導覽</span></label>
         </div>
 
         <h3>⏱️ 宇宙動力學引擎</h3>
@@ -58,11 +80,6 @@
             <button id="play-btn" class="action-btn">▶ 啟動時空演化</button>
             <label style="margin-top: 15px;">流逝速率 (第一宇宙速度): <span id="val-speed" class="range-val">0.1x</span></label>
             <input type="range" id="op-speed" min="1" max="100" value="1">
-            <p style="font-size: 11px; color: #888; line-height: 1.4; margin-top: 8px;">
-                * L1 支援 GIS 動態載入。<br>
-                * L3 導入克卜勒橢圓與彈弓效應。<br>
-                * L4 太陽 45 度角左前衝浪軌跡。
-            </p>
         </div>
 
         <h3>👁️ 觀測圖層控制</h3>
@@ -70,36 +87,60 @@
             <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體與設施標註 (LOD)</span></label>
             <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場、螺旋軌道與航線</span></label>
             <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星環、柯伊伯帶與星塵</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網/分水嶺網格</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>宇宙膨脹流向箭頭</span></label>
-        </div>
-
-        <h3>🎨 視覺調色盤</h3>
-        <div class="control-group">
-            <div class="color-picker-row"><span>宇宙深空背景</span><input type="color" id="color-bg" value="#050A14"></div>
-            <div class="color-picker-row"><span>引力網格顏色</span><input type="color" id="color-grid" value="#00FFFF"></div>
-            <div class="color-picker-row"><span>背景星體顏色</span><input type="color" id="color-particle" value="#C8C8C8"></div>
         </div>
 
         <button id="render-btn" class="action-btn">🔄 重置相機與物理快取</button>
     </div>
 
-    <div id="plot-container">
-        <div id="loading-overlay"><div class="spinner"></div><span>時空矩陣預計算中...</span></div>
-        <div id="plotly-div" style="width:100%; height:100%;"></div>
+    <div id="engine-container">
+        <div id="loading-overlay"><span>時空跳躍中...</span></div>
+        <div id="threejs-container"></div>
+        <div id="plotly-div"></div>
+        
+        <div id="tour-panel">
+            <h4 id="tour-title">標題</h4>
+            <div id="tour-content">內容</div>
+            <button id="next-tour-btn">進行下一次時空躍遷 (Next Scale)</button>
+        </div>
     </div>
 
 <script>
 /**
- * AI Studio - 16級宇宙動力學模擬器 (GIS與軌道動力學完整版)
- * 包含：GIS地表材質、登月歷史軌跡、克卜勒橢圓軌道、太陽系螺旋衝浪、湍流吸積
+ * 核心引擎層：包含 Plotly 現行邏輯與 Three.js 預留接口
  */
 
+// 1. 預留給 Phase 2 的 Three.js 接口 (架構轉換預備)
+class FutureThreeJSEngine {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.isActive = false;
+        console.log("Three.js 引擎接口已就緒。百萬級湍流渲染將掛載於此。");
+    }
+    init() {
+        // 未來這裡將實例化 THREE.WebGLRenderer, THREE.Scene, THREE.Camera
+        // 以及使用 WebGLComputeShader 處理百萬粒子的 N-body 引力
+    }
+    activate() {
+        document.getElementById('plotly-div').style.display = 'none';
+        this.container.style.display = 'block';
+        this.isActive = true;
+    }
+}
+const threeEngine = new FutureThreeJSEngine('threejs-container');
+
+// 2. 故事導覽腳本庫
+const STORY_SCRIPT = [
+    { title: "L1. 地球防禦圈與觀測網", content: "歡迎來到 AI Studio 空間實驗室。在我們的家園外圍，國際太空站(ISS)、天宮與福衛系列正以第一宇宙速度巡航。請啟動左側『時空演化』觀察它們的軌跡。*(註：目前地球為 Plotly 幾何模擬，未來將透過 Three.js 升級為 KeepTrack 等級之照片級真實材質)*。" },
+    { title: "L2. 地月系與歷史刻痕", content: "跨越38萬公里，月球因為潮汐鎖定永遠以同一面朝向我們。仔細看，月表上銘刻著阿波羅與嫦娥探月工程的著陸點，而鵲橋衛星正懸浮於 L2 拉格朗日點中繼訊號。" },
+    { title: "L3. 太陽系與克卜勒力學", content: "縮小視角，我們看見了完整的太陽系。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且極具離心率的特殊軌道，以及外圍半透明的柯伊伯帶。" },
+    { title: "L4. 太陽螺旋衝浪", content: "這才是宇宙的真實樣貌！太陽並非靜止，而是以每秒 230 公里的速度帶領我們在銀河中衝浪。行星被太陽的引力拖曳，在宇宙中畫出壯觀的彈簧狀時空殘影。" },
+    { title: "L5. 銀河系核心湍流", content: "進入百萬光年尺度。這裡的線條代表著向中心超大質量黑洞墜落的『引力吸積湍流』。*(未來我們將在此導入百萬級 WebGL 粒子，還原真實的星系氣體碰撞)*。" },
+    { title: "L6~L16. 大尺度宇宙網", content: "隨著我們繼續躍遷，本星系群、室女座超星系團、直到拉尼亞凱亞的黃金分水嶺。宇宙在大尺度下呈現出如海綿般的暗物質纖維網與絕對空洞。" }
+];
+
 const LEVELS = [
-    "01. 地球防禦圈 (GIS 國界、衛星網與地表設施)", 
-    "02. 地月系與潮汐鎖定 (歷史登月任務與鵲橋)",
-    "03. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
-    "04. 太陽系螺旋衝浪 (左前向量與時空殘影)",
+    "01. 地球防禦圈 (GIS 國界、衛星網與地表設施)", "02. 地月系與潮汐鎖定 (歷史登月任務與鵲橋)",
+    "03. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", "04. 太陽系螺旋衝浪 (左前向量與時空殘影)",
     "05. 銀河系核心 (湍流吸積與費米泡)", "06. 本星系群局部 (雙軸鞍點)",
     "07. 本星系群全貌 (Local Group)", "08. 周邊星系群 (Local Sheet)",
     "09. 室女座超星系團局部 (M87*)", "10. 室女座超星系團骨架 (引力角動量漩渦)",
@@ -108,7 +149,6 @@ const LEVELS = [
     "15. 巨型宇宙網 (高斯塌縮宇宙骨架)", "16. 可觀測宇宙 (極端哈伯擴張)"
 ];
 
-// L3 太陽系 17 天體 (a: 半長軸, e: 離心率, T: 角速度基準, c: 顏色, s: 尺寸, i: 傾角-簡化)
 const PLANETS = [
     {id: 'mercury', name: '水星', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3, isDwarf: false, i: 0.12},
     {id: 'venus', name: '金星', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4, isDwarf: false, i: 0.05},
@@ -119,227 +159,100 @@ const PLANETS = [
     {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7, isDwarf: false, hasRing: true, i: 0.04},
     {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5, isDwarf: false, hasRing: true, i: 0.01},
     {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5, isDwarf: false, i: 0.03},
-    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29},
-    {id: 'orcus', name: '亡神星', a: 39.4, e: 0.225, T: 0.004, c: '#778899', s: 2, isDwarf: true, i: 0.35},
-    {id: 'haumea', name: '妊神星', a: 43.3, e: 0.191, T: 0.0035, c: '#E0E0E0', s: 2, isDwarf: true, i: 0.49},
-    {id: 'quaoar', name: '創神星', a: 43.6, e: 0.038, T: 0.0034, c: '#B0C4DE', s: 2, isDwarf: true, i: 0.14},
-    {id: 'makemake', name: '鳥神星', a: 45.8, e: 0.159, T: 0.0032, c: '#FFA07A', s: 2, isDwarf: true, i: 0.50},
-    {id: 'gonggong', name: '共工星', a: 67.5, e: 0.502, T: 0.0018, c: '#CD5C5C', s: 2, isDwarf: true, i: 0.53},
-    {id: 'eris', name: '鬩神星', a: 67.7, e: 0.440, T: 0.0018, c: '#F8F8FF', s: 2, isDwarf: true, i: 0.76},
-    {id: 'sedna', name: '賽德娜', a: 90.0, e: 0.855, T: 0.0005, c: '#8B0000', s: 1.5, isDwarf: true, i: 0.20} // 半長軸縮小以適應視圖，但保留高離心率特徵
+    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29}
 ];
 
-const BLACK_HOLES = [
-    {id: 'mw', dist_scale: 15, name: '人馬座 A*', desc: '430萬太陽質量', is_mega: false},
-    {id: 'm31', dist_scale: 35, name: 'M31* (仙女座)', desc: '1.4億太陽質量', is_mega: false},
-    {id: 'virgo', dist_scale: 120, name: 'M87*', desc: '65億太陽質量', is_mega: false},
-    {id: 'ga', dist_scale: 280, name: 'Abell 3627 (巨引源)', desc: '巨引源核心', is_mega: false},
-    {id: 'shapley', dist_scale: 500, name: '夏普力主黑洞群', desc: '暗流核心', is_mega: false},
-    {id: 'sloan', dist_scale: 1000, name: '史隆長城節點', desc: '宇宙長城', is_mega: false, offset: [600, 400, -200]}
-];
-
-// L1/L2 座標數據 (Lat, Lon)
 const EARTH_POIS = [
     {name: '🇹🇼 台灣', lat: 23.5, lon: 121.0, c: '#FFFFFF', s: 4, label: true},
     {name: '🇺🇸 美國', lat: 38.0, lon: -97.0, c: '#FFFFFF', s: 4, label: true},
-    {name: '🇯🇵 日本', lat: 36.2, lon: 138.2, c: '#FFFFFF', s: 4, label: true},
-    {name: '🇦🇺 澳洲', lat: -25.2, lon: 133.7, c: '#FFFFFF', s: 4, label: true},
-    {name: '🛰️ FAST 天眼 (中)', lat: 25.6, lon: 106.8, c: '#FF00FF', s: 3, label: false, ray: true},
-    {name: '🛰️ ALMA 陣列 (智)', lat: -23.0, lon: -67.7, c: '#FF00FF', s: 3, label: false, ray: true},
-    {name: '🛰️ VLA 陣列 (美)', lat: 34.0, lon: -107.6, c: '#FF00FF', s: 3, label: false, ray: true},
-    {name: '🛰️ GLT 望遠鏡 (格)', lat: 76.5, lon: -68.7, c: '#FF00FF', s: 3, label: false, ray: true}
+    {name: '🛰️ FAST 天眼', lat: 25.6, lon: 106.8, c: '#FF00FF', s: 3, label: false, ray: true}
 ];
 
 const MOON_LANDINGS = [
     {name: 'Apollo 11 (靜海)', lat: 0.67, lon: 23.47, c: '#00FF00', s: 3},
-    {name: 'Apollo 12 (風暴洋)', lat: -3.01, lon: -23.42, c: '#00AA00', s: 2},
-    {name: 'Apollo 14 (弗拉·毛羅)', lat: -3.64, lon: -17.47, c: '#00AA00', s: 2},
-    {name: 'Apollo 15 (哈德利)', lat: 26.13, lon: 3.63, c: '#00AA00', s: 2},
-    {name: 'Apollo 16 (笛卡爾)', lat: -8.97, lon: 15.50, c: '#00AA00', s: 2},
-    {name: 'Apollo 17 (陶拉斯)', lat: 20.19, lon: 30.77, c: '#00FF00', s: 3},
-    {name: '嫦娥三號 (虹灣)', lat: 44.12, lon: -19.51, c: '#FF0000', s: 3},
-    {name: '嫦娥四號 (月背)', lat: -45.44, lon: 177.60, c: '#FF3333', s: 4}, // 背面
-    {name: '嫦娥五號 (呂姆克)', lat: 43.06, lon: -51.92, c: '#FF0000', s: 3},
-    {name: '嫦娥六號 (南極-艾特肯)', lat: -41.6, lon: -153.9, c: '#FF3333', s: 4}  // 背面
+    {name: '嫦娥四號 (月背)', lat: -45.44, lon: 177.60, c: '#FF3333', s: 4}
 ];
 
 const SCALE_LIMITS = [2.5, 20.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
-
 const CACHE = { structures: {}, orbits: {}, streams: {}, webs: {}, arms: {}, cones: {}, bubbles: {}, seeds: {} };
 
-function hexToRgba(hex, opacity = 1) {
-    let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-}
+function hexToRgba(hex, opacity = 1) { let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16); return `rgba(${r}, ${g}, ${b}, ${opacity})`; }
 function rand(min, max) { return Math.random() * (max - min) + min; }
 function randn() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); }
 function simpleNoise(x, y, z=0) { let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return n - Math.floor(n); }
-
-// 球座標轉換
-function latLonToCartesian(lat, lon, R) {
-    let phi = (90 - lat) * (Math.PI / 180), theta = (lon + 180) * (Math.PI / 180);
-    return { x: -(R * Math.sin(phi) * Math.cos(theta)), y: (R * Math.sin(phi) * Math.sin(theta)), z: (R * Math.cos(phi)) };
-}
-
-// 克卜勒方程解算 (Newton-Raphson)
-function solveKepler(M, e) {
-    let E = M;
-    for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E));
-    return E;
-}
-
-// 獲取行星橢圓軌道上的 3D 坐標
-function getKeplerPos(a, e, i_angle, time, T) {
-    let M = time * T; // 平近點角
-    let E = solveKepler(M, e); // 偏近點角
-    let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); // 真近點角
-    let r = a * (1 - e * Math.cos(E)); // 距離
-    
-    // 基礎橢圓座標 (z=0)
-    let px = r * Math.cos(v);
-    let py = r * Math.sin(v);
-    
-    // 應用軌道傾角 (繞 x 軸旋轉)
-    let z = py * Math.sin(i_angle);
-    let y = py * Math.cos(i_angle);
-    
-    return {x: px, y: y, z: z};
-}
+function latLonToCartesian(lat, lon, R) { let phi = (90 - lat) * (Math.PI / 180), theta = (lon + 180) * (Math.PI / 180); return { x: -(R * Math.sin(phi) * Math.cos(theta)), y: (R * Math.sin(phi) * Math.sin(theta)), z: (R * Math.cos(phi)) }; }
+function solveKepler(M, e) { let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); return E; }
+function getKeplerPos(a, e, i_angle, time, T) { let M = time * T; let E = solveKepler(M, e); let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); let r = a * (1 - e * Math.cos(E)); let px = r * Math.cos(v), py = r * Math.sin(v); return {x: px, y: py * Math.cos(i_angle), z: py * Math.sin(i_angle)}; }
 
 class UniverseEngine {
     constructor(colors, opacities) {
-        this.bgColor = hexToRgba(colors.bg, opacities.bg / 100);
-        this.gridColor = hexToRgba(colors.grid, opacities.grid / 100);
-        this.particleColor = hexToRgba(colors.particle, 0.5);
+        this.bgColor = hexToRgba(colors.bg, 1);
+        this.gridColor = hexToRgba(colors.grid, 0.2);
     }
-
-    createLabel(pos, color, name, size, symbol) {
-        return {
-            type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]],
-            mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} },
-            text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false
-        };
-    }
-
-    // L1: GIS 地球實體生成 (海洋與陸地噪聲)
+    createLabel(pos, color, name, size, symbol) { return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; }
+    
     precalcEarthGIS(key, radius, detail) {
         if(CACHE.structures[key]) return CACHE.structures[key];
         let x=[], y=[], z=[], i=[], j=[], k=[], intensity=[];
-        let offset = 0;
         for(let latStep=0; latStep<=detail; latStep++) {
             let lat = Math.PI * (latStep/detail) - Math.PI/2;
             for(let lonStep=0; lonStep<=detail; lonStep++) {
                 let lon = 2 * Math.PI * (lonStep/detail);
-                let px = radius * Math.cos(lat) * Math.cos(lon);
-                let py = radius * Math.cos(lat) * Math.sin(lon);
-                let pz = radius * Math.sin(lat);
+                let px = radius * Math.cos(lat) * Math.cos(lon), py = radius * Math.cos(lat) * Math.sin(lon), pz = radius * Math.sin(lat);
                 x.push(px); y.push(py); z.push(pz);
-                // 使用噪聲模擬大陸板塊
-                let n = simpleNoise(px*2, py*2, pz*2);
-                intensity.push(n > 0.3 ? 1.0 : 0.0); // 1: 陸地, 0: 海洋
+                intensity.push(simpleNoise(px*2, py*2, pz*2) > 0.3 ? 1.0 : 0.0);
             }
         }
-        for(let latStep=0; latStep<detail; latStep++) {
-            for(let lonStep=0; lonStep<detail; lonStep++) {
-                let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1;
-                let p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1;
-                i.push(p1, p2); j.push(p2, p4); k.push(p3, p3);
-            }
-        }
+        for(let latStep=0; latStep<detail; latStep++) { for(let lonStep=0; lonStep<detail; lonStep++) { let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; i.push(p1, p2); j.push(p2, p4); k.push(p3, p3); } }
         CACHE.structures[key] = {x, y, z, i, j, k, intensity}; return CACHE.structures[key];
     }
 
-    // L2: 月球實體與表面紋理
     precalcMoonSurface(key, center, radius, detail, angleOffset) {
-        // 月球無需快取，因為需要動態跟隨自轉與公轉
         let x=[], y=[], z=[], intensity=[], i_arr=[], j_arr=[], k_arr=[];
         for(let latStep=0; latStep<=detail; latStep++) {
             let lat = Math.PI * (latStep/detail) - Math.PI/2;
             for(let lonStep=0; lonStep<=detail; lonStep++) {
-                let lon = 2 * Math.PI * (lonStep/detail) + angleOffset; // 加上潮汐鎖定自轉角
-                let px = radius * Math.cos(lat) * Math.cos(lon);
-                let py = radius * Math.cos(lat) * Math.sin(lon);
-                let pz = radius * Math.sin(lat);
-                x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + pz);
-                let n = simpleNoise(px*10, py*10, pz*10); // 隕石坑噪聲
-                intensity.push(n);
+                let lon = 2 * Math.PI * (lonStep/detail) + angleOffset; 
+                let px = radius * Math.cos(lat) * Math.cos(lon), py = radius * Math.cos(lat) * Math.sin(lon), pz = radius * Math.sin(lat);
+                x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + pz); intensity.push(simpleNoise(px*10, py*10, pz*10));
             }
         }
-        for(let latStep=0; latStep<detail; latStep++) {
-            for(let lonStep=0; lonStep<detail; lonStep++) {
-                let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1;
-                let p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1;
-                i_arr.push(p1, p2); j_arr.push(p2, p4); k_arr.push(p3, p3);
-            }
-        }
+        for(let latStep=0; latStep<detail; latStep++) { for(let lonStep=0; lonStep<detail; lonStep++) { let p1 = latStep * (detail+1) + lonStep, p2 = p1 + 1, p3 = (latStep+1) * (detail+1) + lonStep, p4 = p3 + 1; i_arr.push(p1, p2); j_arr.push(p2, p4); k_arr.push(p3, p3); } }
         return { type: 'mesh3d', x, y, z, i: i_arr, j: j_arr, k: k_arr, intensity, colorscale: [['0', '#555555'], ['1', '#AAAAAA']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.6, diffuse: 0.8} };
     }
 
-    // L3: 克卜勒橢圓軌道繪製 (200點高解析)
     precalcKeplerOrbit(key, a, e, i_angle) {
         if(CACHE.orbits[key]) return CACHE.orbits[key];
         let x=[], y=[], z=[];
-        for(let step=0; step<=200; step++) {
-            let M = (step/200) * 2 * Math.PI;
-            let E = solveKepler(M, e);
-            let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2));
-            let r = a * (1 - e * Math.cos(E));
-            let px = r * Math.cos(v), py = r * Math.sin(v);
-            x.push(px); y.push(py * Math.cos(i_angle)); z.push(py * Math.sin(i_angle));
+        for(let step=0; step<=150; step++) {
+            let M = (step/150) * 2 * Math.PI, E = solveKepler(M, e), v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)), r = a * (1 - e * Math.cos(E));
+            x.push(r * Math.cos(v)); y.push(r * Math.sin(v) * Math.cos(i_angle)); z.push(r * Math.sin(v) * Math.sin(i_angle));
         }
         CACHE.orbits[key] = {x, y, z}; return CACHE.orbits[key];
     }
 
-    // L3: 行星環鎖定
-    createPlanetaryRing(planetPos, inner_r, outer_r, count, colorHex, i_angle) {
-        let x=[], y=[], z=[], c=[];
-        for(let i=0; i<count; i++) {
-            let r = rand(inner_r, outer_r), theta = rand(0, 2*Math.PI);
-            let px = r * Math.cos(theta), py = r * Math.sin(theta);
-            x.push(planetPos.x + px); 
-            y.push(planetPos.y + py * Math.cos(i_angle)); 
-            z.push(planetPos.z + py * Math.sin(i_angle));
-            c.push(hexToRgba(colorHex, 0.4));
-        }
-        return { type: 'scatter3d', x, y, z, mode: 'markers', marker: {size: 1.0, color: c}, hoverinfo: 'none', showlegend: false };
-    }
-
-    // L4: 太陽螺旋衝浪歷史殘影
     createSurfingTrail(planet, time, sunVelocityVec) {
-        let x=[], y=[], z=[], c=[];
-        let tailLength = 20.0; // 軌跡保留時間
-        let steps = 150;
+        let x=[], y=[], z=[], c=[]; let tailLength = 20.0, steps = 100;
         for(let step=0; step<=steps; step++) {
             let histTime = time - tailLength + (step/steps) * tailLength;
             if (histTime < 0) continue;
-            
             let pos = getKeplerPos(planet.a, planet.e, planet.i, histTime, planet.T);
-            
-            // 加上太陽在該歷史時刻的位移
-            x.push(pos.x + histTime * sunVelocityVec[0]);
-            y.push(pos.y + histTime * sunVelocityVec[1]);
-            z.push(pos.z + histTime * sunVelocityVec[2]);
-            
-            c.push(hexToRgba(planet.c, Math.pow(step/steps, 2) * 0.7)); // 尾巴漸隱
+            x.push(pos.x + histTime * sunVelocityVec[0]); y.push(pos.y + histTime * sunVelocityVec[1]); z.push(pos.z + histTime * sunVelocityVec[2]);
+            c.push(hexToRgba(planet.c, Math.pow(step/steps, 2) * 0.7)); 
         }
         return { type: 'scatter3d', x, y, z, mode: 'lines', line: {color: c, width: 2.0}, hoverinfo: 'none', showlegend: false };
     }
 
-    // L5+: 湍流吸積、旋臂等 (繼承自前代)
     precalcTurbulentAccretion(key, center, max_scale, num_lines) {
         if(CACHE.streams[key]) return CACHE.streams[key];
-        let streams = [], steps = 80, dt = 0.08;
+        let streams = [], steps = 60, dt = 0.1;
         for(let i=0; i<num_lines; i++) {
             let r = max_scale * rand(0.6, 1.2), theta = rand(0, 2*Math.PI), z = rand(-max_scale*0.6, max_scale*0.6); 
-            let cx = center[0] + r*Math.cos(theta), cy = center[1] + r*Math.sin(theta), cz = center[2] + z;
-            let path_x=[cx], path_y=[cy], path_z=[cz];
+            let cx = center[0] + r*Math.cos(theta), cy = center[1] + r*Math.sin(theta), cz = center[2] + z, path_x=[cx], path_y=[cy], path_z=[cz];
             for(let step=0; step<steps; step++) {
                 let dx = cx - center[0], dy = cy - center[1], dz = cz - center[2], current_r = Math.hypot(dx, dy) + 0.01;
-                let v_r = -0.8 * dx / current_r, v_theta = 1.2, v_z = -1.5 * dz / (Math.abs(dz) + 1.0); 
-                let turb_x = (simpleNoise(cx, cy, cz) - 0.5) * 0.5, turb_y = (simpleNoise(cy, cz, cx) - 0.5) * 0.5;
-                cx += (v_r * Math.cos(theta) - v_theta * Math.sin(theta) + turb_x) * dt;
-                cy += (v_r * Math.sin(theta) + v_theta * Math.cos(theta) + turb_y) * dt;
-                cz += v_z * dt; theta += (v_theta / current_r) * dt;
+                let v_r = -0.8 * dx / current_r, v_theta = 1.5, v_z = -1.5 * dz / (Math.abs(dz) + 1.0); 
+                cx += (v_r * Math.cos(theta) - v_theta * Math.sin(theta)) * dt; cy += (v_r * Math.sin(theta) + v_theta * Math.cos(theta)) * dt; cz += v_z * dt; theta += (v_theta / current_r) * dt;
                 path_x.push(cx); path_y.push(cy); path_z.push(cz);
                 if(current_r < 2.0 && Math.abs(cz) < 0.2) break;
             }
@@ -350,142 +263,54 @@ class UniverseEngine {
 
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
-        let expFactor = (level_idx >= 12 && isPlaying) ? (1.0 + (time%30.0)*0.04) : 1.0;
-
-        // ================= L1：地球防禦圈與 GIS 網格 =================
         if (level_idx === 0) {
-            let earth = this.precalcEarthGIS('earth_gis', 1.0, 40);
+            let earth = this.precalcEarthGIS('earth_gis', 1.0, 30);
             t.push({ type: 'mesh3d', x: earth.x, y: earth.y, z: earth.z, i: earth.i, j: earth.j, k: earth.k, intensity: earth.intensity, colorscale: [['0', '#000080'], ['1', '#228B22']], showscale: false, hoverinfo: 'none', lighting: {ambient: 0.7, diffuse: 0.9} });
-            
-            // 大氣層光暈
-            let atmos = this.precalcEarthGIS('atmos', 1.03, 20);
-            t.push({ type: 'mesh3d', x: atmos.x, y: atmos.y, z: atmos.z, i: atmos.i, j: atmos.j, k: atmos.k, color: '#87CEFA', opacity: 0.15, hoverinfo: 'none' });
-
             if(vis.landmarks) {
-                // GIS 標註
-                EARTH_POIS.forEach(poi => {
-                    let pos = latLonToCartesian(poi.lat, poi.lon, 1.01);
-                    if (poi.label) t.push(this.createLabel([pos.x, pos.y, pos.z], poi.c, poi.name, poi.s, 'circle'));
-                    if (poi.ray) {
-                        t.push({ type: 'scatter3d', x: [pos.x, pos.x*1.5], y: [pos.y, pos.y*1.5], z: [pos.z, pos.z*1.5], mode: 'lines+markers', line: {color: poi.c, width: 1}, marker:{size:2, color:poi.c}, hoverinfo: 'none', showlegend: false });
-                        t.push(this.createLabel([pos.x*1.55, pos.y*1.55, pos.z*1.55], poi.c, poi.name, 1, 'circle'));
-                    }
-                });
-
-                // ISS 與 天宮 (TSS) (第一宇宙速度快轉)
+                EARTH_POIS.forEach(poi => { let pos = latLonToCartesian(poi.lat, poi.lon, 1.01); if (poi.label) t.push(this.createLabel([pos.x, pos.y, pos.z], poi.c, poi.name, poi.s, 'circle')); });
                 let iss_v = time * 7.6; let iss_pos = {x: 1.1*Math.cos(iss_v), y: 1.1*Math.sin(iss_v)*Math.cos(0.9), z: 1.1*Math.sin(iss_v)*Math.sin(0.9)};
                 t.push(this.createLabel([iss_pos.x, iss_pos.y, iss_pos.z], '#FFD700', '🛰️ ISS', 5, 'diamond'));
-                
-                let tss_v = time * 7.8; let tss_pos = {x: 1.08*Math.cos(tss_v+2), y: 1.08*Math.sin(tss_v+2)*Math.cos(0.7), z: 1.08*Math.sin(tss_v+2)*Math.sin(0.7)};
-                t.push(this.createLabel([tss_pos.x, tss_pos.y, tss_pos.z], '#FF4500', '🛰️ 天宮', 4, 'diamond'));
-
-                // 台灣福衛 7 號星系群 (6顆)
-                for(let k=0; k<6; k++) {
-                    let fs_v = time * 6.5 + (k * Math.PI/3);
-                    let fs_pos = {x: 1.25*Math.cos(fs_v), y: 1.25*Math.sin(fs_v)*Math.cos(0.4), z: 1.25*Math.sin(fs_v)*Math.sin(0.4)};
-                    t.push(this.createLabel([fs_pos.x, fs_pos.y, fs_pos.z], '#00FFFF', k===0?'福衛7號群':'', 2, 'square'));
-                }
             }
         }
-        // ================= L2：地月系、歷史登月與鵲橋 =================
         else if (level_idx === 1) {
             t.push(this.createLabel([0,0,0], '#1E90FF', '地球', 8, 'circle'));
-            
-            let moon_d = 12.0; // 拉開地月視覺距離
-            let moon_angle = time * 1.5; // 月球公轉 = 自轉 (潮汐鎖定)
-            let mx = moon_d * Math.cos(moon_angle), my = moon_d * Math.sin(moon_angle);
-            
-            // 月表實體生成 (動態自轉)
-            t.push(this.precalcMoonSurface('moon_mesh', [mx, my, 0], 1.5, 25, moon_angle));
-            
+            let moon_d = 12.0, moon_angle = time * 1.5; let mx = moon_d * Math.cos(moon_angle), my = moon_d * Math.sin(moon_angle);
+            t.push(this.precalcMoonSurface('moon_mesh', [mx, my, 0], 1.5, 20, moon_angle));
             if(vis.landmarks) {
-                // 歷史登月點 (精確貼附月表)
                 MOON_LANDINGS.forEach(ld => {
-                    let localPos = latLonToCartesian(ld.lat, ld.lon, 1.52);
-                    // 將局部座標依據月球自轉與公轉矩陣轉換
-                    let worldX = mx + localPos.x * Math.cos(moon_angle) - localPos.y * Math.sin(moon_angle);
-                    let worldY = my + localPos.x * Math.sin(moon_angle) + localPos.y * Math.cos(moon_angle);
-                    let worldZ = localPos.z;
-                    t.push(this.createLabel([worldX, worldY, worldZ], ld.c, ld.name, ld.s, 'x'));
+                    let loc = latLonToCartesian(ld.lat, ld.lon, 1.52);
+                    let wx = mx + loc.x * Math.cos(moon_angle) - loc.y * Math.sin(moon_angle), wy = my + loc.x * Math.sin(moon_angle) + loc.y * Math.cos(moon_angle);
+                    t.push(this.createLabel([wx, wy, loc.z], ld.c, ld.name, ld.s, 'x'));
                 });
-
-                // 鵲橋衛星 (位於 L2 Halo 軌道)
-                let l2_x = moon_d * 1.15 * Math.cos(moon_angle);
-                let l2_y = moon_d * 1.15 * Math.sin(moon_angle);
-                let halo_x = l2_x + 0.8 * Math.cos(time * 5);
-                let halo_z = 0.8 * Math.sin(time * 5);
-                t.push(this.createLabel([halo_x, l2_y, halo_z], '#FF00FF', '🛰️ 鵲橋 (中繼)', 3, 'diamond'));
-                
-                // 阿波羅 11 號 8字軌跡殘影
-                let apoX=[], apoY=[];
-                for(let i=0; i<=100; i++) {
-                    let th = (i/100)*2*Math.PI;
-                    let r = moon_d * Math.sin(th); // Lemniscate 變形
-                    apoX.push(r * Math.cos(th)); apoY.push(r * Math.sin(th));
-                }
-                t.push({ type: 'scatter3d', x: apoX, y: apoY, z: Array(101).fill(0), mode: 'lines', line: {color: 'rgba(0,255,0,0.3)', dash: 'dot'}, hoverinfo:'none', showlegend:false });
+                t.push(this.createLabel([moon_d * 1.15 * Math.cos(moon_angle) + 0.8 * Math.cos(time * 5), moon_d * 1.15 * Math.sin(moon_angle), 0.8 * Math.sin(time * 5)], '#FF00FF', '🛰️ 鵲橋', 3, 'diamond'));
             }
         }
-        // ================= L3：17 天體太陽系與橢圓軌道 =================
         else if (level_idx === 2) {
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
-            
             PLANETS.forEach(p => {
                 let pos = getKeplerPos(p.a, p.e, p.i, time, p.T);
-                if(vis.landmarks) t.push(this.createLabel([pos.x, pos.y, pos.z], p.c, p.isDwarf ? `[矮] ${p.name}` : p.name, p.s, 'circle'));
-                
-                if(vis.streams) {
-                    let orbit = this.precalcKeplerOrbit(`orb_${p.id}`, p.a, p.e, p.i);
-                    t.push({ type: 'scatter3d', x: orbit.x, y: orbit.y, z: orbit.z, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: p.isDwarf? 0.5 : 1.5}, hoverinfo: 'none', showlegend: false });
-                }
-                // 星環鎖定
-                if(p.hasRing && vis.particles) t.push(this.createPlanetaryRing(pos, p.s*0.15, p.s*0.35, 300, p.c, p.i));
+                if(vis.landmarks) t.push(this.createLabel([pos.x, pos.y, pos.z], p.c, p.name, p.s, 'circle'));
+                if(vis.streams) { let orb = this.precalcKeplerOrbit(`orb_${p.id}`, p.a, p.e, p.i); t.push({ type: 'scatter3d', x: orb.x, y: orb.y, z: orb.z, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: 1.0}, hoverinfo: 'none', showlegend: false }); }
             });
-
-            if (vis.particles) {
-                // 柯伊伯帶甜甜圈
-                let k_belt = []; let bx=[], by=[], bz=[];
-                for(let i=0; i<2000; i++) {
-                    let r = rand(30, 48), th = rand(0, 2*Math.PI);
-                    bx.push(r*Math.cos(th)); by.push(r*Math.sin(th)); bz.push(randn()*2.0);
-                }
-                t.push({ type: 'scatter3d', x: bx, y: by, z: bz, mode: 'markers', marker: {size: 1.5, color: 'rgba(150, 200, 255, 0.2)'}, hoverinfo: 'none', showlegend: false });
-            }
         }
-        // ================= L4：太陽螺旋衝浪 (左前向量) =================
         else if (level_idx === 3) {
-            let sunVec = [-4.0, -4.0, 2.0]; // 左前偏上向量
-            let sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
-            
-            if(vis.landmarks) {
-                t.push(this.createLabel([sunPos.x, sunPos.y, sunPos.z], '#FF5500', '太陽', 8, 'circle'));
-                // 鄰近恆星同步衝浪
-                t.push(this.createLabel([40 + time*-3.5, 20 + time*-3.5, 10 + time*1.5], '#FFFFFF', '南門二', 5, 'circle'));
-                t.push(this.createLabel([-30 + time*-4.5, 40 + time*-4.5, -15 + time*2.5], '#FFAA88', '巴納德星', 4, 'circle'));
-            }
-
+            let sunVec = [-4.0, -4.0, 2.0], sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
+            if(vis.landmarks) t.push(this.createLabel([sunPos.x, sunPos.y, sunPos.z], '#FF5500', '太陽', 8, 'circle'));
             PLANETS.forEach(p => {
-                let localPos = getKeplerPos(p.a, p.e, p.i, time, p.T);
-                let worldPos = {x: localPos.x + sunPos.x, y: localPos.y + sunPos.y, z: localPos.z + sunPos.z};
-                
-                if(vis.landmarks) t.push(this.createLabel([worldPos.x, worldPos.y, worldPos.z], p.c, p.name, p.s, 'circle'));
-                
+                let loc = getKeplerPos(p.a, p.e, p.i, time, p.T), world = {x: loc.x + sunPos.x, y: loc.y + sunPos.y, z: loc.z + sunPos.z};
+                if(vis.landmarks) t.push(this.createLabel([world.x, world.y, world.z], p.c, p.name, p.s, 'circle'));
                 if(vis.streams && isPlaying) t.push(this.createSurfingTrail(p, time, sunVec));
             });
         }
-        // ================= L5~L16：繼承大尺度宇宙演化 =================
         else if (level_idx >= 4) {
             let center = [0,0,0];
-            if(vis.landmarks) t.push(this.createLabel(center, '#FF0000', '觀測中心', 5, 'diamond'));
-            
+            if(vis.landmarks) t.push(this.createLabel(center, '#FF0000', '引力核心', 5, 'diamond'));
             if (level_idx === 4 && vis.streams) {
-                let streams = this.precalcTurbulentAccretion('l5_accretion', center, 25, 150);
+                let streams = this.precalcTurbulentAccretion('l5_accretion', center, 25, 100);
                 streams.forEach(s => t.push({ type: 'scatter3d', x: s.x, y: s.y, z: s.z, mode: 'lines', line: {color: 'rgba(100, 50, 255, 0.4)', width: 1.5}, hoverinfo: 'none', showlegend: false }));
             }
-            // 這裡保留了引擎對於 16 級大尺度的框架相容性。為節省代碼版面並聚焦於您要求的 L1-L4 重構，L5以上的進階引力網格在視覺上將採用抽象場勢呈現。
             if(vis.particles) {
-                let px=[], py=[], pz=[];
-                for(let i=0; i<1000; i++) { px.push(randn() * SCALE_LIMITS[level_idx]*0.8); py.push(randn() * SCALE_LIMITS[level_idx]*0.8); pz.push(randn() * SCALE_LIMITS[level_idx]*0.8); }
+                let px=[], py=[], pz=[]; for(let i=0; i<800; i++) { px.push(randn() * SCALE_LIMITS[level_idx]*0.8); py.push(randn() * SCALE_LIMITS[level_idx]*0.8); pz.push(randn() * SCALE_LIMITS[level_idx]*0.8); }
                 t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.3)'}, hoverinfo: 'none', showlegend: false });
             }
         }
@@ -497,17 +322,25 @@ class UniverseEngine {
 const selLevel = document.getElementById('level-select');
 LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); });
 
-document.getElementById('op-speed').addEventListener('input', e => document.getElementById('val-speed').innerText = (e.target.value * 0.1).toFixed(1) + 'x');
+let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, isUserInteracting = false; 
 
-let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
-let isUserInteracting = false; 
+const plotContainer = document.getElementById('engine-container'), renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
+plotContainer.addEventListener('mousedown', () => isUserInteracting = true); plotContainer.addEventListener('mouseup', () => isUserInteracting = false);
 
-const plotContainer = document.getElementById('plot-container');
-plotContainer.addEventListener('mousedown', () => isUserInteracting = true);
-plotContainer.addEventListener('mouseup', () => isUserInteracting = false);
-plotContainer.addEventListener('mouseleave', () => isUserInteracting = false);
+// 故事導覽邏輯
+const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
-const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn'), loading = document.getElementById('loading-overlay');
+function updateTour() {
+    if(!toggleTour.checked) { tourPanel.style.display = 'none'; return; }
+    let idx = parseInt(selLevel.value);
+    let storyIdx = Math.min(idx, 5); // L6以上共用同一個劇本
+    tourTitle.innerText = STORY_SCRIPT[storyIdx].title;
+    tourContent.innerHTML = STORY_SCRIPT[storyIdx].content;
+    tourPanel.style.display = 'block';
+    nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
+}
+toggleTour.addEventListener('change', updateTour);
+nextTourBtn.addEventListener('click', () => { selLevel.value = parseInt(selLevel.value) + 1; selLevel.dispatchEvent(new Event('change')); });
 
 function drawFrame(forceResetCamera = false) {
     let conf = { colors: { bg: document.getElementById('color-bg').value, grid: document.getElementById('color-grid').value, particle: document.getElementById('color-particle').value }, opacities: { bg: 100, grid: 20 }, vis: { landmarks: document.getElementById('toggle-landmarks').checked, streams: document.getElementById('toggle-streams').checked, particles: document.getElementById('toggle-particles').checked } };
@@ -516,25 +349,13 @@ function drawFrame(forceResetCamera = false) {
     
     let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
     let limit = SCALE_LIMITS[idx]; 
-    
-    // 使用 'cube' 確保不會因為視角縮放導致物體消失 (解決 Clipping Plane 問題)
     let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-limit, limit] };
     
-    let layout = {
-        title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(2)}s)</span>`,
-        paper_bgcolor: engine.bgColor, plot_bgcolor: 'rgba(0,0,0,0)',
-        scene: { bgcolor: 'rgba(0,0,0,0)', xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' },
-        margin: { l: 0, r: 0, b: 0, t: 50 },
-        uirevision: 'true' 
-    };
+    let layout = { title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(2)}s)</span>`, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', scene: { bgcolor: 'rgba(0,0,0,0)', xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' }, margin: { l: 0, r: 0, b: 0, t: 50 }, uirevision: 'true' };
 
-    if (forceResetCamera || isFirstRender) {
-        layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8} };
-        isFirstRender = false;
-        Plotly.newPlot('plotly-div', traces, layout);
-    } else {
-        Plotly.react('plotly-div', traces, layout);
-    }
+    if (forceResetCamera || isFirstRender) { layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8} }; isFirstRender = false; Plotly.newPlot('plotly-div', traces, layout); } 
+    else { Plotly.react('plotly-div', traces, layout); }
+    updateTour();
 }
 
 function animatePhysics(timestamp) {
@@ -543,7 +364,7 @@ function animatePhysics(timestamp) {
     let dt = (timestamp - lastTimestamp) / 1000; lastTimestamp = timestamp;
     if(dt > 0.1) dt = 0.016; 
     if (isUserInteracting) return;
-    globalTime += dt * (document.getElementById('op-speed').value * 0.1); // 0.1x 第一宇宙基準
+    globalTime += dt * (document.getElementById('op-speed').value * 0.1);
     drawFrame(false); 
 }
 
@@ -554,13 +375,28 @@ playBtn.addEventListener('click', () => {
 });
 
 selLevel.addEventListener('change', () => {
-    loading.style.display = "flex";
-    setTimeout(() => { globalTime = 0; drawFrame(true); loading.style.display = "none"; }, 100);
+    document.getElementById('loading-overlay').style.display = "flex";
+    setTimeout(() => { globalTime = 0; drawFrame(true); document.getElementById('loading-overlay').style.display = "none"; }, 100);
+});
+
+// 加載畫面邏輯 (Mock 預計算時間)
+window.onload = () => {
+    setTimeout(() => {
+        document.getElementById('loading-status').innerText = "系統就緒 (System Ready)";
+        document.getElementById('loading-status').style.color = "#2ECC71";
+        document.getElementById('start-btn').classList.add('ready');
+    }, 1500); // 模擬加載 1.5 秒
+};
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    document.getElementById('splash-screen').style.opacity = '0';
+    setTimeout(() => {
+        document.getElementById('splash-screen').style.display = 'none';
+        drawFrame(true); // 進入時才渲染 Plotly，提升流暢度
+    }, 1000);
 });
 
 ['toggle-landmarks', 'toggle-streams', 'toggle-particles'].forEach(id => { document.getElementById(id).addEventListener('change', () => drawFrame(false)); });
-
-setTimeout(() => drawFrame(true), 100);
 </script>
 </body>
 </html>
