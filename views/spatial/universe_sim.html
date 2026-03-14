@@ -738,16 +738,10 @@ class UniverseEngine {
 const selLevel = document.getElementById('level-select');
 if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
 
-let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, isUserInteracting = false; 
+// 移除 isUserInteracting 鎖死機制，實現動畫全時播放並支持同步相機互動
+let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
 const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
 const threeEngine = new RealEarthEngine('threejs-container');
-
-// 相機卡死修復：精確攔截使用者的相機互動操作
-window.addEventListener('mousedown', (e) => { if(e.target.closest('#engine-container')) isUserInteracting = true; }, true);
-window.addEventListener('mouseup', () => { isUserInteracting = false; }, true);
-window.addEventListener('touchstart', (e) => { if(e.target.closest('#engine-container')) isUserInteracting = true; }, {capture: true, passive: true});
-window.addEventListener('touchend', () => { isUserInteracting = false; }, {capture: true, passive: true});
-window.addEventListener('mouseleave', () => { isUserInteracting = false; }, true);
 
 const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
@@ -786,8 +780,25 @@ function drawFrame(forceResetCamera = false) {
 
         let div = document.getElementById('plotly-div');
         if (div) {
-            if (forceResetCamera || isFirstRender) { layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8} }; isFirstRender = false; Plotly.newPlot(div, traces, layout); } 
-            else { Plotly.react(div, traces, layout); }
+            // 【關鍵修復】: 提取當前視角，確保任何重繪、暫停或繼續撥放都不會重置相機原點
+            let currentCamera = null;
+            if (div._fullLayout && div._fullLayout.scene && div._fullLayout.scene.camera) {
+                currentCamera = div._fullLayout.scene.camera;
+            } else if (div.layout && div.layout.scene && div.layout.scene.camera) {
+                currentCamera = div.layout.scene.camera;
+            }
+
+            if (forceResetCamera || isFirstRender) {
+                layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8}, center: {x: 0, y: 0, z: 0}, up: {x: 0, y: 0, z: 1} };
+                isFirstRender = false;
+                Plotly.newPlot(div, traces, layout);
+            } else {
+                if (currentCamera) {
+                    // 將相機狀態深拷貝回去，強制 Plotly 繼承使用者當前手動拉近的鏡頭縮放與旋轉
+                    layout.scene.camera = JSON.parse(JSON.stringify(currentCamera));
+                }
+                Plotly.react(div, traces, layout);
+            }
         }
     }
     updateTour();
@@ -805,7 +816,8 @@ function animatePhysics(timestamp) {
     let idx = selLevel ? parseInt(selLevel.value) : 0;
     if (idx === 0) {
         threeEngine.updatePhysics(globalTime);
-    } else if (!isUserInteracting) {
+    } else {
+        // 移除原有的 !isUserInteracting 限制，讓動畫播放時能完美兼容相機鏡頭移動
         drawFrame(false); 
     }
 }
@@ -846,7 +858,7 @@ if(startBtn) {
 
 ['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web', 'toggle-cones'].forEach(id => { 
     let el = document.getElementById(id); 
-    if(el) el.addEventListener('change', () => { if(!isUserInteracting) drawFrame(false); }); 
+    if(el) el.addEventListener('change', () => { drawFrame(false); }); 
 });
 </script>
 </body>
