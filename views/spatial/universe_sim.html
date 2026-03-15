@@ -56,6 +56,10 @@
         button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); }
 
         #threejs-ui-overlay { position: absolute; top: 20px; left: 20px; color: white; z-index: 3; font-size: 14px; text-shadow: 0 0 5px black; pointer-events: none; display: none; }
+        
+        #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: #00FFFF; z-index: 100; backdrop-filter: blur(8px); display: none; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0,255,255,0.2); border-top-color: #00FFFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -94,6 +98,7 @@
     </div>
 
     <div id="engine-container">
+        <div id="loading-overlay"><div class="spinner"></div><span>切換尺度與數據映射中...</span></div>
         <div id="threejs-container"></div>
         <div id="threejs-ui-overlay"><b>WebGL 照片級材質引擎運作中</b><br>滑鼠左鍵：旋轉 | 滾輪：縮放 | 右鍵：平移</div>
         <div id="plotly-div"></div>
@@ -240,27 +245,22 @@ class UniverseEngine {
         return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
     }
     
-    // 動態中心錨定系統：所有座標在生成時就以目標為原點計算，不使用後期矩陣 offset
     getOrbitPos(a, e, time, T) { 
         let M = time * T, E = solveKepler(M, e), v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)), r = a * (1 - e * Math.cos(E)); 
         return [r * Math.cos(v), r * Math.sin(v), 0]; 
     }
 
-    // 哈伯膨脹矩陣
     applyHubble(points, time, baseScale) {
-        let H0 = 0.05 * (100000 / baseScale); // 根據尺度調整膨脹率，越大越明顯
+        let H0 = 0.05 * (100000 / baseScale);
         let expFactor = Math.exp(H0 * time);
         return points.map(p => [p[0]*expFactor, p[1]*expFactor, p[2]*expFactor]);
     }
 
     buildLevelTraces(idx, vis, time) {
         let t = [];
-        let rAng = time * -0.15; // 全局自轉基準
-        let expTime = time * 0.02; // 慢速膨脹時間
+        let rAng = time * -0.15; 
+        let expTime = time * 0.02;
 
-        // -----------------------------------------------------------
-        // L2 & L3: 太陽系 (引力軌道)
-        // -----------------------------------------------------------
         if (idx === 1 || idx === 2) {
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
             let pList = idx === 1 ? PLANETS.slice(0,4) : PLANETS;
@@ -277,14 +277,9 @@ class UniverseEngine {
                 }
             });
         }
-        // -----------------------------------------------------------
-        // L4: 局部恆星際雲 (相對直線運動)
-        // -----------------------------------------------------------
         else if (idx === 3) {
             if(vis.landmarks) {
-                // 太陽置中
                 t.push(this.createLabel([0,0,0], '#FF5500', '太陽系', 6, 'circle'));
-                // 鄰近恆星相對運動 (漂移)
                 let stars = [ {n: '天狼星', v: [0.5, 0.2, -0.1], o: [8, 5, -2], c: '#88CCFF'}, {n: '南門二', v: [-0.3, 0.6, 0.2], o: [-4, 3, 1], c: '#FFDD88'}, {n: '比鄰星', v: [-0.3, 0.6, 0.2], o: [-4.2, 3.1, 1.2], c: '#FF5555'} ];
                 stars.forEach(s => {
                     let pos = [s.o[0] + s.v[0]*time, s.o[1] + s.v[1]*time, s.o[2] + s.v[2]*time];
@@ -299,27 +294,21 @@ class UniverseEngine {
                 t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.2)'}, hoverinfo: 'none', showlegend: false });
             }
         }
-        // -----------------------------------------------------------
-        // L5: 銀河系 (流體渲染與精準拖曳軌跡)
-        // -----------------------------------------------------------
         else if (idx === 4) {
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FFFFFF', '人馬座 A*', 6, 'circle'));
             if(vis.particles) {
                 let gx=[], gy=[], gz=[], gc=[], gs=[];
                 let rMax = 45;
-                // 產生高密度高斯落後臂，原點始終為 0,0,0
                 for(let i=0; i<4000; i++) {
                     let isBulge = i < 1000;
                     let r = isBulge ? Math.abs(randn()) * (rMax * 0.15) : Math.pow(Math.random(), 1.5) * rMax + rMax*0.1;
                     let theta = isBulge ? rand(0, 2*Math.PI) : (1/0.3) * Math.log(r/(rMax*0.1)) + (i%4)*(Math.PI/2) + randn()*0.3;
-                    // 加入全局自轉
                     theta += rAng;
                     gx.push(r * Math.cos(theta)); gy.push(r * Math.sin(theta)); gz.push(randn() * (rMax*0.05) * Math.exp(-r/rMax));
                     gc.push(isBulge ? '#FFFDE7' : (r/rMax < 0.4 ? '#FFF59D' : '#81D4FA')); gs.push(isBulge ? rand(1.5, 3) : rand(0.8, 2));
                 }
                 t.push({ type: 'scatter3d', x: gx, y: gy, z: gz, mode: 'markers', marker: {size: gs, color: gc, opacity: 0.6}, hoverinfo: 'none', showlegend: false });
             }
-            // 太陽系軌道
             let sunR = 26, sunSpd = -0.5, curA = rAng + time*sunSpd;
             let sunP = [sunR*Math.cos(curA), sunR*Math.sin(curA), Math.sin(curA*2)*1.0];
             if(vis.landmarks) t.push(this.createLabel(sunP, '#FF5500', '太陽系', 5, 'circle'));
@@ -328,22 +317,17 @@ class UniverseEngine {
                 for(let i=0; i<=30; i++) {
                     let ht = time - 5.0*(1 - i/30);
                     if(ht < 0) continue;
-                    let ha = (ht * -0.15) + (ht * sunSpd); // 歷史自轉 + 歷史公轉
+                    let ha = (ht * -0.15) + (ht * sunSpd); 
                     tx.push(sunR*Math.cos(ha)); ty.push(sunR*Math.sin(ha)); tz.push(Math.sin(ha*2)*1.0);
                     tc.push(`rgba(255,100,0,${Math.max(0.1, i/30)})`); ts.push(1.0 + 2.0*(i/30));
                 }
                 t.push({ type: 'scatter3d', x: tx, y: ty, z: tz, mode: 'lines+markers', line: {color:'rgba(255,100,0,0.5)', width:2}, marker: {size: ts, color: tc}, hoverinfo: 'none', showlegend: false });
             }
         }
-        // -----------------------------------------------------------
-        // L6 ~ L10: 引力塌縮區 (向質心墜落)
-        // -----------------------------------------------------------
         else if (idx >= 5 && idx <= 9) {
             let limit = SCALE_LIMITS[idx];
-            // 隨機生成引力線的起點
             let seeds = []; for(let i=0; i<150; i++) seeds.push([randn()*limit*0.8, randn()*limit*0.8, randn()*limit*0.8]);
             
-            // 決定此階層的引力中心與墜落目標
             let centerName = "", targetName = "", targetPos = [], streamsColor = "";
             if(idx === 5) { centerName = '本星系群質心'; targetName = '仙女座 (M31)'; targetPos = [1000 - time*50, 500 - time*25, 0]; streamsColor = 'rgba(0,255,100,0.4)'; }
             if(idx === 6) { centerName = '本星系群'; targetName = '局部邊緣矮星系'; targetPos = [-3000 + time*100, 2000 - time*50, 0]; streamsColor = 'rgba(50,200,255,0.4)'; }
@@ -359,7 +343,6 @@ class UniverseEngine {
                 let sx=[], sy=[], sz=[];
                 seeds.forEach(s => {
                     let path = [s]; let cur = [...s];
-                    // 朝向 0,0,0 墜落 (向心力)
                     for(let step=0; step<20; step++) {
                         let dist = Math.hypot(cur[0], cur[1], cur[2]) + 0.1;
                         let pull = limit / (dist * 10);
@@ -374,12 +357,9 @@ class UniverseEngine {
                 if(vis.web && idx >= 8) t.push({ type: 'mesh3d', x: sx.filter(x=>x!=null), y: sy.filter(y=>y!=null), z: sz.filter(z=>z!=null), alphahull: 5, opacity: 0.1, color: streamsColor, hoverinfo: 'none', showlegend: false });
             }
         }
-        // -----------------------------------------------------------
-        // L11 ~ L15: 宇宙膨脹區 (暗能量主導)
-        // -----------------------------------------------------------
         else if (idx >= 10) {
             let limit = SCALE_LIMITS[idx];
-            let expMatrix = 1.0 + (time * 0.05); // 哈伯膨脹系數
+            let expMatrix = 1.0 + (time * 0.05); 
 
             let nodes = [];
             if(idx === 10) nodes = [{n:'拉尼亞凱亞', p:[-limit*0.2,0,0]}, {n:'雙魚-英仙', p:[limit*0.3, limit*0.2, 0]}];
@@ -393,13 +373,11 @@ class UniverseEngine {
                 });
             }
 
-            // 生成高斯塌縮網格 (Cosmic Web)
             if(vis.web || vis.streams) {
                 let wx=[], wy=[], wz=[], ptsX=[], ptsY=[], ptsZ=[];
                 for(let i=0; i<300; i++) {
                     let r = Math.pow(Math.random(), 1.5) * limit * 0.8;
                     let th = rand(0, 2*Math.PI), ph = Math.acos(2*Math.random()-1);
-                    // 膨脹套用
                     let bx = r*Math.sin(ph)*Math.cos(th)*expMatrix;
                     let by = r*Math.sin(ph)*Math.sin(th)*expMatrix;
                     let bz = r*Math.cos(ph)*expMatrix;
@@ -410,14 +388,13 @@ class UniverseEngine {
                 if(vis.streams) t.push({ type: 'scatter3d', x: ptsX, y: ptsY, z: ptsZ, mode: 'markers', marker: {size: 2, color: 'rgba(255,255,200,0.8)'}, hoverinfo: 'none', showlegend: false });
             }
 
-            // L15 極限膨脹向量錐體
             if(idx === 14 && vis.streams) {
                 let cx=[], cy=[], cz=[], cu=[], cv=[], cw=[];
                 for(let i=0; i<100; i++) {
                     let r = limit * rand(0.3, 0.9); let th = rand(0, 2*Math.PI), ph = Math.acos(2*Math.random()-1);
                     let x = r*Math.sin(ph)*Math.cos(th), y = r*Math.sin(ph)*Math.sin(th), z = r*Math.cos(ph);
                     cx.push(x*expMatrix); cy.push(y*expMatrix); cz.push(z*expMatrix);
-                    cu.push(x); cv.push(y); cw.push(z); // 向量向外
+                    cu.push(x); cv.push(y); cw.push(z);
                 }
                 t.push({ type: 'cone', x: cx, y: cy, z: cz, u: cu, v: cv, w: cw, colorscale: 'Blues', sizemode: "absolute", sizeref: limit*0.1, opacity: 0.6, showscale: false, hoverinfo: 'none' });
             }
@@ -427,7 +404,7 @@ class UniverseEngine {
 }
 
 // ============================================================================
-// UI 與動態迴圈控制
+// UI 與動態迴圈控制 (完整重構)
 // ============================================================================
 const selLevel = document.getElementById('level-select');
 if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
@@ -446,6 +423,7 @@ function updateTour() {
     tourPanel.style.display = 'block';
     if(nextTourBtn) nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
 }
+
 if(toggleTour) toggleTour.addEventListener('change', updateTour);
 if(nextTourBtn) nextTourBtn.addEventListener('click', () => { selLevel.value = parseInt(selLevel.value) + 1; selLevel.dispatchEvent(new Event('change')); });
 
@@ -503,8 +481,10 @@ if(playBtn) {
     });
 }
 
+// 補齊重置按鈕邏輯
 if(renderBtn) renderBtn.addEventListener('click', () => { globalTime = 0; drawFrame(true); });
 
+// 補齊下拉選單與 Loading 轉場邏輯
 if(selLevel) {
     selLevel.addEventListener('change', () => {
         let overlay = document.getElementById('loading-overlay');
@@ -513,22 +493,27 @@ if(selLevel) {
     });
 }
 
+// 補齊 Splash Screen 初始化邏輯
 setTimeout(() => {
     const statusText = document.getElementById('loading-status'); const startBtn = document.getElementById('start-btn');
     if(statusText) { statusText.innerText = "系統就緒 (System Ready)"; statusText.style.color = "#2ECC71"; }
     if(startBtn) startBtn.classList.add('ready');
 }, 1500);
 
-let startBtn = document.getElementById('start-btn');
-if(startBtn) {
-    startBtn.addEventListener('click', () => {
+let startBtnObj = document.getElementById('start-btn');
+if(startBtnObj) {
+    startBtnObj.addEventListener('click', () => {
         let splash = document.getElementById('splash-screen');
         if(splash) splash.style.opacity = '0';
         setTimeout(() => { if(splash) splash.style.display = 'none'; drawFrame(true); }, 1000);
     });
 }
 
-['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web'].forEach(id => { let el = document.getElementById(id); if(el) el.addEventListener('change', () => { drawFrame(false); }); });
+// 補齊所有視覺 Toggle 狀態連動渲染
+['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web'].forEach(id => { 
+    let el = document.getElementById(id); 
+    if(el) el.addEventListener('change', () => { drawFrame(false); }); 
+});
 </script>
 </body>
 </html>
