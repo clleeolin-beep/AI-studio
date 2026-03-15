@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 15級宇宙動力學 (纖維流體完全體)</title>
+    <title>AI Studio - 15級宇宙動力學完全體模擬器</title>
     
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -11,132 +11,395 @@
 
     <style>
         body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; font-family: 'Segoe UI', sans-serif; background-color: #000; color: white; display: flex; }
+        
         #splash-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 1s ease-out; }
         #splash-screen h1 { font-size: 3rem; color: #00FFFF; letter-spacing: 5px; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,255,255,0.5); }
+        #splash-screen p { color: #888; letter-spacing: 2px; margin-bottom: 20px; }
+        
+        .upload-container { margin-bottom: 30px; text-align: center; background: rgba(0,255,255,0.1); padding: 20px; border: 1px dashed #00FFFF; border-radius: 10px; }
+        .upload-container input { display: block; margin-top: 10px; color: #FFF; }
+        
         #start-btn { background: transparent; color: #00FFFF; border: 2px solid #00FFFF; padding: 15px 40px; font-size: 1.2rem; cursor: pointer; border-radius: 30px; transition: all 0.3s; opacity: 1; }
         #start-btn:hover { background: #00FFFF; color: #000; box-shadow: 0 0 20px rgba(0,255,255,0.8); }
-        #control-panel { width: 310px; min-width: 310px; background-color: #1A252F; padding: 20px; box-sizing: border-box; overflow-y: auto; border-right: 2px solid #00FFFF; z-index: 10; }
-        #engine-container { flex-grow: 1; height: 100vh; position: relative; }
+
+        #control-panel { width: 310px; min-width: 310px; background-color: #1A252F; padding: 20px; box-sizing: border-box; overflow-y: auto; border-right: 2px solid #00FFFF; z-index: 10; box-shadow: 2px 0 15px rgba(0,255,255,0.1); }
+        #control-panel::-webkit-scrollbar { width: 6px; }
+        #control-panel::-webkit-scrollbar-thumb { background-color: rgba(0,255,255,0.3); border-radius: 3px; }
+        
+        #engine-container { flex-grow: 1; height: 100vh; position: relative; background: radial-gradient(circle at center, #0a1128 0%, #000000 100%); }
+        
+        #threejs-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; display: none; }
         #plotly-div { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        #tour-panel { position: absolute; bottom: 30px; right: 30px; width: 350px; background: rgba(10, 17, 40, 0.85); border: 1px solid #00FFFF; border-radius: 10px; padding: 20px; z-index: 100; backdrop-filter: blur(10px); display: none; }
-        button.action-btn { width: 100%; background-color: #2C3E50; color: #00FFFF; border: 1px solid #00FFFF; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 5px; }
+
+        #tour-panel { position: absolute; bottom: 30px; right: 30px; width: 350px; background: rgba(10, 17, 40, 0.85); border: 1px solid #00FFFF; border-radius: 10px; padding: 20px; z-index: 100; backdrop-filter: blur(10px); display: none; box-shadow: 0 0 20px rgba(0,255,255,0.2); }
+        #tour-title { font-size: 16px; color: #FFD700; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #tour-content { font-size: 13px; color: #E0E0E0; line-height: 1.6; margin-bottom: 15px; }
+        
+        h3 { margin-top: 15px; font-size: 15px; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; color: #00FFFF; letter-spacing: 1px; }
+        h3:first-child { margin-top: 0; }
+        .control-group { margin-bottom: 15px; }
+        select { width: 100%; padding: 8px; background-color: rgba(255,255,255,0.9); color: #000; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer; }
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: #00FFFF; }
+        
+        button.action-btn { width: 100%; background-color: #2C3E50; color: #00FFFF; font-weight: bold; border: 1px solid #00FFFF; padding: 12px; border-radius: 5px; cursor: pointer; transition: all 0.3s; font-size: 14px; margin-top: 5px; letter-spacing: 1px; }
+        button.action-btn:hover { background: #00FFFF; color: #000; box-shadow: 0 0 10px rgba(0,255,255,0.5); }
+        button#play-btn { background-color: #E74C3C; color: white; border-color: #E74C3C; margin-top: 15px; }
+        button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); }
+
         .toggle-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 13px; cursor: pointer; color: #B0C4DE; }
-        .toggle-row input { margin-right: 10px; }
-        select { width: 100%; padding: 8px; background: #eee; color: #000; font-weight: bold; border-radius: 4px; }
+        .toggle-row input { margin-right: 10px; width: 16px; height: 16px; accent-color: #E74C3C; }
+
+        #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.85); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; font-weight: bold; color: #00FFFF; font-size: 20px; }
+        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0,255,255,0.2); border-top-color: #00FFFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #threejs-ui-overlay { position: absolute; top: 20px; left: 20px; color: white; z-index: 3; font-size: 14px; text-shadow: 0 0 5px black; pointer-events: none; display: none; }
     </style>
 </head>
 <body>
 
     <div id="splash-screen">
         <h1>AI STUDIO</h1>
-        <p>宇宙大尺度結構流場模擬 - 纖維化重構</p>
-        <button id="start-btn">進入纖維觀測模式</button>
+        <p>連續性宇宙尺度動力學模擬器</p>
+        
+        <div class="upload-container">
+            <span id="loading-status" style="color:#00FFFF; font-weight:bold;">可選：匯入自訂的 universe_database_1000.csv</span>
+            <input type="file" id="csv-upload" accept=".csv">
+        </div>
+
+        <button id="start-btn">進入觀測模式</button>
     </div>
 
     <div id="control-panel">
         <h3>🌌 尺度切換</h3>
         <div class="control-group"><select id="level-select"></select></div>
-        <h3>⏱️ 時空演化</h3>
+        <div class="control-group">
+            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟動態導覽資訊</span></label>
+        </div>
+
+        <h3>⏱️ 物理力學引擎</h3>
         <button id="play-btn" class="action-btn">▶ 啟動演化</button>
-        <label>流速倍率: <input type="range" id="op-speed" min="1" max="100" value="10"></label>
-        <h3>👁️ 圖層控制</h3>
-        <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> 核心定錨點</label>
-        <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> 宇宙纖維流線</label>
-        <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> 高密度粒子雲</label>
-        <button id="render-btn" class="action-btn">🔄 重置相機</button>
+        <label style="margin-top: 15px; display:block; color:#E0E0E0; font-size:13px; font-weight:bold;">時間倍率: <span id="val-speed" style="float:right; color:#00FFFF;">1.0x</span></label>
+        <input type="range" id="op-speed" min="1" max="100" value="10">
+
+        <h3>👁️ 觀測圖層</h3>
+        <div class="control-group">
+            <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>資料庫天體標註</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場勢曲線</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>流體結構粒子</span></label>
+        </div>
+        <button id="render-btn" class="action-btn">🔄 重置相機與時間</button>
     </div>
 
     <div id="engine-container">
+        <div id="loading-overlay"><div class="spinner"></div><span>引擎運算與矩陣映射中...</span></div>
+        <div id="threejs-container"></div>
+        <div id="threejs-ui-overlay"><b>WebGL 照片級材質引擎運作中</b><br>滑鼠左鍵：旋轉 | 滾輪：縮放 | 右鍵：平移</div>
         <div id="plotly-div"></div>
         <div id="tour-panel">
-            <h4 id="tour-title" style="color:#FFD700; margin-top:0;"></h4>
-            <div id="tour-content" style="font-size:13px; line-height:1.6;"></div>
+            <h4 id="tour-title"></h4>
+            <div id="tour-content"></div>
             <button id="next-tour-btn" class="action-btn" style="margin-top:15px;">進行尺度躍遷</button>
         </div>
     </div>
 
 <script>
 // ============================================================================
-// 1. 尺度與資料庫定義 (移除均質化，強化結構辨識)
+// 1. 全局配置與資料庫載入邏輯
 // ============================================================================
-const LEVELS = ["地月系","太陽系","星際雲","銀河系","本星系群","室女座團","拉尼亞核心","拉尼亞全貌","超星系團鏈","史隆長城","武仙長城","暗物質骨架","觀測宇宙邊緣"];
-const SCALE_LIMITS = [1, 50, 20, 50, 3000, 15000, 60000, 250000, 1000000, 2500000, 10000000, 25000000, 46500000];
+const LEVELS = ["01. 地月系統","02. 內太陽系","03. 全太陽系","04. 局部星際雲","05. 銀河系","06. 本星系群","07. 局部星系板塊","08. 室女座超星系團","09. 拉尼亞凱亞核心","10. 拉尼亞凱亞全貌","11. 超星系團鏈","12. 史隆長城","13. 武仙-北冕座長城","14. 暗物質宇宙網格","15. 觀測宇宙邊緣"];
+const SCALE_LIMITS = [1, 2, 50, 20, 50, 300, 1500, 6000, 25000, 50000, 100000, 150000, 1000000, 3000000, 4650000];
 
-const GLOBAL_DATABASE = [
-    { name: '太陽系', level: [1,2,3,4,5], pos: [0,0,0], c: '#FF5500', s: 8 },
-    { name: '人馬座 A*', level: [4], pos: [0,0,0], c: '#FFF', s: 10 },
-    { name: 'M31 仙女座', level: [5,6], pos: [200, 150, -50], c: '#88CCFF', s: 12 },
-    { name: '室女座心 (M87)', level: [6,7], pos: [-4000, 3000, 1000], c: '#FFAA00', s: 15 },
-    { name: '巨引源', level: [7,8], pos: [-15000, 8000, -5000], c: '#FFFFFF', s: 20 },
-    { name: '夏普力超星系團', level: [8,9], pos: [-35000, 12000, -8000], c: '#AA55FF', s: 22 },
-    { name: '史隆長城', level: [10], pos: [0,0,0], c: '#FF5555', s: 25 }
+// 預設備用骨幹 (防止使用者不上傳 CSV 時系統崩潰)
+let GLOBAL_DATABASE = [
+    { id: 'mercury', name: '水星', level: [1,2], type: 'planet', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3 },
+    { id: 'venus', name: '金星', level: [1,2], type: 'planet', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4 },
+    { id: 'earth', name: '地球', level: [1,2], type: 'planet', a: 1.0, e: 0.016, T: 1.0, c: '#1E90FF', s: 4.5 },
+    { id: 'mars', name: '火星', level: [1,2], type: 'planet', a: 1.52, e: 0.093, T: 0.53, c: '#FF4500', s: 3.5 },
+    { id: 'sun', name: '太陽系', level: [3,4], type: 'star', pos: [0, 0, 0], v: [0, 0, 0], c: '#FF5500', s: 8 },
+    { id: 'sgrA', name: '人馬座 A*', level: [5], type: 'bh', pos: [0, 0, 0], c: '#FFFFFF', s: 10 },
+    { id: 'mw_lg', name: '銀河系', level: [6], type: 'galaxy', pos: [0, 0, 0], c: '#FF5500', s: 8 },
+    { id: 'm31', name: '仙女座 (M31)', level: [6,7], type: 'galaxy', pos: [150, 200, -50], c: '#88CCFF', s: 10 },
+    { id: 'virgo_core', name: '室女座星系團', level: [7,8], type: 'cluster', pos: [-4000, 3000, 1500], c: '#FFAA00', s: 12 },
+    { id: 'great_attractor', name: '巨引源', level: [8,9,10], type: 'attractor', pos: [-15000, 8000, -5000], c: '#FFFFFF', s: 15 },
+    { id: 'sloan', name: '史隆長城', level: [11,12], type: 'wall', pos: [0, 0, 0], c: '#FF5555', s: 20 }
 ];
 
-const randn = () => { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); };
+const STORY_SCRIPT = [
+    { title: "L1. 地月系統", content: "WebGL 渲染真實地球。引力主導最基礎的天體運行。" },
+    { title: "L2. 內太陽系", content: "切換為動力學引擎。四顆岩石行星的克卜勒軌道。原點死鎖於太陽。" },
+    { title: "L3. 全太陽系", content: "擴展至氣體巨星與冥王星。萬有引力主宰的邊界。" },
+    { title: "L4. 局部恆星際雲", content: "資料庫恆星絕對座標定錨。流體線條勾勒出獵戶座懸臂邊緣的密度空間。" },
+    { title: "L5. 銀河系", content: "極座標鎖死修正：太陽系已嚴格鎖定於懸臂的對數螺旋方程式內，隨著星系完全同步自轉。" },
+    { title: "L6. 本星系群", content: "進入星系際空間。纖維流體展現銀河系與仙女座星系因引力作用互相靠近的趨勢。" },
+    { title: "L7. 局部星系板塊", content: "動態引力流線：矮星系沿著引力勢能，如同水流般匯聚向本星系群的質心。" },
+    { title: "L8. 室女座超星系團", content: "大尺度引力場曲線：流線明確指向巨大的室女座核心 (M87) 進行塌縮墜落。" },
+    { title: "L9. 拉尼亞凱亞核心", content: "空間趨勢視覺化：室女座與半人馬座星系團，全體流線共同匯聚向『巨引源』。" },
+    { title: "L10. 拉尼亞凱亞全貌", content: "引力流域分水嶺：藍色與紅色的引力場曲線區分出拉尼亞凱亞與鄰近超星系團的勢能邊界。" },
+    { title: "L11. 大尺度纖維結構", content: "此處開始，引力塌縮已無法抵抗哈伯空間膨脹效應。" },
+    { title: "L12. 史隆長城", content: "龐大的星系牆。空間的拉伸速度與引力塌縮產生對抗。" },
+    { title: "L13. 武仙-北冕座長城", content: "因暗能量驅動的哈伯膨脹，整個結構的基底正隨著時間相互遠離。" },
+    { title: "L14. 暗物質宇宙網格", content: "星系已不可見，只剩下高斯隨機場塌縮形成的暗物質骨架網絡，在暗能量撕裂下擴張。" },
+    { title: "L15. 可觀測宇宙", content: "微波背景輻射球體邊緣。所有點陣都遵循 v=H0*d 的哈伯定律，呈現純粹的空間膨脹。" }
+];
+
+// CSV 檔案讀取邏輯 (FileReader API)
+document.getElementById('csv-upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        try {
+            const csvText = evt.target.result;
+            const rows = csvText.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+            let database = [];
+            for (let i = 1; i < rows.length; i++) {
+                let cols = rows[i].split(',');
+                if(cols.length < 15) continue;
+                let obj = {
+                    id: cols[0], name: cols[1], type: cols[3],
+                    level: cols[2].split('|').map(Number),
+                    c: cols[13] || '#FFFFFF', 
+                    s: parseFloat(cols[14]) || 5.0
+                };
+                if (cols[4] !== '') obj.pos = [parseFloat(cols[4]), parseFloat(cols[5]), parseFloat(cols[6])];
+                if (cols[7] !== '') obj.v = [parseFloat(cols[7]), parseFloat(cols[8]), parseFloat(cols[9])];
+                if (cols[10] !== '') { obj.a = parseFloat(cols[10]); obj.e = parseFloat(cols[11]); obj.T = parseFloat(cols[12]); }
+                database.push(obj);
+            }
+            if(database.length > 0) {
+                GLOBAL_DATABASE = database;
+                document.getElementById('loading-status').innerText = `✅ 成功覆寫載入 ${GLOBAL_DATABASE.length} 筆天體觀測資料`;
+                document.getElementById('loading-status').style.color = "#2ECC71";
+            }
+        } catch(err) {
+            console.error(err);
+            document.getElementById('loading-status').innerText = "❌ CSV 解析失敗，將使用預設骨幹節點";
+            document.getElementById('loading-status').style.color = "#E74C3C";
+        }
+    };
+    reader.readAsText(file);
+});
 
 // ============================================================================
-// 2. 宇宙動力學引擎 (重構大尺度纖維邏輯)
+// 2. 共用數學庫
+// ============================================================================
+const safeCheck = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
+const randn = () => { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); };
+const solveKepler = (M, e) => { let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); return E; };
+const latLonToLocal = (lat, lon, radius) => { let phi = (90 - lat)*(Math.PI/180), theta = (lon + 180)*(Math.PI/180); return { x: -(radius*Math.sin(phi)*Math.cos(theta)), z: (radius*Math.sin(phi)*Math.sin(theta)), y: (radius*Math.cos(phi)) }; };
+
+// ============================================================================
+// 3. 引擎 1：Three.js 照片級地球渲染器 (專屬 L1)
+// ============================================================================
+class RealEarthEngine {
+    constructor(containerId) {
+        this.container = document.getElementById(containerId);
+        this.isActive = false;
+        this.scene = null; this.camera = null; this.renderer = null; this.controls = null; this.objects = {};
+        this.init();
+    }
+    init() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(45, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+        this.camera.position.set(0, 0, 4);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.container.appendChild(this.renderer.domElement);
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true; this.controls.dampingFactor = 0.05;
+        this.scene.add(new THREE.AmbientLight(0x333333));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); directionalLight.position.set(5, 3, 5); this.scene.add(directionalLight);
+        
+        const textureLoader = new THREE.TextureLoader();
+        const earthMat = new THREE.MeshPhongMaterial({
+            map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'),
+            specularMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'),
+            normalMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg'),
+            specular: new THREE.Color(0x333333), shininess: 15
+        });
+        this.objects.earth = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), earthMat);
+        
+        let taipei = latLonToLocal(25.03, 121.56, 1.01);
+        let marker = new THREE.Mesh(new THREE.SphereGeometry(0.015, 16, 16), new THREE.MeshBasicMaterial({color: 0x00FFFF}));
+        marker.position.set(taipei.x, taipei.y, taipei.z); this.objects.earth.add(marker);
+        this.scene.add(this.objects.earth);
+
+        const cloudMat = new THREE.MeshPhongMaterial({ map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_clouds_1024.png'), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+        this.objects.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.015, 64, 64), cloudMat); this.scene.add(this.objects.clouds);
+
+        this.objects.moonGroup = new THREE.Group();
+        const moonMat = new THREE.MeshPhongMaterial({ map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'), bumpMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'), bumpScale: 0.02 });
+        this.objects.moon = new THREE.Mesh(new THREE.SphereGeometry(0.27, 32, 32), moonMat);
+        this.objects.moonGroup.add(this.objects.moon); this.scene.add(this.objects.moonGroup);
+
+        this.objects.iss = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xFFD700 }));
+        this.scene.add(this.objects.iss);
+
+        window.addEventListener('resize', () => {
+            if(!this.isActive) return;
+            this.camera.aspect = this.container.clientWidth / this.container.clientHeight; this.camera.updateProjectionMatrix();
+            this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        });
+        this.animate();
+    }
+    activate() { document.getElementById('plotly-div').style.display = 'none'; this.container.style.display = 'block'; document.getElementById('threejs-ui-overlay').style.display = 'block'; this.isActive = true; }
+    deactivate() { this.container.style.display = 'none'; document.getElementById('plotly-div').style.display = 'block'; document.getElementById('threejs-ui-overlay').style.display = 'none'; this.isActive = false; }
+    updatePhysics(time) {
+        if (!this.isActive) return;
+        this.objects.earth.rotation.y = time * 0.5; this.objects.clouds.rotation.y = time * 0.55; 
+        let mAng = time * 1.5; this.objects.moonGroup.position.set(5.0 * Math.cos(mAng), 0, 5.0 * Math.sin(mAng)); this.objects.moonGroup.rotation.y = -mAng + Math.PI/2; 
+        let issAng = time * 7.6; this.objects.iss.position.set(1.15 * Math.cos(issAng), 1.15 * Math.sin(issAng) * Math.sin(0.9), 1.15 * Math.sin(issAng) * Math.cos(0.9));
+    }
+    animate() { requestAnimationFrame(() => this.animate()); if (this.isActive) { this.controls.update(); this.renderer.render(this.scene, this.camera); } }
+}
+
+// ============================================================================
+// 4. 引擎 2：Plotly 連續尺度動力學引擎 (專屬 L2 ~ L15 數據與流體渲染)
 // ============================================================================
 class UniverseEngine {
     createLabel(pos, color, name, size) { 
-        return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color }, text: [name], textposition: "top center", textfont: {color: color, size: 10}, hoverinfo: 'none', showlegend: false }; 
+        return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
+    }
+    
+    getOrbitPos(a, e, time, T) { 
+        let M = time * T, E = solveKepler(M, e), v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)), r = a * (1 - e * Math.cos(E)); 
+        return [r * Math.cos(v), r * Math.sin(v), 0]; 
     }
 
     buildLevelTraces(idx, vis, time) {
         let t = [];
-        let limit = SCALE_LIMITS[idx];
-        let rAng = time * -0.15;
-        let localData = GLOBAL_DATABASE.filter(d => d.level.includes(idx + 1));
+        let rAng = time * -0.15; // 全局自轉常數
+        let localData = GLOBAL_DATABASE.filter(item => item.level && item.level.includes(idx + 1));
 
-        // 核心定錨
-        if(vis.landmarks) localData.forEach(d => t.push(this.createLabel(d.pos, d.c, d.name, d.s)));
-
-        // --- 銀河系處理 (維持優異的辨識度) ---
-        if (idx === 3) {
-            let gx=[], gy=[], gz=[], gc=[]; let rMax=50, b=0.3, a=5;
-            for(let i=0; i<3000; i++) {
-                let isBulge = i<800;
-                let r = isBulge ? Math.abs(randn())*6 : Math.pow(Math.random(),1.5)*rMax + a;
-                let theta = isBulge ? Math.random()*Math.PI*2 : (1/b)*Math.log(r/a) + (i%4)*(Math.PI/2) + rAng;
-                gx.push(r*Math.cos(theta)); gy.push(r*Math.sin(theta)); gz.push(randn()*(rMax*0.05)*Math.exp(-r/rMax));
-                gc.push(isBulge ? '#FFFDE7' : '#81D4FA');
-            }
-            t.push({ type:'scatter3d', x:gx, y:gy, z:gz, mode:'markers', marker:{size:1.5, color:gc, opacity:0.6}, hoverinfo:'none' });
-        }
-
-        // --- 大尺度重構：層次纖維流 (L6-L15) ---
-        else if (idx >= 5) {
-            let sx=[], sy=[], sz=[], sc=[];
-            let attractors = localData.filter(d => d.s >= 15);
-            if (attractors.length === 0) attractors = [{pos:[0,0,0]}];
-
-            // 替代均質區塊：生成受引力場導向的定向流線
-            let numSeeds = 40; 
-            for(let i=0; i<numSeeds; i++) {
-                let cur = [randn()*limit*0.8, randn()*limit*0.8, randn()*limit*0.8];
-                let color = idx > 8 ? 'rgba(255,100,100,0.3)' : 'rgba(0,255,255,0.25)';
-                
-                for(let s=0; s<25; s++) { // 步進生成纖維
-                    let force = [0,0,0];
-                    attractors.forEach(a => {
-                        let dx=a.pos[0]-cur[0], dy=a.pos[1]-cur[1], dz=a.pos[2]-cur[2], d=Math.hypot(dx,dy,dz)+0.1;
-                        force[0]+=dx/d * (limit/10); force[1]+=dy/d * (limit/10); force[2]+=dz/d * (limit/10);
-                    });
-                    cur[0]+=force[0]*0.15; cur[1]+=force[1]*0.15; cur[2]+=force[2]*0.15;
-                    sx.push(cur[0]); sy.push(cur[1]); sz.push(cur[2]);
+        // -----------------------------------------------------------
+        // L2 & L3: 太陽系 (引力軌道)
+        // -----------------------------------------------------------
+        if (idx === 1 || idx === 2) {
+            if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10));
+            localData.forEach(p => {
+                if(!p.a) return;
+                let pos = this.getOrbitPos(p.a, p.e, time, p.T);
+                if(vis.landmarks) t.push(this.createLabel(pos, p.c, p.name, p.s));
+                if(vis.streams) {
+                    let ox=[], oy=[], oz=[];
+                    for(let step=0; step<=150; step++) {
+                        let M = (step/150)*2*Math.PI, E = solveKepler(M, p.e), v = 2*Math.atan(Math.sqrt((1+p.e)/(1-p.e))*Math.tan(E/2)), r = p.a*(1-p.e*Math.cos(E));
+                        ox.push(r*Math.cos(v)); oy.push(r*Math.sin(v)); oz.push(0);
+                    }
+                    t.push({ type: 'scatter3d', x: ox, y: oy, z: oz, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: 1.0}, hoverinfo: 'none', showlegend: false });
                 }
-                sx.push(null); sy.push(null); sz.push(null);
+            });
+        }
+        // -----------------------------------------------------------
+        // L4: 局部恆星際雲 (獵戶座懸臂邊緣)
+        // -----------------------------------------------------------
+        else if (idx === 3) {
+            localData.forEach(s => {
+                if(!s.pos) return;
+                let vx = s.v ? s.v[0] : 0, vy = s.v ? s.v[1] : 0, vz = s.v ? s.v[2] : 0;
+                let pos = [s.pos[0] + vx*time, s.pos[1] + vy*time, s.pos[2] + vz*time];
+                if(vis.landmarks) t.push(this.createLabel(pos, s.c, s.name, s.s));
+                if(vis.streams && s.v) t.push({ type: 'scatter3d', x: [s.pos[0], pos[0]], y: [s.pos[1], pos[1]], z: [s.pos[2], pos[2]], mode: 'lines', line: {color: 'rgba(255,255,255,0.3)', width: 2, dash: 'dot'}, hoverinfo: 'none', showlegend: false });
+            });
+            if(vis.particles) {
+                let fx=[], fy=[], fz=[];
+                for(let i=0; i<200; i++) {
+                    let u = (Math.random()-0.5)*30;
+                    let v = randn() * 3; 
+                    fx.push(u); fy.push(u * 0.5 + v); fz.push(randn()*2);
+                }
+                t.push({ type: 'scatter3d', x: fx, y: fy, z: fz, mode: 'markers', marker: {size: 3, color: 'rgba(100, 200, 255, 0.25)'}, hoverinfo: 'none', showlegend: false });
             }
-            if(vis.streams) t.push({ type:'scatter3d', x:sx, y:sy, z:sz, mode:'lines', line:{color:'rgba(0,255,255,0.4)', width:1.5}, hoverinfo:'none' });
+        }
+        // -----------------------------------------------------------
+        // L5: 銀河系 (軌道方程式嚴格同步)
+        // -----------------------------------------------------------
+        else if (idx === 4) {
+            if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FFFFFF', '人馬座 A*', 8));
+            
+            let rMax = 50, b = 0.3, a = 5;
 
-            // 生成結構粒子，模擬「分水嶺」與「節點」
+            if(vis.particles) {
+                let gx=[], gy=[], gz=[], gc=[], gs=[];
+                for(let i=0; i<3000; i++) {
+                    let isBulge = i < 800;
+                    let r = isBulge ? Math.abs(randn()) * (rMax * 0.15) : Math.pow(Math.random(), 1.5) * rMax + a;
+                    let thetaIdeal = isBulge ? Math.random()*2*Math.PI : (1/b) * Math.log(r/a) + (i%4)*(Math.PI/2) + randn()*0.2;
+                    let theta = thetaIdeal + rAng;
+                    gx.push(r * Math.cos(theta)); gy.push(r * Math.sin(theta)); gz.push(randn() * (rMax*0.05) * Math.exp(-r/rMax));
+                    gc.push(isBulge ? '#FFFDE7' : (r/rMax < 0.4 ? '#FFF59D' : '#81D4FA')); gs.push(isBulge ? Math.random()*1.5+1.5 : Math.random()*1.2+0.8);
+                }
+                t.push({ type: 'scatter3d', x: gx, y: gy, z: gz, mode: 'markers', marker: {size: gs, color: gc, opacity: 0.6}, hoverinfo: 'none', showlegend: false });
+            }
+            
+            // 太陽系鎖死
+            let sunR = 26; 
+            let sunThetaIdeal = (1/b) * Math.log(sunR/a) + Math.PI;
+            let sunTheta = sunThetaIdeal + rAng; 
+            let sunP = [sunR * Math.cos(sunTheta), sunR * Math.sin(sunTheta), 0.5];
+            
+            if(vis.landmarks) t.push(this.createLabel(sunP, '#FF5500', '太陽系', 6));
+            if(vis.streams) {
+                let tx=[], ty=[], tz=[], tc=[], ts=[];
+                for(let i=0; i<=20; i++) {
+                    let ht = time - 3.0*(1 - i/20);
+                    if(ht < 0) continue;
+                    let hAng = sunThetaIdeal + (ht * -0.15);
+                    tx.push(sunR*Math.cos(hAng)); ty.push(sunR*Math.sin(hAng)); tz.push(0.5);
+                    tc.push(`rgba(255,100,0,${Math.max(0.1, i/20)})`); ts.push(1.0 + 2.0*(i/20));
+                }
+                t.push({ type: 'scatter3d', x: tx, y: ty, z: tz, mode: 'lines+markers', line: {color:'rgba(255,100,0,0.5)', width:2}, marker: {size: ts, color: tc}, hoverinfo: 'none', showlegend: false });
+            }
+        }
+        // -----------------------------------------------------------
+        // L6 ~ L10: 引力塌縮區 (流線網格判斷空間)
+        // -----------------------------------------------------------
+        else if (idx >= 5 && idx <= 9) {
+            let limit = SCALE_LIMITS[idx];
+            let attractors = [];
+            
+            if(vis.landmarks) {
+                localData.forEach(node => {
+                    if(!node.pos) return;
+                    t.push(this.createLabel(node.pos, node.c, node.name, node.s));
+                    if(node.s >= 8.0) attractors.push(node);
+                });
+            }
+            if (attractors.length === 0) attractors = [{pos: [0,0,0]}];
+
+            if(vis.streams) {
+                let sx=[], sy=[], sz=[];
+                let stepSize = limit / 6;
+                for(let px = -limit; px <= limit; px += stepSize) {
+                    for(let py = -limit; py <= limit; py += stepSize) {
+                        for(let pz = -limit/2; pz <= limit/2; pz += stepSize*1.5) {
+                            let cur = [px + randn()*stepSize*0.2, py + randn()*stepSize*0.2, pz];
+                            
+                            for(let step=0; step<15; step++) { 
+                                let force = [0,0,0];
+                                attractors.forEach(a => {
+                                    let dx = a.pos[0] - cur[0], dy = a.pos[1] - cur[1], dz = a.pos[2] - cur[2];
+                                    let dist = Math.hypot(dx, dy, dz) + 0.1;
+                                    let pull = limit / (dist * 5);
+                                    force[0] += (dx/dist)*pull; force[1] += (dy/dist)*pull; force[2] += (dz/dist)*pull;
+                                });
+                                cur[0] += force[0]; cur[1] += force[1]; cur[2] += force[2];
+                                sx.push(cur[0]); sy.push(cur[1]); sz.push(cur[2]);
+                            }
+                            sx.push(null); sy.push(null); sz.push(null); 
+                        }
+                    }
+                }
+                let streamColor = idx > 7 ? 'rgba(255, 100, 100, 0.4)' : 'rgba(100, 200, 255, 0.4)';
+                t.push({ type: 'scatter3d', x: sx, y: sy, z: sz, mode: 'lines', line: {color: streamColor, width: 1.5}, hoverinfo: 'none', showlegend: false });
+            }
             if(vis.particles) {
                 let px=[], py=[], pz=[], pc=[];
                 for(let i=0; i<800; i++) {
                     let r = Math.pow(Math.random(), 0.5) * limit;
                     let th = Math.random()*Math.PI*2, ph = Math.acos(2*Math.random()-1);
                     let x=r*Math.sin(ph)*Math.cos(th), y=r*Math.sin(ph)*Math.sin(th), z=r*Math.cos(ph);
-                    // 向最近節點收縮，形成纖維感
                     let target = attractors[i % attractors.length];
                     let weight = 0.4;
                     px.push(x*(1-weight) + target.pos[0]*weight);
@@ -144,7 +407,46 @@ class UniverseEngine {
                     pz.push(z*(1-weight) + target.pos[2]*weight);
                     pc.push(idx > 8 ? '#FF8888' : '#88FFFF');
                 }
-                t.push({ type:'scatter3d', x:px, y:py, z:pz, mode:'markers', marker:{size:2, color:pc, opacity:0.4}, hoverinfo:'none' });
+                t.push({ type:'scatter3d', x:px, y:py, z:pz, mode:'markers', marker:{size:2, color:pc, opacity:0.4}, hoverinfo:'none', showlegend: false });
+            }
+        }
+        // -----------------------------------------------------------
+        // L11 ~ L15: 宇宙膨脹區 (暗能量主導)
+        // -----------------------------------------------------------
+        else if (idx >= 10) {
+            let limit = SCALE_LIMITS[idx];
+            let expMatrix = 1.0 + (time * 0.02); 
+
+            if(vis.landmarks) {
+                localData.forEach(nd => {
+                    if(!nd.pos) return;
+                    let ep = [nd.pos[0]*expMatrix, nd.pos[1]*expMatrix, nd.pos[2]*expMatrix];
+                    t.push(this.createLabel(ep, nd.c, nd.name, nd.s));
+                });
+            }
+
+            if(vis.streams) {
+                let wx=[], wy=[], wz=[], ptsX=[], ptsY=[], ptsZ=[];
+                for(let i=0; i<400; i++) {
+                    let r = Math.pow(Math.random(), 1.5) * limit * 0.8;
+                    let th = Math.random()*2*Math.PI, ph = Math.acos(2*Math.random()-1);
+                    let bx = r*Math.sin(ph)*Math.cos(th)*expMatrix;
+                    let by = r*Math.sin(ph)*Math.sin(th)*expMatrix;
+                    let bz = r*Math.cos(ph)*expMatrix;
+                    ptsX.push(bx); ptsY.push(by); ptsZ.push(bz);
+                    if(i > 0 && i % 4 === 0) { wx.push(bx, ptsX[i-1], null); wy.push(by, ptsY[i-1], null); wz.push(bz, ptsZ[i-1], null); }
+                }
+                t.push({ type: 'scatter3d', x: wx, y: wy, z: wz, mode: 'lines', line: {color: 'rgba(255, 100, 100, 0.3)', width: 1}, hoverinfo: 'none', showlegend: false });
+            }
+            if(vis.particles) {
+                let cx=[], cy=[], cz=[], cu=[], cv=[], cw=[];
+                for(let i=0; i<150; i++) {
+                    let r = limit * (Math.random()*0.6+0.3); let th = Math.random()*2*Math.PI, ph = Math.acos(2*Math.random()-1);
+                    let x = r*Math.sin(ph)*Math.cos(th), y = r*Math.sin(ph)*Math.sin(th), z = r*Math.cos(ph);
+                    cx.push(x*expMatrix); cy.push(y*expMatrix); cz.push(z*expMatrix);
+                    cu.push(x); cv.push(y); cw.push(z);
+                }
+                t.push({ type: 'cone', x: cx, y: cy, z: cz, u: cu, v: cv, w: cw, colorscale: 'Blues', sizemode: "absolute", sizeref: limit*0.08, opacity: 0.5, showscale: false, hoverinfo: 'none' });
             }
         }
         return t;
@@ -152,57 +454,114 @@ class UniverseEngine {
 }
 
 // ============================================================================
-// 3. UI 控制與循環 (支援相機同步)
+// 5. UI 與動態迴圈控制 (解決相機鎖死問題)
 // ============================================================================
 const selLevel = document.getElementById('level-select');
-LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = `${(i+1).toString().padStart(2,'0')}. ${lv}`; selLevel.appendChild(opt); });
+if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
 
-let globalTime = 0, isPlaying = false, animReq = null;
-const engine = new UniverseEngine();
+let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true, lastDrawTime = 0; 
+const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
+const threeEngine = new RealEarthEngine('threejs-container');
+const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
-function drawFrame(resetCam = false) {
+function updateTour() {
+    if(!toggleTour || !tourPanel || !selLevel) return;
+    if(!toggleTour.checked) { tourPanel.style.display = 'none'; return; }
     let idx = parseInt(selLevel.value);
-    let vis = { landmarks: true, streams: true, particles: true };
-    let traces = engine.buildLevelTraces(idx, vis, globalTime);
-    let limit = SCALE_LIMITS[idx];
+    if(tourTitle) tourTitle.innerText = STORY_SCRIPT[idx].title;
+    if(tourContent) tourContent.innerHTML = STORY_SCRIPT[idx].content;
+    tourPanel.style.display = 'block';
+    if(nextTourBtn) nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
+}
+
+if(toggleTour) toggleTour.addEventListener('change', updateTour);
+if(nextTourBtn) nextTourBtn.addEventListener('click', () => { selLevel.value = parseInt(selLevel.value) + 1; selLevel.dispatchEvent(new Event('change')); });
+
+function drawFrame(forceResetCamera = false) {
+    let idx = selLevel ? parseInt(selLevel.value) : 0; if(isNaN(idx)) idx = 0;
     
-    let layout = {
-        title: `<b>${LEVELS[idx]}</b> (尺度: ${limit.toLocaleString()} 單位)`,
-        paper_bgcolor: 'black', plot_bgcolor: 'black',
-        scene: { 
-            xaxis: {range:[-limit, limit], color:'#0FF', gridcolor:'#1A252F'},
-            yaxis: {range:[-limit, limit], color:'#0FF', gridcolor:'#1A252F'},
-            zaxis: {range:[-limit, limit], color:'#0FF', gridcolor:'#1A252F'},
-            aspectmode: 'cube'
-        },
-        margin: {l:0, r:0, b:0, t:50}, uirevision: 'true'
-    };
+    if (idx === 0) {
+        threeEngine.activate();
+        threeEngine.updatePhysics(globalTime);
+    } else {
+        threeEngine.deactivate();
+        
+        let conf = { vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true) } };
+        let engine = new UniverseEngine();
+        let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
+        let limit = SCALE_LIMITS[idx]; 
+        let axis_config = { showgrid: true, gridcolor: '#1A252F', zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-limit, limit] };
+        
+        // uirevision: 'true' 允許使用者在動畫播放時自由拖曳相機
+        let layout = { title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(2)}s)</span>`, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', scene: { bgcolor: 'rgba(0,0,0,0)', xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' }, margin: { l: 0, r: 0, b: 0, t: 50 }, uirevision: 'true' };
 
-    if (resetCam) layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 1.2} };
-    Plotly.react('plotly-div', traces, layout);
+        let div = document.getElementById('plotly-div');
+        if (div) {
+            let currentCamera = null;
+            if (div._fullLayout && div._fullLayout.scene && div._fullLayout.scene.camera) { currentCamera = div._fullLayout.scene.camera; } 
+            else if (div.layout && div.layout.scene && div.layout.scene.camera) { currentCamera = div.layout.scene.camera; }
+
+            if (forceResetCamera || isFirstRender) {
+                layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8}, center: {x: 0, y: 0, z: 0}, up: {x: 0, y: 0, z: 1} };
+                isFirstRender = false; Plotly.newPlot(div, traces, layout);
+            } else {
+                if (currentCamera) { layout.scene.camera = JSON.parse(JSON.stringify(currentCamera)); }
+                Plotly.react(div, traces, layout);
+            }
+        }
+    }
+    updateTour();
 }
 
-document.getElementById('start-btn').onclick = () => {
-    document.getElementById('splash-screen').style.opacity = 0;
-    setTimeout(() => { document.getElementById('splash-screen').style.display='none'; drawFrame(true); }, 1000);
-};
+function animatePhysics(timestamp) {
+    if (!isPlaying) return;
+    animReq = requestAnimationFrame(animatePhysics); 
+    
+    let dt = (timestamp - lastTimestamp) / 1000; lastTimestamp = timestamp;
+    if(dt > 0.1) dt = 0.016; 
+    let speed = document.getElementById('op-speed') ? parseFloat(document.getElementById('op-speed').value) : 10;
+    globalTime += dt * (speed * 0.1);
 
-document.getElementById('play-btn').onclick = function() {
-    isPlaying = !isPlaying;
-    this.innerText = isPlaying ? "⏸ 暫停演化" : "▶ 啟動演化";
-    this.style.backgroundColor = isPlaying ? "#E74C3C" : "#2ECC71";
-    if (isPlaying) animate(); else cancelAnimationFrame(animReq);
-};
-
-function animate() {
-    let speed = document.getElementById('op-speed').value / 100;
-    globalTime += speed;
-    drawFrame(false);
-    animReq = requestAnimationFrame(animate);
+    let idx = selLevel ? parseInt(selLevel.value) : 0;
+    if (idx === 0) { 
+        threeEngine.updatePhysics(globalTime); 
+    } else { 
+        // 渲染頻率降載 (Throttle)：限制 Plotly 更新率，釋放主執行緒給滑鼠拖曳
+        if (timestamp - lastDrawTime > 60) {
+            drawFrame(false); 
+            lastDrawTime = timestamp;
+        }
+    }
 }
 
-document.getElementById('render-btn').onclick = () => drawFrame(true);
-selLevel.onchange = () => drawFrame(true);
+if(playBtn) {
+    playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying) { playBtn.innerText = "⏸ 暫停演化"; playBtn.classList.add('playing'); lastTimestamp = performance.now(); animReq = requestAnimationFrame(animatePhysics); } 
+        else { playBtn.innerText = "▶ 啟動演化"; playBtn.classList.remove('playing'); cancelAnimationFrame(animReq); drawFrame(false); }
+    });
+}
+
+if(renderBtn) renderBtn.addEventListener('click', () => { globalTime = 0; isFirstRender = true; drawFrame(true); });
+
+if(selLevel) {
+    selLevel.addEventListener('change', () => {
+        let overlay = document.getElementById('loading-overlay');
+        if(overlay) overlay.style.display = "flex";
+        setTimeout(() => { globalTime = 0; isFirstRender = true; drawFrame(true); if(overlay) overlay.style.display = "none"; }, 100);
+    });
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+    let splash = document.getElementById('splash-screen');
+    if(splash) splash.style.opacity = '0';
+    setTimeout(() => { if(splash) splash.style.display = 'none'; drawFrame(true); }, 1000);
+});
+
+['toggle-landmarks', 'toggle-streams', 'toggle-particles'].forEach(id => { 
+    let el = document.getElementById(id); 
+    if(el) el.addEventListener('change', () => { drawFrame(false); }); 
+});
 </script>
 </body>
 </html>
