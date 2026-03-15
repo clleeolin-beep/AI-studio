@@ -241,7 +241,7 @@ const STORY_SCRIPT = [
     { title: "L1. 雙引擎切換：地月系", content: "您現在正體驗 AI Studio 首創的雙引擎無縫架構。此層級由 WebGL (Three.js) 渲染真實的 4K 地球紋理與大氣雲層。您可以清晰看見地球與月球上的歷史登陸點標記，以及 ISS 國際太空站正以極快速度環繞。(請啟動左側時空演化)" },
     { title: "L2. 太陽系與克卜勒力學", content: "系統已自動切換回 Plotly 幾何引擎。17顆主要與矮行星正遵循克卜勒橢圓定律運行。請注意冥王星等矮行星那傾斜且具高離心率的特殊軌道。" },
     { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是以每秒 230 公里的速度繞行銀河中心。行星受太陽引力拖曳，在星際空間中畫出壯觀的彈簧狀時空軌跡。" },
-    { title: "L4. 銀河系核心動態", content: "進入百萬光年尺度。這裡的線條展現了向中心超大質量黑洞墜落的『引力吸積軌跡』，以及垂直於盤面的巨大高能費米泡。" },
+    { title: "L4. 銀河系流體渲染", content: "進入百萬光年尺度。本層級已導入高斯粒子分佈邏輯 (PDF)，捨棄靜態幾何線條，呈現 NASA 光學影像質感的銀河中心隆起、對數螺旋臂與塵埃帶。" },
     { title: "L5~L8. 本星系群與室女座", content: "我們的銀河系與仙女座星系 (M31) 正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。" },
     { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源 (Great Attractor)』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
     { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
@@ -465,49 +465,94 @@ class UniverseEngine {
         return { type: 'scatter3d', x, y, z, mode: 'lines', line: {color: c, width: 2.0}, hoverinfo: 'none', showlegend: false };
     }
 
-    precalcSpiralArms(key, center, max_radius, arms) {
+    // 重構: 高密度高斯粒子點雲生成 (取代原本生硬的螺旋線)
+    precalcGalaxyDensity(key, center, max_radius, num_particles) {
         if(CACHE.arms[key]) return CACHE.arms[key];
-        let all_x=[], all_y=[], all_z=[], bar_length = max_radius * 0.25;
-        for(let i=0; i<arms; i++) {
-            let offset = i * (2*Math.PI / arms);
-            for(let j=0; j<=300; j++) {
-                let t = j/300, theta = t * 4 * Math.PI; 
-                let r_base = bar_length + (max_radius - bar_length) * Math.pow(t, 0.8);
-                let turbulence = (simpleNoise(t * 10, offset) - 0.5) * (r_base * 0.15);
-                let r = r_base + turbulence;
-                let cx = r * Math.cos(theta + offset), cy = r * Math.sin(theta + offset);
-                let bar_weight = Math.exp(-t * 8), bar_x = (bar_length * t) * Math.cos(offset), bar_y = (bar_length * t) * Math.sin(offset);
-                let final_x = center[0] + cx * (1 - bar_weight) + bar_x * bar_weight;
-                let final_y = center[1] + cy * (1 - bar_weight) + bar_y * bar_weight;
-                let z_turbulence = (simpleNoise(final_x, final_y) - 0.5) * (max_radius * 0.01);
-                let final_z = center[2] + z_turbulence * Math.exp(-t * 2); 
-                all_x.push(final_x); all_y.push(final_y); all_z.push(final_z);
-            }
-            all_x.push(null); all_y.push(null); all_z.push(null);
+        let x=[], y=[], z=[], c=[], s=[], op=[];
+        
+        // 核心隆起 (Bulge) - 高密度, 偏黃白
+        let bulge_count = Math.floor(num_particles * 0.25);
+        for(let i=0; i<bulge_count; i++) {
+            let r = Math.abs(randn()) * (max_radius * 0.15);
+            let theta = rand(0, 2*Math.PI);
+            let phi = Math.acos(2 * Math.random() - 1);
+            x.push(center[0] + r * Math.sin(phi) * Math.cos(theta));
+            y.push(center[1] + r * Math.sin(phi) * Math.sin(theta));
+            z.push(center[2] + r * Math.cos(phi) * 0.6); 
+            c.push('#FFFDE7'); s.push(rand(1.5, 3.0)); op.push(rand(0.5, 0.9));
         }
-        CACHE.arms[key] = {x: all_x, y: all_y, z: all_z}; return CACHE.arms[key];
+
+        // 旋臂與盤面 (Disk & Arms) - 基於機率密度函數佈點
+        let arm_count = num_particles - bulge_count;
+        let num_arms = 4;
+        let winding_b = 0.3; // 纏繞係數
+        
+        for(let i=0; i<arm_count; i++) {
+            let arm_idx = i % num_arms;
+            let offset = arm_idx * (2 * Math.PI / num_arms);
+            
+            // 使用非線性分佈讓外圍粒子變少，核心變多
+            let t = Math.pow(Math.random(), 1.5); 
+            let r = t * max_radius;
+            if (r < max_radius * 0.1) r += max_radius * 0.1;
+            
+            // 對數螺旋線角度基準
+            let theta_ideal = (1 / winding_b) * Math.log(r / (max_radius*0.1)) + offset;
+            
+            // 高斯噪聲散射，越外圍擴散越大
+            let scatter = randn() * (r * 0.3); 
+            let theta = theta_ideal + (scatter / r);
+            
+            let px = r * Math.cos(theta);
+            let py = r * Math.sin(theta);
+            let pz = randn() * (max_radius * 0.05) * Math.exp(-r/max_radius); // Z軸厚度隨半徑遞減
+            
+            x.push(center[0] + px);
+            y.push(center[1] + py);
+            z.push(center[2] + pz);
+            
+            // 溫度顏色演化：內部黃/白 -> 外部藍/紫 -> 塵埃帶暗色
+            let color_ratio = r / max_radius;
+            let is_dust = Math.random() > 0.85; // 15% 機率產生塵埃帶遮蔽
+            
+            if (is_dust) {
+                c.push('#1A1A2E'); op.push(rand(0.1, 0.3)); s.push(rand(2.0, 4.0));
+            } else {
+                if(color_ratio < 0.3) c.push('#FFF59D');
+                else if(color_ratio < 0.6) c.push('#81D4FA'); 
+                else c.push('#B388FF');
+                op.push(rand(0.2, 0.7)); s.push(rand(0.8, 2.0));
+            }
+        }
+        
+        CACHE.arms[key] = {x, y, z, c, s, op};
+        return CACHE.arms[key];
     }
 
-    drawSpiralArmsDynamic(armData, color, angle, scale) {
-        let tf = TransformEngine.apply(armData.x, armData.y, armData.z, angle, scale);
-        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 2.0}, hoverinfo: 'none', showlegend: false }];
+    drawGalaxyDensityDynamic(data, angle, scale) {
+        let tf = TransformEngine.apply(data.x, data.y, data.z, angle, scale);
+        return [{
+            type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers',
+            marker: { size: data.s, color: data.c, opacity: data.op },
+            hoverinfo: 'none', showlegend: false
+        }];
     }
 
     precalcFermiBubbles(key, center, height, width, density) {
         if(CACHE.bubbles[key]) return CACHE.bubbles[key];
-        let x=[], y=[], z=[], c=[];
+        let x=[], y=[], z=[], c=[], s=[], op=[];
         for(let i=0; i<density; i++) {
             let h = rand(0, height), max_r = width * Math.sin(Math.PI * (h / height)), r = max_r * Math.sqrt(Math.random()), theta = rand(0, 2*Math.PI);
             let px = r * Math.cos(theta), py = r * Math.sin(theta);
-            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + h + 0.5); c.push('rgba(140, 50, 255, 0.25)'); 
-            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] - h - 0.5); c.push('rgba(140, 50, 255, 0.25)');
+            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + h + 0.5); c.push('#E040FB'); s.push(rand(2,4)); op.push(rand(0.1, 0.4));
+            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] - h - 0.5); c.push('#E040FB'); s.push(rand(2,4)); op.push(rand(0.1, 0.4));
         }
-        CACHE.bubbles[key] = {x, y, z, c}; return CACHE.bubbles[key];
+        CACHE.bubbles[key] = {x, y, z, c, s, op}; return CACHE.bubbles[key];
     }
     
     drawFermiBubblesDynamic(bubbleData, angle, scale) {
         let tf = TransformEngine.apply(bubbleData.x, bubbleData.y, bubbleData.z, angle, scale);
-        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: 2.5, color: bubbleData.c, opacity: 0.6}, hoverinfo: 'none', showlegend: false }];
+        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: {size: bubbleData.s, color: bubbleData.c, opacity: bubbleData.op}, hoverinfo: 'none', showlegend: false }];
     }
 
     precalcTurbulentAccretion(key, center, max_scale, num_lines) {
@@ -648,9 +693,9 @@ class UniverseEngine {
         }
 
         if (level_idx === 0) { 
-            return []; // L1 交由 Three.js 引擎接管
+            return []; 
         }
-        else if (level_idx === 1) { // 太陽系全貌
+        else if (level_idx === 1) { 
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
             PLANETS.forEach(p => {
                 let pos = getKeplerPos(p.a, p.e, p.i, time, p.T);
@@ -664,7 +709,7 @@ class UniverseEngine {
                 t.push({ type: 'scatter3d', x: bx, y: by, z: bz, mode: 'markers', marker: {size: 1.5, color: 'rgba(150, 200, 255, 0.2)'}, hoverinfo: 'none', showlegend: false });
             }
         }
-        else if (level_idx === 2) { // 太陽系螺旋衝浪
+        else if (level_idx === 2) { 
             let sunVec = [-4.0, -4.0, 2.0], sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
             if(vis.landmarks) t.push(this.createLabel([sunPos.x, sunPos.y, sunPos.z], '#FF5500', '太陽', 8, 'circle'));
             PLANETS.forEach(p => {
@@ -673,12 +718,15 @@ class UniverseEngine {
                 if(vis.streams && isPlaying) t.push(this.createSurfingTrail(p, time, sunVec));
             });
         }
-        else if (level_idx === 3) { // 銀河系核心
+        else if (level_idx === 3) { // 銀河系核心 - 重構流體渲染
             if(vis.landmarks) { t.push(this.createLabel([8,0,0], '#FF0000', '<上一層: 太陽系>', 4, 'circle', rotationAngle, 1.0)); t.push(this.createLabel([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0)); }
             if(vis.streams) {
-                let arms = this.precalcSpiralArms(`L${level_idx}_arms`, dyn.mw, 16, 4); t.push(...this.drawSpiralArmsDynamic(arms, 'rgba(0, 255, 255, 0.6)', rotationAngle, 1.0));
-                let accretion = this.precalcTurbulentAccretion(`L${level_idx}_accretion`, dyn.mw, 25.0, 180); t.push(...this.drawStreamlinesDynamic(accretion, 'rgba(0, 100, 255, 0.35)', rotationAngle, 1.0));
-                let bubbles = this.precalcFermiBubbles(`L${level_idx}_bubbles`, dyn.mw, 18.0, 6.0, 400); t.push(...this.drawFermiBubblesDynamic(bubbles, rotationAngle, 1.0));
+                // 替換：利用 6000 顆高斯粒子渲染具備體積感的銀河系，取代原有的 4 條線段
+                let galaxyData = this.precalcGalaxyDensity(`L${level_idx}_galaxy_pdf`, dyn.mw, 18, 6000); 
+                t.push(...this.drawGalaxyDensityDynamic(galaxyData, rotationAngle, 1.0));
+                
+                let bubbles = this.precalcFermiBubbles(`L${level_idx}_bubbles_vol`, dyn.mw, 18.0, 6.0, 800); 
+                t.push(...this.drawFermiBubblesDynamic(bubbles, rotationAngle, 1.0));
             }
         }
         else if (level_idx >= 4 && level_idx <= 7) { 
@@ -738,7 +786,6 @@ class UniverseEngine {
 const selLevel = document.getElementById('level-select');
 if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('option'); opt.value = i; opt.text = lv; selLevel.appendChild(opt); }); }
 
-// 移除 isUserInteracting 鎖死機制，實現動畫全時播放並支持同步相機互動
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
 const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
 const threeEngine = new RealEarthEngine('threejs-container');
@@ -780,7 +827,6 @@ function drawFrame(forceResetCamera = false) {
 
         let div = document.getElementById('plotly-div');
         if (div) {
-            // 【關鍵修復】: 提取當前視角，確保任何重繪、暫停或繼續撥放都不會重置相機原點
             let currentCamera = null;
             if (div._fullLayout && div._fullLayout.scene && div._fullLayout.scene.camera) {
                 currentCamera = div._fullLayout.scene.camera;
@@ -794,7 +840,6 @@ function drawFrame(forceResetCamera = false) {
                 Plotly.newPlot(div, traces, layout);
             } else {
                 if (currentCamera) {
-                    // 將相機狀態深拷貝回去，強制 Plotly 繼承使用者當前手動拉近的鏡頭縮放與旋轉
                     layout.scene.camera = JSON.parse(JSON.stringify(currentCamera));
                 }
                 Plotly.react(div, traces, layout);
@@ -817,7 +862,6 @@ function animatePhysics(timestamp) {
     if (idx === 0) {
         threeEngine.updatePhysics(globalTime);
     } else {
-        // 移除原有的 !isUserInteracting 限制，讓動畫播放時能完美兼容相機鏡頭移動
         drawFrame(false); 
     }
 }
