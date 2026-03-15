@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Studio - 15級宇宙動力學模擬器 (雙引擎完全體)</title>
+    <title>AI Studio - 15級宇宙動力學連續尺度模擬器</title>
     
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -32,8 +32,8 @@
         #plotly-div { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
         #tour-panel { position: absolute; bottom: 30px; right: 30px; width: 350px; background: rgba(10, 17, 40, 0.85); border: 1px solid #00FFFF; border-radius: 10px; padding: 20px; box-shadow: 0 0 20px rgba(0,255,255,0.2); z-index: 100; backdrop-filter: blur(10px); display: none; }
-        #tour-title { font-size: 18px; color: #FFD700; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
-        #tour-content { font-size: 14px; color: #E0E0E0; line-height: 1.6; margin-bottom: 15px; }
+        #tour-title { font-size: 16px; color: #FFD700; margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #tour-content { font-size: 13px; color: #E0E0E0; line-height: 1.5; margin-bottom: 15px; }
         #next-tour-btn { background: #00FFFF; color: #000; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
         #next-tour-btn:hover { background: #FFFFFF; }
         
@@ -46,10 +46,6 @@
         .toggle-row { display: flex; align-items: center; margin-bottom: 8px; font-weight: normal; cursor: pointer; font-size: 13px; color: #B0C4DE; transition: color 0.2s; }
         .toggle-row:hover { color: #FFFFFF; }
         .toggle-row input[type="checkbox"] { margin-right: 10px; cursor: pointer; width: 16px; height: 16px; accent-color: #E74C3C; }
-        
-        .color-picker-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); }
-        .color-picker-row span { font-size: 12px; }
-        input[type="color"] { border: 1px solid rgba(255,255,255,0.5); width: 35px; height: 25px; padding: 0; cursor: pointer; background: transparent; border-radius: 3px; }
 
         input[type="range"] { width: 100%; cursor: pointer; accent-color: #00FFFF; }
         .range-val { font-size: 12px; float: right; color: #00FFFF; font-weight: bold; }
@@ -59,10 +55,6 @@
         button#play-btn { background-color: #E74C3C; color: white; border-color: #E74C3C; margin-top: 15px; }
         button#play-btn.playing { background-color: #2ECC71; border-color: #2ECC71; color: #000; box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); }
 
-        #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 20, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; color: #00FFFF; z-index: 100; backdrop-filter: blur(8px); display: none; }
-        .spinner { width: 50px; height: 50px; border: 5px solid rgba(0,255,255,0.2); border-top-color: #00FFFF; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
         #threejs-ui-overlay { position: absolute; top: 20px; left: 20px; color: white; z-index: 3; font-size: 14px; text-shadow: 0 0 5px black; pointer-events: none; display: none; }
     </style>
 </head>
@@ -70,8 +62,8 @@
 
     <div id="splash-screen">
         <h1>AI STUDIO</h1>
-        <p>惇陽空間模擬實驗室 - 雙引擎宇宙架構</p>
-        <div id="loading-status" class="loading-text">載入真實高解析度天文材質與數學矩陣...</div>
+        <p>連續性宇宙尺度動力學引擎</p>
+        <div id="loading-status" class="loading-text">編譯引力流體矩陣與哈伯張量...</div>
         <button id="start-btn">進入觀測模式</button>
     </div>
 
@@ -81,688 +73,355 @@
             <select id="level-select"></select>
         </div>
         <div class="control-group">
-            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟天文導覽資訊</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-tour" checked> <span>開啟動態導覽資訊</span></label>
         </div>
 
-        <h3>⏱️ 物理動態引擎</h3>
+        <h3>⏱️ 物理力學引擎</h3>
         <div class="control-group">
             <button id="play-btn" class="action-btn">▶ 啟動時空演化</button>
-            <label style="margin-top: 15px;">時間流逝倍率: <span id="val-speed" class="range-val">0.1x</span></label>
-            <input type="range" id="op-speed" min="1" max="100" value="1">
-            <p style="font-size: 11px; color: #888; line-height: 1.4; margin-top: 8px;">
-                * L1 啟用 Three.js 真實影像渲染。<br>
-                * L2~L15 啟用 Plotly 動力學演算。<br>
-                * 動畫播放期間支援滑鼠自由拖曳。
-            </p>
+            <label style="margin-top: 15px;">時間流逝倍率: <span id="val-speed" class="range-val">1.0x</span></label>
+            <input type="range" id="op-speed" min="1" max="100" value="10">
         </div>
 
         <h3>👁️ 觀測圖層控制</h3>
         <div class="control-group">
-            <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體與探測器標註</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>軌道線與引力場勢</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>星雲與宇宙微星體</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>暗物質宇宙網格</span></label>
-            <label class="toggle-row"><input type="checkbox" id="toggle-cones" checked> <span>空間膨脹向量</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-landmarks" checked> <span>天體核心標註</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-streams" checked> <span>引力場與軌跡</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-particles" checked> <span>流體與星雲粒子</span></label>
+            <label class="toggle-row"><input type="checkbox" id="toggle-web" checked> <span>宇宙大尺度網格</span></label>
         </div>
-
-        <h3>🎨 視覺調色盤</h3>
-        <div class="control-group">
-            <div class="color-picker-row"><span>深空背景顏色</span><input type="color" id="color-bg" value="#050A14"></div>
-            <div class="color-picker-row"><span>引力網格顏色</span><input type="color" id="color-grid" value="#00FFFF"></div>
-            <div class="color-picker-row"><span>背景星塵顏色</span><input type="color" id="color-particle" value="#C8C8C8"></div>
-        </div>
-
-        <button id="render-btn" class="action-btn">🔄 重置相機與快取</button>
+        <button id="render-btn" class="action-btn">🔄 重置相機與時間</button>
     </div>
 
     <div id="engine-container">
-        <div id="loading-overlay"><div class="spinner"></div><span>引擎切換與數據映射中...</span></div>
-        
         <div id="threejs-container"></div>
         <div id="threejs-ui-overlay"><b>WebGL 照片級材質引擎運作中</b><br>滑鼠左鍵：旋轉 | 滾輪：縮放 | 右鍵：平移</div>
-        
         <div id="plotly-div"></div>
-        
         <div id="tour-panel">
             <h4 id="tour-title">標題</h4>
             <div id="tour-content">內容</div>
-            <button id="next-tour-btn">進行下一次尺度躍遷 (Next Scale)</button>
+            <button id="next-tour-btn">進行尺度躍遷 (Next Scale)</button>
         </div>
     </div>
 
 <script>
 // ============================================================================
-// 基礎防禦性與數學公用函式庫
+// 系統核心數據庫：嚴格定義的15個尺度
+// ============================================================================
+const LEVELS = [
+    "01. 地月系統 (30萬公里)",
+    "02. 內太陽系 (2 AU)", 
+    "03. 全太陽系與柯伊伯帶 (50 AU)",
+    "04. 局部恆星際雲 (20 光年)", 
+    "05. 銀河系全貌 (12 萬光年)",
+    "06. 本星系群 (300 萬光年)", 
+    "07. 局部星系板塊 (1500 萬光年)",
+    "08. 室女座超星系團 (6000 萬光年)", 
+    "09. 拉尼亞凱亞核心區 (2.5 億光年)",
+    "10. 拉尼亞凱亞全貌 (5 億光年)", 
+    "11. 雙魚-英仙座超星系團鏈 (10 億光年)",
+    "12. 史隆長城 (15 億光年)", 
+    "13. 武仙-北冕座長城 (100 億光年)",
+    "14. 暗物質宇宙骨架 (300 億光年)", 
+    "15. 可觀測宇宙邊緣 (465 億光年)"
+];
+
+const SCALE_LIMITS = [ 1.0, 2.0, 50.0, 20.0, 100.0, 3000.0, 15000.0, 60000.0, 250000.0, 500000.0, 1000000.0, 1500000.0, 10000000.0, 30000000.0, 46500000.0 ];
+
+const STORY_SCRIPT = [
+    { title: "L1. 地月系統", content: "WebGL 渲染真實地球。引力主導最基礎的天體運行。" },
+    { title: "L2. 內太陽系", content: "切換動力學引擎。四顆岩石行星的克卜勒軌道。原點死鎖於太陽。" },
+    { title: "L3. 全太陽系", content: "擴展至氣體巨星與冥王星。萬有引力主宰的邊界。" },
+    { title: "L4. 局部恆星際雲", content: "太陽系不再靜止，與天狼星、南門二等鄰近恆星在星際空間中進行相對直線漂移。尺度：光年。" },
+    { title: "L5. 銀河系 (落後臂與公轉)", content: "原點死鎖於人馬座A*。高斯流體演算法呈現落後臂結構。太陽系以極快速度公轉，留下精準歷史軌跡，徹底解決軌道偏移 Bug。" },
+    { title: "L6. 本星系群", content: "進入星系際空間。銀河系與仙女座星系 (M31) 由於引力作用正在互相靠近。宇宙膨脹在此尺度被引力完全抵消。" },
+    { title: "L7. 局部星系板塊", content: "大量的矮星系沿著引力勢能，如同水流般匯聚向本星系群的質心。" },
+    { title: "L8. 室女座超星系團", content: "本星系群只是邊緣的過客，正以每秒 600 公里的速度向巨大的室女座核心 (M87) 墜落。" },
+    { title: "L9. 拉尼亞凱亞核心", content: "室女座超星系團與半人馬座星系團，全體向著『巨引源』流動。" },
+    { title: "L10. 拉尼亞凱亞全貌", content: "五億光年尺度。黃金網格標示出巨引源至夏普力超星系團的龐大暗流分水嶺。" },
+    { title: "L11. 大尺度纖維結構", content: "雙魚-英仙座超星系團與拉尼亞凱亞形成對峙的宇宙纖維。此處開始，哈伯空間膨脹效應逐漸顯現。" },
+    { title: "L12. 史隆長城", content: "十五億光年。龐大的星系牆。空間的拉伸速度開始與引力塌縮抗衡。" },
+    { title: "L13. 武仙-北冕座長城", content: "百億光年。已知宇宙最大結構。因暗能量驅動的哈伯膨脹，整個結構的基底正隨著時間相互遠離。" },
+    { title: "L14. 暗物質宇宙網格", content: "三百億光年。星系已不可見，只剩下高斯隨機場塌縮形成的暗物質骨架網絡，在暗能量撕裂下擴張。" },
+    { title: "L15. 可觀測宇宙", content: "四百六十五億光年極限。微波背景輻射球體邊緣。所有點陣都遵循 v=H0*d 的哈伯定律，呈現純粹的空間膨脹。" }
+];
+
+// ============================================================================
+// 共用數學庫
 // ============================================================================
 const safeVal = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
 const safeCheck = (id, def) => { const el = document.getElementById(id); return el ? el.checked : def; };
-
-function hexToRgba(hex, opacity = 1) { 
-    let r = parseInt(hex.substring(1, 3), 16), g = parseInt(hex.substring(3, 5), 16), b = parseInt(hex.substring(5, 7), 16); 
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`; 
-}
-
 function rand(min, max) { return Math.random() * (max - min) + min; }
-
-function randn() { 
-    let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); 
-    return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); 
-}
-
-function simpleNoise(x, y, z=0) { 
-    let n = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; 
-    return n - Math.floor(n); 
-}
-
-function latLonToLocal(lat, lon, radius) {
-    let phi = (90 - lat) * (Math.PI / 180);
-    let theta = (lon + 180) * (Math.PI / 180);
-    let x = -(radius * Math.sin(phi) * Math.cos(theta));
-    let z = (radius * Math.sin(phi) * Math.sin(theta));
-    let y = (radius * Math.cos(phi));
-    return {x, y, z};
-}
-
-function solveKepler(M, e) { 
-    let E = M; 
-    for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); 
-    return E; 
-}
-
-function getKeplerPos(a, e, i_angle, time, T) { 
-    let M = time * T; 
-    let E = solveKepler(M, e); 
-    let v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)); 
-    let r = a * (1 - e * Math.cos(E)); 
-    let px = r * Math.cos(v), py = r * Math.sin(v); 
-    return {x: px, y: py * Math.cos(i_angle), z: py * Math.sin(i_angle)}; 
-}
-
-class TransformEngine {
-    static apply(arrX, arrY, arrZ, angle, scale, tx=0, ty=0, tz=0) {
-        let len = arrX.length; let outX = new Array(len), outY = new Array(len), outZ = new Array(len);
-        let cosA = Math.cos(angle), sinA = Math.sin(angle);
-        for(let i=0; i<len; i++) {
-            if (arrX[i] === null) { outX[i] = null; outY[i] = null; outZ[i] = null; } 
-            else { 
-                let sx = arrX[i] * scale, sy = arrY[i] * scale; 
-                outX[i] = sx * cosA - sy * sinA + tx; 
-                outY[i] = sx * sinA + sy * cosA + ty; 
-                outZ[i] = arrZ[i] * scale + tz; 
-            }
-        }
-        return {x: outX, y: outY, z: outZ};
-    }
-    static applyVector(arrU, arrV, arrW, angle) {
-        let len = arrU.length; let outU = new Array(len), outV = new Array(len), outW = new Array(len);
-        let cosA = Math.cos(angle), sinA = Math.sin(angle);
-        for(let i=0; i<len; i++) { 
-            outU[i] = arrU[i] * cosA - arrV[i] * sinA; 
-            outV[i] = arrU[i] * sinA + arrV[i] * cosA; 
-            outW[i] = arrW[i]; 
-        }
-        return {u: outU, v: outV, w: outW};
-    }
-}
+function randn() { let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2.0*Math.log(u))*Math.cos(2.0*Math.PI*v); }
+function solveKepler(M, e) { let E = M; for(let i=0; i<5; i++) E = E - (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E)); return E; }
+function latLonToLocal(lat, lon, radius) { let phi = (90 - lat) * (Math.PI / 180); let theta = (lon + 180) * (Math.PI / 180); return { x: -(radius * Math.sin(phi) * Math.cos(theta)), z: (radius * Math.sin(phi) * Math.sin(theta)), y: (radius * Math.cos(phi)) }; }
 
 // ============================================================================
-// 數據庫與劇情腳本
-// ============================================================================
-const EARTH_POIS = [
-    {name: '台北 AI Studio', lat: 25.032969, lon: 121.565418, color: '#00FFFF'},
-    {name: '東京', lat: 35.6895, lon: 139.6917, color: '#FF00FF'},
-    {name: '紐約', lat: 40.7128, lon: -74.0060, color: '#FFFF00'}
-];
-
-const MOON_LANDINGS = [
-    {name: '阿波羅 11 號 (靜海)', lat: 0.674, lon: 23.472, color: '#FFD700'},
-    {name: '嫦娥四號 (馮·卡門坑)', lat: -45.444, lon: 177.599, color: '#FF4500'}
-];
-
-const LEVELS = [
-    "01. 地月系統 (Three.js 真實影像與衛星網)",
-    "02. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
-    "03. 太陽系行進軌跡 (太陽系螺旋衝浪)",
-    "04. 銀河系核心 (流體渲染與落後臂力學)", 
-    "05. 本星系群局部 (雙軸鞍點)",
-    "06. 本星系群全貌 (Local Group)", 
-    "07. 周邊星系群 (Local Sheet)",
-    "08. 室女座超星系團局部 (M87*)", 
-    "09. 室女座超星系團骨架 (角動量引力漩渦)",
-    "10. 拉尼亞凱亞次級網絡", 
-    "11. 拉尼亞凱亞核心 (動態巨引源)",
-    "12. 拉尼亞凱亞全貌 (引力流域分水嶺)", 
-    "13. 周邊超星系團 (暗能量介入)",
-    "14. 巨型宇宙網 (高斯塌縮骨架)", 
-    "15. 可觀測宇宙 (哈伯空間膨脹)"
-];
-
-const STORY_SCRIPT = [
-    { title: "L1. 雙引擎切換：地月系", content: "您現在正體驗 AI Studio 首創的雙引擎無縫架構。此層級由 WebGL 渲染真實地球紋理與大氣。您可以清晰看見登陸點標記與 ISS 國際太空站。(請啟動左側時空演化)" },
-    { title: "L2. 太陽系與克卜勒力學", content: "切換為 Plotly 動力學引擎。17顆主要與矮行星正遵循克卜勒橢圓定律運行。視角始終錨定太陽原點。" },
-    { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是繞行銀河中心。行星受引力拖曳畫出彈簧狀軌跡。座標系會跟隨移動的太陽系，讓焦點保持置中。" },
-    { title: "L4. 銀河系流體渲染", content: "進入百萬光年尺度。幾何懸臂已修正為符合真實物理的「落後臂 (Trailing Arm)」，星系整體呈順時針自轉。注意黃金色的太陽系，正拖曳著歷史軌跡繞行核心。" },
-    { title: "L5~L8. 本星系群與室女座", content: "銀河系與仙女座星系正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。視角已錨定當前星群質心。" },
-    { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
-    { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
-];
-const STORY_MAP = [0, 1, 2, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6];
-
-const PLANETS = [
-    {id: 'mercury', name: '水星', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3, isDwarf: false, i: 0.12},
-    {id: 'venus', name: '金星', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4, isDwarf: false, i: 0.05},
-    {id: 'earth', name: '地球', a: 1.0, e: 0.016, T: 1.0, c: '#1E90FF', s: 4.5, isDwarf: false, i: 0.0},
-    {id: 'mars', name: '火星', a: 1.52, e: 0.093, T: 0.53, c: '#FF4500', s: 3.5, isDwarf: false, i: 0.03},
-    {id: 'ceres', name: '谷神星', a: 2.77, e: 0.075, T: 0.21, c: '#A9A9A9', s: 2.5, isDwarf: true, i: 0.18},
-    {id: 'jupiter', name: '木星', a: 5.2, e: 0.048, T: 0.084, c: '#DEB887', s: 8, isDwarf: false, i: 0.02},
-    {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7, isDwarf: false, hasRing: true, i: 0.04},
-    {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5, isDwarf: false, hasRing: true, i: 0.01},
-    {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5, isDwarf: false, i: 0.03},
-    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2, isDwarf: true, i: 0.29}
-];
-
-const BLACK_HOLES = [
-    {id: 'mw', dist_scale: 15, name: '人馬座 A*', desc: '430萬太陽質量', is_mega: false},
-    {id: 'm31', dist_scale: 35, name: 'M31* (仙女座)', desc: '1.4億太陽質量', is_mega: false},
-    {id: 'virgo', dist_scale: 120, name: 'M87*', desc: '65億太陽質量', is_mega: false},
-    {id: 'ga', dist_scale: 280, name: 'Abell 3627', desc: '巨引源', is_mega: false},
-    {id: 'shapley', dist_scale: 500, name: '夏普力超星系團', desc: '暗流核心', is_mega: false},
-    {id: 'sloan', dist_scale: 1000, name: '史隆長城節點', desc: '宇宙長城', is_mega: false, offset: [600, 400, -200]}
-];
-
-const SCALE_LIMITS = [1.0, 120, 150, 40, 60, 80, 100, 150, 200, 280, 350, 500, 1000, 2500, 3000];
-const CACHE = { orbits: {}, streams: {}, webs: {}, arms: {}, cones: {}, seeds: {} };
-
-// ============================================================================
-// 引擎 1：Three.js 照片級地球渲染器
+// 引擎 1：Three.js (L1 專用)
 // ============================================================================
 class RealEarthEngine {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
         this.isActive = false;
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
-        this.controls = null;
-        this.objects = {};
+        this.scene = null; this.camera = null; this.renderer = null; this.controls = null; this.objects = {};
         this.init();
     }
-
     init() {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(45, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
         this.camera.position.set(0, 0, 4);
-
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.container.appendChild(this.renderer.domElement);
-
         this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-
-        const ambientLight = new THREE.AmbientLight(0x333333); 
-        this.scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        directionalLight.position.set(5, 3, 5);
-        this.scene.add(directionalLight);
-
-        const textureLoader = new THREE.TextureLoader();
+        this.controls.enableDamping = true; this.controls.dampingFactor = 0.05;
+        this.scene.add(new THREE.AmbientLight(0x333333));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); directionalLight.position.set(5, 3, 5); this.scene.add(directionalLight);
         
+        const textureLoader = new THREE.TextureLoader();
         const earthGeo = new THREE.SphereGeometry(1, 64, 64);
         const earthMat = new THREE.MeshPhongMaterial({
             map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'),
             specularMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'),
             normalMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg'),
-            specular: new THREE.Color(0x333333),
-            shininess: 15
+            specular: new THREE.Color(0x333333), shininess: 15
         });
         this.objects.earth = new THREE.Mesh(earthGeo, earthMat);
         
-        EARTH_POIS.forEach(poi => {
-            let pos = latLonToLocal(poi.lat, poi.lon, 1.01);
-            let geo = new THREE.SphereGeometry(0.015, 16, 16);
-            let mat = new THREE.MeshBasicMaterial({color: poi.color});
-            let mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(pos.x, pos.y, pos.z);
-            this.objects.earth.add(mesh);
-        });
-
+        let taipei = latLonToLocal(25.03, 121.56, 1.01);
+        let marker = new THREE.Mesh(new THREE.SphereGeometry(0.015, 16, 16), new THREE.MeshBasicMaterial({color: 0x00FFFF}));
+        marker.position.set(taipei.x, taipei.y, taipei.z); this.objects.earth.add(marker);
         this.scene.add(this.objects.earth);
 
         const cloudGeo = new THREE.SphereGeometry(1.015, 64, 64);
-        const cloudMat = new THREE.MeshPhongMaterial({
-            map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_clouds_1024.png'),
-            transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false
-        });
-        this.objects.clouds = new THREE.Mesh(cloudGeo, cloudMat);
-        this.scene.add(this.objects.clouds);
+        const cloudMat = new THREE.MeshPhongMaterial({ map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_clouds_1024.png'), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+        this.objects.clouds = new THREE.Mesh(cloudGeo, cloudMat); this.scene.add(this.objects.clouds);
 
         this.objects.moonGroup = new THREE.Group();
-        const moonGeo = new THREE.SphereGeometry(0.27, 32, 32);
-        const moonMat = new THREE.MeshPhongMaterial({
-            map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'),
-            bumpMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'),
-            bumpScale: 0.02
-        });
-        this.objects.moon = new THREE.Mesh(moonGeo, moonMat);
-        
-        MOON_LANDINGS.forEach(poi => {
-            let pos = latLonToLocal(poi.lat, poi.lon, 0.275);
-            let geo = new THREE.SphereGeometry(0.008, 16, 16);
-            let mat = new THREE.MeshBasicMaterial({color: poi.color});
-            let mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(pos.x, pos.y, pos.z);
-            this.objects.moon.add(mesh);
-        });
+        const moonMat = new THREE.MeshPhongMaterial({ map: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'), bumpMap: textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg'), bumpScale: 0.02 });
+        this.objects.moon = new THREE.Mesh(new THREE.SphereGeometry(0.27, 32, 32), moonMat);
+        this.objects.moonGroup.add(this.objects.moon); this.scene.add(this.objects.moonGroup);
 
-        this.objects.moonGroup.add(this.objects.moon);
-        this.scene.add(this.objects.moonGroup);
-
-        const issGeo = new THREE.BoxGeometry(0.05, 0.05, 0.05);
-        const issMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
-        this.objects.iss = new THREE.Mesh(issGeo, issMat);
+        this.objects.iss = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xFFD700 }));
         this.scene.add(this.objects.iss);
 
         window.addEventListener('resize', () => {
             if(!this.isActive) return;
-            this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
-            this.camera.updateProjectionMatrix();
+            this.camera.aspect = this.container.clientWidth / this.container.clientHeight; this.camera.updateProjectionMatrix();
             this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
         });
-
         this.animate();
     }
-
-    activate() {
-        document.getElementById('plotly-div').style.display = 'none';
-        this.container.style.display = 'block';
-        document.getElementById('threejs-ui-overlay').style.display = 'block';
-        this.isActive = true;
-    }
-
-    deactivate() {
-        this.container.style.display = 'none';
-        document.getElementById('plotly-div').style.display = 'block';
-        document.getElementById('threejs-ui-overlay').style.display = 'none';
-        this.isActive = false;
-    }
-
+    activate() { document.getElementById('plotly-div').style.display = 'none'; this.container.style.display = 'block'; document.getElementById('threejs-ui-overlay').style.display = 'block'; this.isActive = true; }
+    deactivate() { this.container.style.display = 'none'; document.getElementById('plotly-div').style.display = 'block'; document.getElementById('threejs-ui-overlay').style.display = 'none'; this.isActive = false; }
     updatePhysics(time) {
         if (!this.isActive) return;
-        this.objects.earth.rotation.y = time * 0.5;
-        this.objects.clouds.rotation.y = time * 0.55; 
-        
-        let moonDist = 5.0; 
-        let moonAngle = time * 1.5;
-        this.objects.moonGroup.position.set(moonDist * Math.cos(moonAngle), 0, moonDist * Math.sin(moonAngle));
-        this.objects.moonGroup.rotation.y = -moonAngle + Math.PI/2; 
-
-        let issAngle = time * 7.6;
-        let issH = 1.15;
-        this.objects.iss.position.set(issH * Math.cos(issAngle), issH * Math.sin(issAngle) * Math.sin(0.9), issH * Math.sin(issAngle) * Math.cos(0.9));
+        this.objects.earth.rotation.y = time * 0.5; this.objects.clouds.rotation.y = time * 0.55; 
+        let mAng = time * 1.5; this.objects.moonGroup.position.set(5.0 * Math.cos(mAng), 0, 5.0 * Math.sin(mAng)); this.objects.moonGroup.rotation.y = -mAng + Math.PI/2; 
+        let issAng = time * 7.6; this.objects.iss.position.set(1.15 * Math.cos(issAng), 1.15 * Math.sin(issAng) * Math.sin(0.9), 1.15 * Math.sin(issAng) * Math.cos(0.9));
     }
-
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        if (this.isActive) {
-            this.controls.update();
-            this.renderer.render(this.scene, this.camera);
-        }
-    }
+    animate() { requestAnimationFrame(() => this.animate()); if (this.isActive) { this.controls.update(); this.renderer.render(this.scene, this.camera); } }
 }
 
 // ============================================================================
-// 引擎 2：Plotly 宇宙動力學引擎
+// 引擎 2：Plotly 連續尺度動力學引擎 (L2 - L15)
 // ============================================================================
+const PLANETS = [
+    {id: 'mercury', name: '水星', a: 0.39, e: 0.205, T: 4.15, c: '#B0C4DE', s: 3}, {id: 'venus', name: '金星', a: 0.72, e: 0.006, T: 1.62, c: '#DAA520', s: 4},
+    {id: 'earth', name: '地球', a: 1.0, e: 0.016, T: 1.0, c: '#1E90FF', s: 4.5}, {id: 'mars', name: '火星', a: 1.52, e: 0.093, T: 0.53, c: '#FF4500', s: 3.5},
+    {id: 'jupiter', name: '木星', a: 5.2, e: 0.048, T: 0.084, c: '#DEB887', s: 8}, {id: 'saturn', name: '土星', a: 9.5, e: 0.054, T: 0.034, c: '#F5DEB3', s: 7},
+    {id: 'uranus', name: '天王星', a: 19.2, e: 0.047, T: 0.011, c: '#87CEEB', s: 5.5}, {id: 'neptune', name: '海王星', a: 30.1, e: 0.008, T: 0.006, c: '#4169E1', s: 5.5},
+    {id: 'pluto', name: '冥王星', a: 39.5, e: 0.248, T: 0.004, c: '#D2B48C', s: 2}
+];
+
 class UniverseEngine {
-    constructor() { this.textColor = '#FFFF00'; }
-    
     createLabel(pos, color, name, size, symbol) { 
         return { type: 'scatter3d', x: [pos[0]], y: [pos[1]], z: [pos[2]], mode: 'markers+text', marker: { size: size, color: color, symbol: symbol, line: {color:'white', width:0.5} }, text: [name], textposition: "top center", textfont: {color: color, size: 10, weight: 'bold'}, hoverinfo: 'none', showlegend: false }; 
     }
     
-    createBlackHole(pos, name, desc, is_mega, angle, scale) {
-        if(!pos) pos = [0,0,0]; let bh_size = is_mega ? 7 : 4; 
-        let core = { type: 'scatter3d', x: [pos[0]*scale], y: [pos[1]*scale], z: [pos[2]*scale], mode: 'markers+text', marker: { size: bh_size, color: '#000000', symbol: 'circle', line: {color: is_mega ? '#FFD700' : '#000000', width: 2} }, text: [is_mega ? `👑 ${name}` : `🕳️ ${name}`], textposition: "bottom right", textfont: {color: is_mega ? '#FFD700' : this.textColor, size: 10}, hoverinfo: 'none', showlegend: false };
-        let ring_x = [], ring_y = [], ring_z = []; let r = is_mega ? 1.0 : 0.5; 
-        for(let i=0; i<=40; i++) { let theta = (i / 40) * 2 * Math.PI; ring_x.push(pos[0] + r * Math.cos(theta)); ring_y.push(pos[1] + r * Math.sin(theta)); ring_z.push(pos[2]); }
-        let tf_ring = TransformEngine.apply(ring_x, ring_y, ring_z, angle, scale);
-        let ring = { type: 'scatter3d', x: tf_ring.x, y: tf_ring.y, z: tf_ring.z, mode: 'lines', line: {color: is_mega ? 'rgba(255, 50, 50, 0.8)' : 'rgba(255, 0, 255, 0.6)', width: 2}, hoverinfo: 'none', showlegend: false };
-        return [core, ring];
+    // 動態中心錨定系統：所有座標在生成時就以目標為原點計算，不使用後期矩陣 offset
+    getOrbitPos(a, e, time, T) { 
+        let M = time * T, E = solveKepler(M, e), v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)), r = a * (1 - e * Math.cos(E)); 
+        return [r * Math.cos(v), r * Math.sin(v), 0]; 
     }
 
-    precalcKeplerOrbit(key, a, e, i_angle) {
-        if(CACHE.orbits[key]) return CACHE.orbits[key];
-        let x=[], y=[], z=[];
-        for(let step=0; step<=150; step++) {
-            let M = (step/150) * 2 * Math.PI, E = solveKepler(M, e), v = 2 * Math.atan(Math.sqrt((1+e)/(1-e)) * Math.tan(E/2)), r = a * (1 - e * Math.cos(E));
-            x.push(r * Math.cos(v)); y.push(r * Math.sin(v) * Math.cos(i_angle)); z.push(r * Math.sin(v) * Math.sin(i_angle));
-        }
-        CACHE.orbits[key] = {x, y, z}; return CACHE.orbits[key];
+    // 哈伯膨脹矩陣
+    applyHubble(points, time, baseScale) {
+        let H0 = 0.05 * (100000 / baseScale); // 根據尺度調整膨脹率，越大越明顯
+        let expFactor = Math.exp(H0 * time);
+        return points.map(p => [p[0]*expFactor, p[1]*expFactor, p[2]*expFactor]);
     }
 
-    createPlanetaryRing(planetPos, inner_r, outer_r, count, colorHex, i_angle) {
-        let x=[], y=[], z=[], c=[];
-        for(let i=0; i<count; i++) {
-            let r = rand(inner_r, outer_r), theta = rand(0, 2*Math.PI);
-            x.push(planetPos.x + r * Math.cos(theta)); y.push(planetPos.y + r * Math.sin(theta) * Math.cos(i_angle)); z.push(planetPos.z + r * Math.sin(theta) * Math.sin(i_angle));
-            c.push(`rgba(200,200,200,0.4)`);
-        }
-        return { type: 'scatter3d', x, y, z, mode: 'markers', marker: {size: 1.0, color: c}, hoverinfo: 'none', showlegend: false };
-    }
-
-    createSurfingTrail(planet, time, sunVelocityVec) {
-        let x=[], y=[], z=[], c=[]; let tailLength = 20.0, steps = 100;
-        for(let step=0; step<=steps; step++) {
-            let histTime = time - tailLength + (step/steps) * tailLength;
-            if (histTime < 0) continue;
-            let pos = getKeplerPos(planet.a, planet.e, planet.i, histTime, planet.T);
-            x.push(pos.x + histTime * sunVelocityVec[0]); y.push(pos.y + histTime * sunVelocityVec[1]); z.push(pos.z + histTime * sunVelocityVec[2]);
-            c.push(`rgba(200,200,200,${Math.pow(step/steps, 2) * 0.7})`); 
-        }
-        return { type: 'scatter3d', x, y, z, mode: 'lines', line: {color: c, width: 2.0}, hoverinfo: 'none', showlegend: false };
-    }
-
-    precalcGalaxyDensity(key, center, max_radius, num_particles) {
-        if(CACHE.arms[key]) return CACHE.arms[key];
-        let x=[], y=[], z=[], c=[], s=[], op=[];
-        let bulge_count = Math.floor(num_particles * 0.25);
-        for(let i=0; i<bulge_count; i++) {
-            let r = Math.abs(randn()) * (max_radius * 0.15);
-            let theta = rand(0, 2*Math.PI);
-            let phi = Math.acos(2 * Math.random() - 1);
-            x.push(center[0] + r * Math.sin(phi) * Math.cos(theta));
-            y.push(center[1] + r * Math.sin(phi) * Math.sin(theta));
-            z.push(center[2] + r * Math.cos(phi) * 0.6); 
-            c.push('#FFFDE7'); s.push(rand(1.5, 3.0)); op.push(rand(0.5, 0.9));
-        }
-
-        let arm_count = num_particles - bulge_count;
-        let num_arms = 4, winding_b = 0.3; 
-        
-        for(let i=0; i<arm_count; i++) {
-            let arm_idx = i % num_arms;
-            let offset = arm_idx * (2 * Math.PI / num_arms);
-            let t = Math.pow(Math.random(), 1.5); 
-            let r = t * max_radius;
-            if (r < max_radius * 0.1) r += max_radius * 0.1;
-            
-            // 修正為正值展開角，配合後續的負值（順時針）自轉矩陣，形成真實物理的「落後臂 (Trailing Arm)」
-            let theta_ideal = (1 / winding_b) * Math.log(r / (max_radius*0.1)) + offset;
-            let scatter = randn() * (r * 0.3); 
-            let theta = theta_ideal + (scatter / r);
-            
-            let px = r * Math.cos(theta);
-            let py = r * Math.sin(theta);
-            let pz = randn() * (max_radius * 0.05) * Math.exp(-r/max_radius); 
-            
-            x.push(center[0] + px); y.push(center[1] + py); z.push(center[2] + pz);
-            let color_ratio = r / max_radius;
-            let is_dust = Math.random() > 0.85; 
-            
-            if (is_dust) {
-                c.push('#1A1A2E'); op.push(rand(0.1, 0.3)); s.push(rand(2.0, 4.0));
-            } else {
-                if(color_ratio < 0.3) c.push('#FFF59D');
-                else if(color_ratio < 0.6) c.push('#81D4FA'); 
-                else c.push('#B388FF');
-                op.push(rand(0.2, 0.7)); s.push(rand(0.8, 2.0));
-            }
-        }
-        CACHE.arms[key] = {x, y, z, c, s, op}; return CACHE.arms[key];
-    }
-
-    drawGalaxyDensityDynamic(data, angle, scale) {
-        let tf = TransformEngine.apply(data.x, data.y, data.z, angle, scale);
-        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'markers', marker: { size: data.s, color: data.c, opacity: data.op }, hoverinfo: 'none', showlegend: false }];
-    }
-
-    precalcTurbulentAccretion(key, center, max_scale, num_lines) {
-        if(CACHE.streams[key]) return CACHE.streams[key];
-        let streams = [], steps = 60, dt = 0.1;
-        for(let i=0; i<num_lines; i++) {
-            let r = max_scale * rand(0.6, 1.2), theta = rand(0, 2*Math.PI), z = rand(-max_scale*0.6, max_scale*0.6); 
-            let cx = center[0] + r*Math.cos(theta), cy = center[1] + r*Math.sin(theta), cz = center[2] + z, path_x=[cx], path_y=[cy], path_z=[cz];
-            for(let step=0; step<steps; step++) {
-                let dx = cx - center[0], dy = cy - center[1], dz = cz - center[2], current_r = Math.hypot(dx, dy) + 0.01;
-                let v_r = -0.8 * dx / current_r, v_theta = 1.5, v_z = -1.5 * dz / (Math.abs(dz) + 1.0); 
-                cx += (v_r * Math.cos(theta) - v_theta * Math.sin(theta)) * dt; cy += (v_r * Math.sin(theta) + v_theta * Math.cos(theta)) * dt; cz += v_z * dt; theta += (v_theta / current_r) * dt;
-                path_x.push(cx); path_y.push(cy); path_z.push(cz);
-                if(current_r < 2.0 && Math.abs(cz) < 0.2) break;
-            }
-            streams.push({path_x, path_y, path_z, basin_id: -1});
-        }
-        CACHE.streams[key] = streams; return streams;
-    }
-
-    getSeeds(key, center, max_scale, point_density) {
-        if(CACHE.seeds[key]) return CACHE.seeds[key]; let seeds = [];
-        for(let i=0; i<point_density; i++) {
-            let r = max_scale * Math.cbrt(((i*7.1)%100)/100), phi = ((i*11.3)%100)/100 * Math.PI, theta = ((i*19.7)%100)/100 * 2*Math.PI;
-            seeds.push([center[0] + r * Math.sin(phi) * Math.cos(theta), center[1] + r * Math.sin(phi) * Math.sin(theta), center[2] + r * Math.cos(phi)]);
-        }
-        CACHE.seeds[key] = seeds; return seeds;
-    }
-
-    calcDynamicStreamlines(seeds, max_scale, attractors, isExpansion) {
-        let streams = [], steps = 30, dt = max_scale / (steps * 1.2);
-        for(let i=0; i<seeds.length; i++) {
-            let cx = seeds[i][0], cy = seeds[i][1], cz = seeds[i][2], path_x=[cx], path_y=[cy], path_z=[cz], basin_id = -1;
-            for(let step=0; step<steps; step++) {
-                let gx=0, gy=0, gz=0;
-                if (isExpansion) { gx = cx * 0.05; gy = cy * 0.05; gz = cz * 0.05; } 
-                else if (attractors) {
-                    for(let a=0; a<attractors.length; a++) {
-                        let attr = attractors[a], dx = attr.pos[0]-cx, dy = attr.pos[1]-cy, dz = attr.pos[2]-cz, dist = Math.hypot(dx, dy, dz) + 1e-5, pull = attr.mass / Math.pow(dist, 1.5); 
-                        gx += (dx/dist)*pull; gy += (dy/dist)*pull; gz += (dz/dist)*pull;
-                        if(attr.spin && attr.axis) {
-                            let ax = attr.axis[0], ay = attr.axis[1], az = attr.axis[2], vpx = (dy/dist)*az - (dz/dist)*ay, vpy = (dz/dist)*ax - (dx/dist)*az, vpz = (dx/dist)*ay - (dy/dist)*ax, spin_force = attr.spin * pull * 0.6;
-                            gx += vpx * spin_force; gy += vpy * spin_force; gz += vpz * spin_force;
-                        }
-                    }
-                }
-                let f_mag = Math.hypot(gx, gy, gz) + 1e-10; cx += (gx/f_mag)*dt; cy += (gy/f_mag)*dt; cz += (gz/f_mag)*dt;
-                path_x.push(cx); path_y.push(cy); path_z.push(cz);
-                if (attractors && !isExpansion) { for(let a=0; a<attractors.length; a++) if (Math.hypot(cx-attractors[a].pos[0], cy-attractors[a].pos[1], cz-attractors[a].pos[2]) < dt*1.5) { basin_id = a; break; } }
-                if (basin_id !== -1) break;
-            }
-            streams.push({path_x, path_y, path_z, basin_id});
-        }
-        return streams;
-    }
-
-    drawStreamlinesDynamic(streams, color, angle, scale) {
-        let all_x=[], all_y=[], all_z=[]; streams.forEach(s => { all_x.push(...s.path_x, null); all_y.push(...s.path_y, null); all_z.push(...s.path_z, null); });
-        let tf = TransformEngine.apply(all_x, all_y, all_z, angle, scale);
-        return [{ type: 'scatter3d', x: tf.x, y: tf.y, z: tf.z, mode: 'lines', line: {color: color, width: 1.5}, hoverinfo: 'none', showlegend: false }];
-    }
-
-    drawLaniakeaWatershedDynamic(streams, target_basin_id, angle, scale, drawMesh) {
-        let traces = [], target_x=[], target_y=[], target_z=[], outer_x=[], outer_y=[], outer_z=[], basin_x=[], basin_y=[], basin_z=[];
-        streams.forEach(stream => {
-            if (stream.basin_id === target_basin_id) { target_x.push(...stream.path_x, null); target_y.push(...stream.path_y, null); target_z.push(...stream.path_z, null);
-                if(drawMesh) for(let i=0; i<stream.path_x.length; i+=3) { basin_x.push(stream.path_x[i]); basin_y.push(stream.path_y[i]); basin_z.push(stream.path_z[i]); }
-            } else { outer_x.push(...stream.path_x, null); outer_y.push(...stream.path_y, null); outer_z.push(...stream.path_z, null); }
-        });
-        let tf_target = TransformEngine.apply(target_x, target_y, target_z, angle, scale), tf_outer = TransformEngine.apply(outer_x, outer_y, outer_z, angle, scale);
-        traces.push({ type: 'scatter3d', x: tf_target.x, y: tf_target.y, z: tf_target.z, mode: 'lines', line: {color: 'rgba(255, 204, 0, 0.6)', width: 1.5}, hoverinfo: 'none', showlegend: false });
-        traces.push({ type: 'scatter3d', x: tf_outer.x, y: tf_outer.y, z: tf_outer.z, mode: 'lines', line: {color: 'rgba(50, 150, 255, 0.35)', width: 1.5}, hoverinfo: 'none', showlegend: false });
-        if (drawMesh && basin_x.length > 10) { let tf_mesh = TransformEngine.apply(basin_x, basin_y, basin_z, angle, scale); traces.push({ type: 'mesh3d', x: tf_mesh.x, y: tf_mesh.y, z: tf_mesh.z, alphahull: 4, opacity: 0.15, color: 'goldenrod', hoverinfo: 'none', showlegend: false }); }
-        return traces;
-    }
-
-    precalcDensityWeb(key, center, radius, num_halos, anchors) {
-        if(CACHE.webs[key]) return CACHE.webs[key];
-        let halos = [], bg_count = Math.floor(num_halos * 0.3);
-        for(let i=0; i<bg_count; i++) halos.push([center[0] + rand(-radius, radius), center[1] + rand(-radius, radius), center[2] + rand(-radius, radius)]);
-        let cluster_count = num_halos - bg_count;
-        if(anchors && anchors.length > 0) {
-            let per_anchor = Math.floor(cluster_count / anchors.length);
-            anchors.forEach(anc => { for(let i=0; i<per_anchor; i++) halos.push([anc[0] + randn()*radius*0.2, anc[1] + randn()*radius*0.2, anc[2] + randn()*radius*0.2]); });
-        }
-        let line_x=[], line_y=[], line_z=[], px=[], py=[], pz=[], psize=[];
-        for(let i=0; i<halos.length; i++) {
-            let h = halos[i]; px.push(h[0]); py.push(h[1]); pz.push(h[2]); psize.push(((i*7.7)%3) + 2); 
-            let dists = [];
-            for(let j=0; j<halos.length; j++) { if(i === j) continue; dists.push({idx: j, d: Math.hypot(h[0]-halos[j][0], h[1]-halos[j][1], h[2]-halos[j][2])}); }
-            dists.sort((a,b) => a.d - b.d);
-            for(let k=0; k<Math.min(4, dists.length); k++) {
-                if(dists[k].d < radius*0.3) { let neighbor = halos[dists[k].idx]; line_x.push(h[0], neighbor[0], null); line_y.push(h[1], neighbor[1], null); line_z.push(h[2], neighbor[2], null); }
-            }
-        }
-        CACHE.webs[key] = {line: {x:line_x, y:line_y, z:line_z}, points: {x:px, y:py, z:pz, size:psize}}; return CACHE.webs[key];
-    }
-
-    drawDensityWeb(webData, scale) {
-        let tf_line = TransformEngine.apply(webData.line.x, webData.line.y, webData.line.z, 0, scale), tf_pts = TransformEngine.apply(webData.points.x, webData.points.y, webData.points.z, 0, scale);
-        return [
-            { type: 'scatter3d', x: tf_line.x, y: tf_line.y, z: tf_line.z, mode: 'lines', line: {color: 'rgba(180, 50, 255, 0.45)', width: 1.5}, hoverinfo: 'none', showlegend: false },
-            { type: 'scatter3d', x: tf_pts.x, y: tf_pts.y, z: tf_pts.z, mode: 'markers', marker: {size: webData.points.size, color: 'rgba(255, 255, 150, 0.9)'}, hoverinfo: 'none', showlegend: false }
-        ];
-    }
-
-    precalcCones(key, scale_val, num) {
-        if(CACHE.cones[key]) return CACHE.cones[key];
-        let x=[], y=[], z=[], u=[], v=[], w=[];
-        for(let i=0; i<num; i++) {
-            let r = scale_val * (((i*11.1)%50+40)/100), phi = ((i*17.3)%100)/100 * Math.PI, theta = ((i*23.9)%100)/100 * 2*Math.PI;
-            let px = r * Math.sin(phi) * Math.cos(theta), py = r * Math.sin(phi) * Math.sin(theta), pz = r * Math.cos(phi);
-            x.push(px); y.push(py); z.push(pz); u.push(px); v.push(py); w.push(pz);
-        }
-        CACHE.cones[key] = {x, y, z, u, v, w, scale_val}; return CACHE.cones[key];
-    }
-
-    drawConesDynamic(coneData, angle, scale) {
-        let tf_pos = TransformEngine.apply(coneData.x, coneData.y, coneData.z, angle, scale), tf_vec = TransformEngine.applyVector(coneData.u, coneData.v, coneData.w, angle);
-        return { type: 'cone', x: tf_pos.x, y: tf_pos.y, z: tf_pos.z, u: tf_vec.u, v: tf_vec.v, w: tf_vec.w, colorscale: 'Blues', sizemode: "absolute", sizeref: coneData.scale_val*0.1*scale, opacity: 0.7, showscale: false, hoverinfo: 'none' };
-    }
-
-    buildLevelTraces(level_idx, vis, time) {
+    buildLevelTraces(idx, vis, time) {
         let t = [];
-        // 修正：全局自轉改為負值（順時針旋轉）
-        let rotationAngle = (isPlaying && level_idx <= 3) ? time * -0.15 : 0; 
-        let loopTime = time % 30.0;
-        let expandFactor = (level_idx >= 10 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
+        let rAng = time * -0.15; // 全局自轉基準
+        let expTime = time * 0.02; // 慢速膨脹時間
 
-        let dyn = {
-            mw: [10*Math.cos(time*0.1), 10*Math.sin(time*0.1), 2*Math.sin(time*0.05)], m31: [25 - 5*Math.cos(time*0.1), 10 - 5*Math.sin(time*0.1), 5 - 2*Math.sin(time*0.05)],
-            virgo: [60 + 15*Math.cos(time*0.05), 40 + 15*Math.sin(time*0.05), 20], ga: [150 + 30*Math.cos(time*0.03), -50 + 30*Math.sin(time*0.03), 40 + 10*Math.sin(time*0.02)],
-            perseus: [-100 + 20*Math.sin(time*0.04), 80 + 20*Math.cos(time*0.04), -40], shapley: [300, -150, 100], sloan: [600, 400, -200], hcb: [2000, 1500, -1000]
-        };
-        let getDynBH = (id) => { if(dyn[id]) return dyn[id]; let bh = BLACK_HOLES.find(b => b.id === id); return bh && bh.offset ? bh.offset : [0,0,0]; };
-
-        if (vis.landmarks && level_idx >= 3) {
-            BLACK_HOLES.forEach(bh => { if (bh.dist_scale <= SCALE_LIMITS[level_idx] * 1.5) t.push(...this.createBlackHole(getDynBH(bh.id), bh.name, bh.desc, bh.is_mega, rotationAngle, expandFactor)); });
-        }
-
-        if (level_idx === 0) { 
-            return []; 
-        }
-        else if (level_idx === 1) { 
+        // -----------------------------------------------------------
+        // L2 & L3: 太陽系 (引力軌道)
+        // -----------------------------------------------------------
+        if (idx === 1 || idx === 2) {
             if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FF5500', '太陽', 10, 'circle'));
-            PLANETS.forEach(p => {
-                let pos = getKeplerPos(p.a, p.e, p.i, time, p.T);
-                if(vis.landmarks) t.push(this.createLabel([pos.x, pos.y, pos.z], p.c, p.name, p.s, 'circle'));
-                if(vis.streams) { let orb = this.precalcKeplerOrbit(`orb_${p.id}`, p.a, p.e, p.i); t.push({ type: 'scatter3d', x: orb.x, y: orb.y, z: orb.z, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: 1.0}, hoverinfo: 'none', showlegend: false }); }
-                if(p.hasRing) t.push(this.createPlanetaryRing(pos, p.s*0.15, p.s*0.35, 300, p.c, p.i));
-            });
-        }
-        else if (level_idx === 2) { 
-            let sunVec = [-4.0, -4.0, 2.0], sunPos = {x: time * sunVec[0], y: time * sunVec[1], z: time * sunVec[2]};
-            if(vis.landmarks) t.push(this.createLabel([sunPos.x, sunPos.y, sunPos.z], '#FF5500', '太陽', 8, 'circle'));
-            PLANETS.forEach(p => {
-                let loc = getKeplerPos(p.a, p.e, p.i, time, p.T), world = {x: loc.x + sunPos.x, y: loc.y + sunPos.y, z: loc.z + sunPos.z};
-                if(vis.landmarks) t.push(this.createLabel([world.x, world.y, world.z], p.c, p.name, p.s, 'circle'));
-                if(vis.streams && isPlaying) t.push(this.createSurfingTrail(p, time, sunVec));
-            });
-        }
-        else if (level_idx === 3) { // 銀河系流體渲染 (修正為落後臂)
-            if(vis.landmarks) { t.push(this.createLabel([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0)); }
-            if(vis.streams) {
-                let galaxyData = this.precalcGalaxyDensity(`L${level_idx}_galaxy_pdf`, dyn.mw, 18, 6000); 
-                t.push(...this.drawGalaxyDensityDynamic(galaxyData, rotationAngle, 1.0));
-            }
-            
-            // 修正：太陽系公轉方向與盤面旋轉方向一致 (順時針)
-            let sun_orbit_r = 8.0, sun_orbit_spd = -0.5, sun_angle = time * sun_orbit_spd;
-            let sun_world_pos = [ dyn.mw[0] + sun_orbit_r * Math.cos(sun_angle), dyn.mw[1] + sun_orbit_r * Math.sin(sun_angle), dyn.mw[2] + Math.sin(sun_angle * 2) * 0.5 ];
-            
-            if(vis.landmarks) t.push(this.createLabel(sun_world_pos, '#FF5500', '太陽系', 5, 'circle', rotationAngle, 1.0));
-            if(vis.streams && isPlaying) {
-                let trail_x=[], trail_y=[], trail_z=[], trail_c=[], trail_s=[];
-                let steps = 40, tail_len = 8.0; 
-                for(let i=0; i<=steps; i++) {
-                    let ht = time - tail_len * (1 - (i/steps));
-                    if(ht < 0) continue;
-                    let ha = ht * sun_orbit_spd, h_mw = [10*Math.cos(ht*0.1), 10*Math.sin(ht*0.1), 2*Math.sin(ht*0.05)];
-                    trail_x.push(h_mw[0] + sun_orbit_r * Math.cos(ha)); trail_y.push(h_mw[1] + sun_orbit_r * Math.sin(ha)); trail_z.push(h_mw[2] + Math.sin(ha * 2) * 0.5);
-                    trail_c.push(`rgba(255,100,0,${Math.max(0.1, i/steps)})`); trail_s.push(1.0 + 2.0 * (i/steps));
-                }
-                t.push({ type: 'scatter3d', x: trail_x, y: trail_y, z: trail_z, mode: 'lines+markers', line: {color: 'rgba(255,100,0,0.3)', width: 1}, marker: {size: trail_s, color: trail_c}, hoverinfo: 'none', showlegend: false });
-            }
-        }
-        else if (level_idx >= 4 && level_idx <= 7) { 
-            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 4, 'circle', 0, 1.0)); if (level_idx >= 6) t.push(this.createLabel(dyn.virgo, '#FFAA00', '室女座星系團', 5, 'circle', 0, 1.0)); }
-            if(vis.streams) {
-                let seeds = this.getSeeds(`L${level_idx}`, [0,0,0], 100.0, 180);
-                let attractors = level_idx < 6 ? [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.5}, {pos: dyn.m31, mass: 1.5, axis:[0.2,0,1], spin:0.5}] : [{pos: dyn.mw, mass: 1.0, axis:[0,0,1], spin:0.1}, {pos: dyn.virgo, mass: 20.0, axis:[-0.5,0.8,1], spin: 1.2}];
-                let streams = this.calcDynamicStreamlines(seeds, 100.0, attractors, false);
-                let color = level_idx < 6 ? 'rgba(0,255,100,0.4)' : 'rgba(200,50,255,0.4)';
-                t.push(...this.drawStreamlinesDynamic(streams, color, 0, 1.0));
-            }
-        }
-        else if (level_idx === 8 || level_idx === 9) { 
-            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 5, 'diamond', 0, 1.0)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '巨引源', 6, 'circle', 0, 1.0)); }
-            if(vis.streams) {
-                let seeds = this.getSeeds(`L9`, [50, -20, 20], 280.0, 200);
-                let attractors = [{pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, {pos: dyn.shapley, mass: 120.0, axis:[0,0,1], spin:0.2}];
-                let streams = this.calcDynamicStreamlines(seeds, 280.0, attractors, false);
-                t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, 1.0, vis.web));
-            }
-        }
-        else if (level_idx >= 10) { 
-            let sim_scale = 2500.0;
-            if(vis.landmarks) { t.push(this.createLabel(dyn.mw, '#FF0000', '本星系群', 5, 'diamond', 0, expandFactor)); t.push(this.createLabel(dyn.ga, '#FFFFFF', '拉尼亞凱亞', 5, 'circle', 0, expandFactor)); }
-            
-            if (level_idx === 10 || level_idx === 11) {
-                if(vis.landmarks) t.push(this.createLabel(dyn.shapley, '#9900FF', '夏普力', 6, 'circle', 0, expandFactor));
+            let pList = idx === 1 ? PLANETS.slice(0,4) : PLANETS;
+            pList.forEach(p => {
+                let pos = this.getOrbitPos(p.a, p.e, time, p.T);
+                if(vis.landmarks) t.push(this.createLabel(pos, p.c, p.name, p.s, 'circle'));
                 if(vis.streams) {
-                    let seeds = this.getSeeds(`L11`, [0,0,0], 1000.0, 200);
-                    let attractors = [{pos: dyn.perseus, mass: 90.0, axis:[1,1,0], spin:0.8}, {pos: dyn.ga, mass: 150.0, axis:[-1,0.5,1], spin: 1.5}, {pos: dyn.shapley, mass: 250.0, axis:[0,0,1], spin:1.0}];
-                    let streams = this.calcDynamicStreamlines(seeds, 1000.0, attractors, false);
-                    t.push(...this.drawLaniakeaWatershedDynamic(streams, 1, 0, expandFactor, vis.web));
-                }
-                if(level_idx === 11 && vis.cones) { let cones = this.precalcCones(`L12`, 1000.0, 100); t.push(this.drawConesDynamic(cones, 0, expandFactor)); }
-            } else {
-                if(vis.landmarks) { t.push(this.createLabel(dyn.sloan, '#FF5500', '史隆長城', 6, 'circle', 0, expandFactor)); t.push(this.createLabel(dyn.hcb, '#FFFFFF', '北冕座長城', 6, 'diamond', 0, expandFactor)); t.push(this.createLabel([1500, -800, 600], '#AAAAAA', '英仙-雙魚座', 5, 'circle', 0, expandFactor)); }
-                if(vis.web) {
-                    let anchors = [[0,0,0], dyn.sloan, dyn.hcb, dyn.shapley, dyn.perseus, [1500, -800, 600], [-1200, 1000, -500]];
-                    let webData = this.precalcDensityWeb(`L14_Gaussian`, [0,0,0], sim_scale, 800, anchors); t.push(...this.drawDensityWeb(webData, expandFactor));
-                }
-                if(vis.streams) { let seeds = this.getSeeds(`L14_EXP`, [0,0,0], sim_scale, 250); let streams = this.calcDynamicStreamlines(seeds, sim_scale, null, true); t.push(...this.drawStreamlinesDynamic(streams, 'rgba(100,150,255,0.4)', 0, expandFactor)); }
-                if(vis.cones) { let cones = this.precalcCones(`L14_cone`, sim_scale, 150); t.push(this.drawConesDynamic(cones, 0, expandFactor)); }
-            }
-        }
-        
-        let offset = [0,0,0];
-        if (level_idx === 2) offset = [time * -4.0, time * -4.0, time * 2.0];
-        else if (level_idx >= 3 && level_idx <= 6) offset = dyn.mw; 
-        else if (level_idx >= 7 && level_idx <= 8) offset = dyn.ga; 
-        else if (level_idx >= 9 && level_idx <= 10) offset = dyn.shapley; 
-        else if (level_idx >= 11 && level_idx <= 12) offset = dyn.sloan; 
-
-        if (offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0) {
-            t.forEach(trace => {
-                if (Array.isArray(trace.x) && Array.isArray(trace.y) && Array.isArray(trace.z)) {
-                    for(let i=0; i<trace.x.length; i++) {
-                        if (trace.x[i] !== null) { trace.x[i] -= offset[0]; trace.y[i] -= offset[1]; trace.z[i] -= offset[2]; }
+                    let ox=[], oy=[], oz=[];
+                    for(let step=0; step<=150; step++) {
+                        let M = (step/150)*2*Math.PI, E = solveKepler(M, p.e), v = 2*Math.atan(Math.sqrt((1+p.e)/(1-p.e))*Math.tan(E/2)), r = p.a*(1-p.e*Math.cos(E));
+                        ox.push(r*Math.cos(v)); oy.push(r*Math.sin(v)); oz.push(0);
                     }
+                    t.push({ type: 'scatter3d', x: ox, y: oy, z: oz, mode: 'lines', line: {color: 'rgba(255,255,255,0.2)', width: 1.0}, hoverinfo: 'none', showlegend: false });
                 }
             });
         }
-        
+        // -----------------------------------------------------------
+        // L4: 局部恆星際雲 (相對直線運動)
+        // -----------------------------------------------------------
+        else if (idx === 3) {
+            if(vis.landmarks) {
+                // 太陽置中
+                t.push(this.createLabel([0,0,0], '#FF5500', '太陽系', 6, 'circle'));
+                // 鄰近恆星相對運動 (漂移)
+                let stars = [ {n: '天狼星', v: [0.5, 0.2, -0.1], o: [8, 5, -2], c: '#88CCFF'}, {n: '南門二', v: [-0.3, 0.6, 0.2], o: [-4, 3, 1], c: '#FFDD88'}, {n: '比鄰星', v: [-0.3, 0.6, 0.2], o: [-4.2, 3.1, 1.2], c: '#FF5555'} ];
+                stars.forEach(s => {
+                    let pos = [s.o[0] + s.v[0]*time, s.o[1] + s.v[1]*time, s.o[2] + s.v[2]*time];
+                    t.push(this.createLabel(pos, s.c, s.n, 5, 'circle'));
+                    if(vis.streams) {
+                        t.push({ type: 'scatter3d', x: [s.o[0], pos[0]], y: [s.o[1], pos[1]], z: [s.o[2], pos[2]], mode: 'lines', line: {color: 'rgba(255,255,255,0.3)', width: 2, dash: 'dot'}, hoverinfo: 'none', showlegend: false });
+                    }
+                });
+            }
+            if(vis.particles) {
+                let px=[], py=[], pz=[]; for(let i=0; i<300; i++) { px.push(randn()*15); py.push(randn()*15); pz.push(randn()*15); }
+                t.push({ type: 'scatter3d', x: px, y: py, z: pz, mode: 'markers', marker: {size: 1.5, color: 'rgba(200,200,255,0.2)'}, hoverinfo: 'none', showlegend: false });
+            }
+        }
+        // -----------------------------------------------------------
+        // L5: 銀河系 (流體渲染與精準拖曳軌跡)
+        // -----------------------------------------------------------
+        else if (idx === 4) {
+            if(vis.landmarks) t.push(this.createLabel([0,0,0], '#FFFFFF', '人馬座 A*', 6, 'circle'));
+            if(vis.particles) {
+                let gx=[], gy=[], gz=[], gc=[], gs=[];
+                let rMax = 45;
+                // 產生高密度高斯落後臂，原點始終為 0,0,0
+                for(let i=0; i<4000; i++) {
+                    let isBulge = i < 1000;
+                    let r = isBulge ? Math.abs(randn()) * (rMax * 0.15) : Math.pow(Math.random(), 1.5) * rMax + rMax*0.1;
+                    let theta = isBulge ? rand(0, 2*Math.PI) : (1/0.3) * Math.log(r/(rMax*0.1)) + (i%4)*(Math.PI/2) + randn()*0.3;
+                    // 加入全局自轉
+                    theta += rAng;
+                    gx.push(r * Math.cos(theta)); gy.push(r * Math.sin(theta)); gz.push(randn() * (rMax*0.05) * Math.exp(-r/rMax));
+                    gc.push(isBulge ? '#FFFDE7' : (r/rMax < 0.4 ? '#FFF59D' : '#81D4FA')); gs.push(isBulge ? rand(1.5, 3) : rand(0.8, 2));
+                }
+                t.push({ type: 'scatter3d', x: gx, y: gy, z: gz, mode: 'markers', marker: {size: gs, color: gc, opacity: 0.6}, hoverinfo: 'none', showlegend: false });
+            }
+            // 太陽系軌道
+            let sunR = 26, sunSpd = -0.5, curA = rAng + time*sunSpd;
+            let sunP = [sunR*Math.cos(curA), sunR*Math.sin(curA), Math.sin(curA*2)*1.0];
+            if(vis.landmarks) t.push(this.createLabel(sunP, '#FF5500', '太陽系', 5, 'circle'));
+            if(vis.streams) {
+                let tx=[], ty=[], tz=[], tc=[], ts=[];
+                for(let i=0; i<=30; i++) {
+                    let ht = time - 5.0*(1 - i/30);
+                    if(ht < 0) continue;
+                    let ha = (ht * -0.15) + (ht * sunSpd); // 歷史自轉 + 歷史公轉
+                    tx.push(sunR*Math.cos(ha)); ty.push(sunR*Math.sin(ha)); tz.push(Math.sin(ha*2)*1.0);
+                    tc.push(`rgba(255,100,0,${Math.max(0.1, i/30)})`); ts.push(1.0 + 2.0*(i/30));
+                }
+                t.push({ type: 'scatter3d', x: tx, y: ty, z: tz, mode: 'lines+markers', line: {color:'rgba(255,100,0,0.5)', width:2}, marker: {size: ts, color: tc}, hoverinfo: 'none', showlegend: false });
+            }
+        }
+        // -----------------------------------------------------------
+        // L6 ~ L10: 引力塌縮區 (向質心墜落)
+        // -----------------------------------------------------------
+        else if (idx >= 5 && idx <= 9) {
+            let limit = SCALE_LIMITS[idx];
+            // 隨機生成引力線的起點
+            let seeds = []; for(let i=0; i<150; i++) seeds.push([randn()*limit*0.8, randn()*limit*0.8, randn()*limit*0.8]);
+            
+            // 決定此階層的引力中心與墜落目標
+            let centerName = "", targetName = "", targetPos = [], streamsColor = "";
+            if(idx === 5) { centerName = '本星系群質心'; targetName = '仙女座 (M31)'; targetPos = [1000 - time*50, 500 - time*25, 0]; streamsColor = 'rgba(0,255,100,0.4)'; }
+            if(idx === 6) { centerName = '本星系群'; targetName = '局部邊緣矮星系'; targetPos = [-3000 + time*100, 2000 - time*50, 0]; streamsColor = 'rgba(50,200,255,0.4)'; }
+            if(idx === 7) { centerName = '室女座 (M87)'; targetName = '本星系群'; targetPos = [-20000 + time*200, 10000 - time*100, 5000]; streamsColor = 'rgba(200,50,255,0.4)'; }
+            if(idx === 8) { centerName = '巨引源'; targetName = '室女座超星系團'; targetPos = [-80000 + time*300, 40000, -20000]; streamsColor = 'rgba(255,200,0,0.4)'; }
+            if(idx === 9) { centerName = '夏普力超星系團'; targetName = '巨引源'; targetPos = [-150000 + time*400, 50000, -30000]; streamsColor = 'rgba(255,100,50,0.4)'; }
+
+            if(vis.landmarks) {
+                t.push(this.createLabel([0,0,0], '#FFFFFF', centerName, 8, 'circle'));
+                t.push(this.createLabel(targetPos, '#FF5500', targetName, 6, 'diamond'));
+            }
+            if(vis.streams || vis.web) {
+                let sx=[], sy=[], sz=[];
+                seeds.forEach(s => {
+                    let path = [s]; let cur = [...s];
+                    // 朝向 0,0,0 墜落 (向心力)
+                    for(let step=0; step<20; step++) {
+                        let dist = Math.hypot(cur[0], cur[1], cur[2]) + 0.1;
+                        let pull = limit / (dist * 10);
+                        cur[0] -= (cur[0]/dist)*pull; cur[1] -= (cur[1]/dist)*pull; cur[2] -= (cur[2]/dist)*pull;
+                        path.push([...cur]);
+                        if(dist < limit*0.05) break;
+                    }
+                    path.forEach(p => { sx.push(p[0]); sy.push(p[1]); sz.push(p[2]); });
+                    sx.push(null); sy.push(null); sz.push(null);
+                });
+                if(vis.streams) t.push({ type: 'scatter3d', x: sx, y: sy, z: sz, mode: 'lines', line: {color: streamsColor, width: 1.5}, hoverinfo: 'none', showlegend: false });
+                if(vis.web && idx >= 8) t.push({ type: 'mesh3d', x: sx.filter(x=>x!=null), y: sy.filter(y=>y!=null), z: sz.filter(z=>z!=null), alphahull: 5, opacity: 0.1, color: streamsColor, hoverinfo: 'none', showlegend: false });
+            }
+        }
+        // -----------------------------------------------------------
+        // L11 ~ L15: 宇宙膨脹區 (暗能量主導)
+        // -----------------------------------------------------------
+        else if (idx >= 10) {
+            let limit = SCALE_LIMITS[idx];
+            let expMatrix = 1.0 + (time * 0.05); // 哈伯膨脹系數
+
+            let nodes = [];
+            if(idx === 10) nodes = [{n:'拉尼亞凱亞', p:[-limit*0.2,0,0]}, {n:'雙魚-英仙', p:[limit*0.3, limit*0.2, 0]}];
+            if(idx === 11) nodes = [{n:'史隆長城', p:[0,0,0]}];
+            if(idx === 12) nodes = [{n:'武仙-北冕座長城', p:[0,0,0]}];
+            
+            if(vis.landmarks && idx <= 12) {
+                nodes.forEach(nd => {
+                    let ep = [nd.p[0]*expMatrix, nd.p[1]*expMatrix, nd.p[2]*expMatrix];
+                    t.push(this.createLabel(ep, '#FFD700', nd.n, 8, 'circle'));
+                });
+            }
+
+            // 生成高斯塌縮網格 (Cosmic Web)
+            if(vis.web || vis.streams) {
+                let wx=[], wy=[], wz=[], ptsX=[], ptsY=[], ptsZ=[];
+                for(let i=0; i<300; i++) {
+                    let r = Math.pow(Math.random(), 1.5) * limit * 0.8;
+                    let th = rand(0, 2*Math.PI), ph = Math.acos(2*Math.random()-1);
+                    // 膨脹套用
+                    let bx = r*Math.sin(ph)*Math.cos(th)*expMatrix;
+                    let by = r*Math.sin(ph)*Math.sin(th)*expMatrix;
+                    let bz = r*Math.cos(ph)*expMatrix;
+                    ptsX.push(bx); ptsY.push(by); ptsZ.push(bz);
+                    if(i > 0 && i % 3 === 0) { wx.push(bx, ptsX[i-1], null); wy.push(by, ptsY[i-1], null); wz.push(bz, ptsZ[i-1], null); }
+                }
+                if(vis.web) t.push({ type: 'scatter3d', x: wx, y: wy, z: wz, mode: 'lines', line: {color: 'rgba(150,50,255,0.4)', width: 1}, hoverinfo: 'none', showlegend: false });
+                if(vis.streams) t.push({ type: 'scatter3d', x: ptsX, y: ptsY, z: ptsZ, mode: 'markers', marker: {size: 2, color: 'rgba(255,255,200,0.8)'}, hoverinfo: 'none', showlegend: false });
+            }
+
+            // L15 極限膨脹向量錐體
+            if(idx === 14 && vis.streams) {
+                let cx=[], cy=[], cz=[], cu=[], cv=[], cw=[];
+                for(let i=0; i<100; i++) {
+                    let r = limit * rand(0.3, 0.9); let th = rand(0, 2*Math.PI), ph = Math.acos(2*Math.random()-1);
+                    let x = r*Math.sin(ph)*Math.cos(th), y = r*Math.sin(ph)*Math.sin(th), z = r*Math.cos(ph);
+                    cx.push(x*expMatrix); cy.push(y*expMatrix); cz.push(z*expMatrix);
+                    cu.push(x); cv.push(y); cw.push(z); // 向量向外
+                }
+                t.push({ type: 'cone', x: cx, y: cy, z: cz, u: cu, v: cv, w: cw, colorscale: 'Blues', sizemode: "absolute", sizeref: limit*0.1, opacity: 0.6, showscale: false, hoverinfo: 'none' });
+            }
+        }
         return t;
     }
 }
@@ -776,16 +435,14 @@ if (selLevel) { LEVELS.forEach((lv, i) => { let opt = document.createElement('op
 let globalTime = 0, isPlaying = false, animReq = null, lastTimestamp = 0, isFirstRender = true; 
 const renderBtn = document.getElementById('render-btn'), playBtn = document.getElementById('play-btn');
 const threeEngine = new RealEarthEngine('threejs-container');
-
 const tourPanel = document.getElementById('tour-panel'), tourTitle = document.getElementById('tour-title'), tourContent = document.getElementById('tour-content'), toggleTour = document.getElementById('toggle-tour'), nextTourBtn = document.getElementById('next-tour-btn');
 
 function updateTour() {
     if(!toggleTour || !tourPanel || !selLevel) return;
     if(!toggleTour.checked) { tourPanel.style.display = 'none'; return; }
     let idx = parseInt(selLevel.value);
-    let storyIdx = STORY_MAP[idx] || 0;
-    if(tourTitle) tourTitle.innerText = STORY_SCRIPT[storyIdx].title;
-    if(tourContent) tourContent.innerHTML = STORY_SCRIPT[storyIdx].content;
+    if(tourTitle) tourTitle.innerText = STORY_SCRIPT[idx].title;
+    if(tourContent) tourContent.innerHTML = STORY_SCRIPT[idx].content;
     tourPanel.style.display = 'block';
     if(nextTourBtn) nextTourBtn.style.display = (idx < LEVELS.length - 1) ? 'block' : 'none';
 }
@@ -801,34 +458,24 @@ function drawFrame(forceResetCamera = false) {
     } else {
         threeEngine.deactivate();
         
-        let conf = { 
-            colors: { bg: safeVal('color-bg', '#050A14'), grid: safeVal('color-grid', '#00FFFF') }, 
-            opacities: { bg: 100, grid: 20 }, 
-            vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true), web: safeCheck('toggle-web', true), cones: safeCheck('toggle-cones', true) } 
-        };
+        let conf = { vis: { landmarks: safeCheck('toggle-landmarks', true), streams: safeCheck('toggle-streams', true), particles: safeCheck('toggle-particles', true), web: safeCheck('toggle-web', true) } };
         let engine = new UniverseEngine();
         let traces = engine.buildLevelTraces(idx, conf.vis, globalTime);
         let limit = SCALE_LIMITS[idx]; 
-        let axis_config = { showgrid: true, gridcolor: engine.gridColor, zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-limit, limit] };
+        let axis_config = { showgrid: true, gridcolor: '#00FFFF', zeroline: false, showline: false, showbackground: false, showspikes: false, range: [-limit, limit] };
         let layout = { title: `<b>${LEVELS[idx]}</b> <span style="font-size:12px;color:#aaa;">(T: ${globalTime.toFixed(2)}s)</span>`, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', scene: { bgcolor: 'rgba(0,0,0,0)', xaxis: axis_config, yaxis: axis_config, zaxis: axis_config, aspectmode: 'cube' }, margin: { l: 0, r: 0, b: 0, t: 50 }, uirevision: 'true' };
 
         let div = document.getElementById('plotly-div');
         if (div) {
             let currentCamera = null;
-            if (div._fullLayout && div._fullLayout.scene && div._fullLayout.scene.camera) {
-                currentCamera = div._fullLayout.scene.camera;
-            } else if (div.layout && div.layout.scene && div.layout.scene.camera) {
-                currentCamera = div.layout.scene.camera;
-            }
+            if (div._fullLayout && div._fullLayout.scene && div._fullLayout.scene.camera) { currentCamera = div._fullLayout.scene.camera; } 
+            else if (div.layout && div.layout.scene && div.layout.scene.camera) { currentCamera = div.layout.scene.camera; }
 
             if (forceResetCamera || isFirstRender) {
                 layout.scene.camera = { eye: {x: 1.5, y: 1.5, z: 0.8}, center: {x: 0, y: 0, z: 0}, up: {x: 0, y: 0, z: 1} };
-                isFirstRender = false;
-                Plotly.newPlot(div, traces, layout);
+                isFirstRender = false; Plotly.newPlot(div, traces, layout);
             } else {
-                if (currentCamera) {
-                    layout.scene.camera = JSON.parse(JSON.stringify(currentCamera));
-                }
+                if (currentCamera) { layout.scene.camera = JSON.parse(JSON.stringify(currentCamera)); }
                 Plotly.react(div, traces, layout);
             }
         }
@@ -841,16 +488,11 @@ function animatePhysics(timestamp) {
     animReq = requestAnimationFrame(animatePhysics); 
     let dt = (timestamp - lastTimestamp) / 1000; lastTimestamp = timestamp;
     if(dt > 0.1) dt = 0.016; 
-    
     let speed = parseFloat(safeVal('op-speed', 10));
     globalTime += dt * (speed * 0.1);
 
     let idx = selLevel ? parseInt(selLevel.value) : 0;
-    if (idx === 0) {
-        threeEngine.updatePhysics(globalTime);
-    } else {
-        drawFrame(false); 
-    }
+    if (idx === 0) { threeEngine.updatePhysics(globalTime); } else { drawFrame(false); }
 }
 
 if(playBtn) {
@@ -872,8 +514,7 @@ if(selLevel) {
 }
 
 setTimeout(() => {
-    const statusText = document.getElementById('loading-status');
-    const startBtn = document.getElementById('start-btn');
+    const statusText = document.getElementById('loading-status'); const startBtn = document.getElementById('start-btn');
     if(statusText) { statusText.innerText = "系統就緒 (System Ready)"; statusText.style.color = "#2ECC71"; }
     if(startBtn) startBtn.classList.add('ready');
 }, 1500);
@@ -887,10 +528,7 @@ if(startBtn) {
     });
 }
 
-['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web', 'toggle-cones'].forEach(id => { 
-    let el = document.getElementById(id); 
-    if(el) el.addEventListener('change', () => { drawFrame(false); }); 
-});
+['toggle-landmarks', 'toggle-streams', 'toggle-particles', 'toggle-web'].forEach(id => { let el = document.getElementById(id); if(el) el.addEventListener('change', () => { drawFrame(false); }); });
 </script>
 </body>
 </html>
