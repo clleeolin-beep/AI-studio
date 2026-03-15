@@ -119,7 +119,7 @@
         <div id="loading-overlay"><div class="spinner"></div><span>引擎切換與數據映射中...</span></div>
         
         <div id="threejs-container"></div>
-        <div id="threejs-ui-overlay"><b>WebGL 照片級材質引擎運作中</b><br>滑滑鼠左鍵：旋轉 | 滾輪：縮放 | 右鍵：平移</div>
+        <div id="threejs-ui-overlay"><b>WebGL 照片級材質引擎運作中</b><br>滑鼠左鍵：旋轉 | 滾輪：縮放 | 右鍵：平移</div>
         
         <div id="plotly-div"></div>
         
@@ -223,7 +223,7 @@ const LEVELS = [
     "01. 地月系統 (Three.js 真實影像與衛星網)",
     "02. 太陽系全貌 (17天體橢圓軌道與柯伊伯帶)", 
     "03. 太陽系行進軌跡 (太陽系螺旋衝浪)",
-    "04. 銀河系核心 (引力吸積與流體渲染)", 
+    "04. 銀河系核心 (流體渲染與落後臂力學)", 
     "05. 本星系群局部 (雙軸鞍點)",
     "06. 本星系群全貌 (Local Group)", 
     "07. 周邊星系群 (Local Sheet)",
@@ -241,7 +241,7 @@ const STORY_SCRIPT = [
     { title: "L1. 雙引擎切換：地月系", content: "您現在正體驗 AI Studio 首創的雙引擎無縫架構。此層級由 WebGL 渲染真實地球紋理與大氣。您可以清晰看見登陸點標記與 ISS 國際太空站。(請啟動左側時空演化)" },
     { title: "L2. 太陽系與克卜勒力學", content: "切換為 Plotly 動力學引擎。17顆主要與矮行星正遵循克卜勒橢圓定律運行。視角始終錨定太陽原點。" },
     { title: "L3. 太陽螺旋衝浪", content: "太陽並非靜止，而是繞行銀河中心。行星受引力拖曳畫出彈簧狀軌跡。座標系會跟隨移動的太陽系，讓焦點保持置中。" },
-    { title: "L4. 銀河系流體渲染", content: "進入百萬光年尺度。已拔除背景隨機星塵與中心擾流干擾。利用 6000 顆高斯粒子呈現高密度流體狀旋臂。注意黃金色的太陽系，正拖曳著歷史軌跡繞行核心。" },
+    { title: "L4. 銀河系流體渲染", content: "進入百萬光年尺度。幾何懸臂已修正為符合真實物理的「落後臂 (Trailing Arm)」，星系整體呈順時針自轉。注意黃金色的太陽系，正拖曳著歷史軌跡繞行核心。" },
     { title: "L5~L8. 本星系群與室女座", content: "銀河系與仙女座星系正互相拉扯。在更大的尺度上，整個本星系群都在向室女座超星系團 (Virgo Cluster) 的引力阱墜落。視角已錨定當前星群質心。" },
     { title: "L9~L12. 拉尼亞凱亞超星系團", content: "數萬個星系正沿著不可見的暗物質河流，匯聚向『巨引源』與夏普力超星系團。黃金色的網格標示出了引力分水嶺。" },
     { title: "L13~L15. 可觀測宇宙骨架", content: "尺度來到數十億光年。我們採用高斯坍縮演算法，模擬出宇宙大尺度下的『史隆長城』與『絕對空洞』。藍色箭頭標示了由暗能量驅動的哈伯空間膨脹。" }
@@ -488,9 +488,12 @@ class UniverseEngine {
             let t = Math.pow(Math.random(), 1.5); 
             let r = t * max_radius;
             if (r < max_radius * 0.1) r += max_radius * 0.1;
+            
+            // 修正為正值展開角，配合後續的負值（順時針）自轉矩陣，形成真實物理的「落後臂 (Trailing Arm)」
             let theta_ideal = (1 / winding_b) * Math.log(r / (max_radius*0.1)) + offset;
             let scatter = randn() * (r * 0.3); 
             let theta = theta_ideal + (scatter / r);
+            
             let px = r * Math.cos(theta);
             let py = r * Math.sin(theta);
             let pz = randn() * (max_radius * 0.05) * Math.exp(-r/max_radius); 
@@ -638,7 +641,8 @@ class UniverseEngine {
 
     buildLevelTraces(level_idx, vis, time) {
         let t = [];
-        let rotationAngle = (isPlaying && level_idx <= 3) ? time * 0.15 : 0; 
+        // 修正：全局自轉改為負值（順時針旋轉）
+        let rotationAngle = (isPlaying && level_idx <= 3) ? time * -0.15 : 0; 
         let loopTime = time % 30.0;
         let expandFactor = (level_idx >= 10 && isPlaying) ? (1.0 + loopTime * 0.04) : 1.0;
 
@@ -674,15 +678,15 @@ class UniverseEngine {
                 if(vis.streams && isPlaying) t.push(this.createSurfingTrail(p, time, sunVec));
             });
         }
-        else if (level_idx === 3) { // 銀河系流體渲染
+        else if (level_idx === 3) { // 銀河系流體渲染 (修正為落後臂)
             if(vis.landmarks) { t.push(this.createLabel([2, -4, -5], '#DDDDDD', '大麥哲倫星系', 3, 'circle', rotationAngle, 1.0)); }
             if(vis.streams) {
                 let galaxyData = this.precalcGalaxyDensity(`L${level_idx}_galaxy_pdf`, dyn.mw, 18, 6000); 
                 t.push(...this.drawGalaxyDensityDynamic(galaxyData, rotationAngle, 1.0));
             }
             
-            // 太陽系軌道與漸變尾跡
-            let sun_orbit_r = 8.0, sun_orbit_spd = 0.5, sun_angle = time * sun_orbit_spd;
+            // 修正：太陽系公轉方向與盤面旋轉方向一致 (順時針)
+            let sun_orbit_r = 8.0, sun_orbit_spd = -0.5, sun_angle = time * sun_orbit_spd;
             let sun_world_pos = [ dyn.mw[0] + sun_orbit_r * Math.cos(sun_angle), dyn.mw[1] + sun_orbit_r * Math.sin(sun_angle), dyn.mw[2] + Math.sin(sun_angle * 2) * 0.5 ];
             
             if(vis.landmarks) t.push(this.createLabel(sun_world_pos, '#FF5500', '太陽系', 5, 'circle', rotationAngle, 1.0));
@@ -742,13 +746,12 @@ class UniverseEngine {
             }
         }
         
-        // 矩陣平移：強制將各階層的核心對準原點 (0,0,0) 以穩定相機視角
         let offset = [0,0,0];
-        if (level_idx === 2) offset = [time * -4.0, time * -4.0, time * 2.0]; // L3: 太陽系
-        else if (level_idx >= 3 && level_idx <= 6) offset = dyn.mw; // L4~L7: 銀河系核心
-        else if (level_idx >= 7 && level_idx <= 8) offset = dyn.ga; // L8~L9: 巨引源
-        else if (level_idx >= 9 && level_idx <= 10) offset = dyn.shapley; // L10~L11: 夏普力
-        else if (level_idx >= 11 && level_idx <= 12) offset = dyn.sloan; // L12~L13: 史隆長城
+        if (level_idx === 2) offset = [time * -4.0, time * -4.0, time * 2.0];
+        else if (level_idx >= 3 && level_idx <= 6) offset = dyn.mw; 
+        else if (level_idx >= 7 && level_idx <= 8) offset = dyn.ga; 
+        else if (level_idx >= 9 && level_idx <= 10) offset = dyn.shapley; 
+        else if (level_idx >= 11 && level_idx <= 12) offset = dyn.sloan; 
 
         if (offset[0] !== 0 || offset[1] !== 0 || offset[2] !== 0) {
             t.forEach(trace => {
