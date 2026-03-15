@@ -64,7 +64,7 @@
       { "id": "MapEditor", "name": "圖資編輯工具", "icon": "🛠️", "path": "views/spatial/map_editor.html", "category": "空間資訊" },
       { "id": "WeatherMonitor", "name": "氣象監測系統", "icon": "☁️", "path": "views/spatial/Weather.html", "category": "空間資訊" },
       { "id": "WeatherData", "name": "氣候資料工具", "icon": "📅", "path": "views/spatial/WeatherData.html", "category": "空間資訊" },
-      { "id": "universe_simulator", "name": "3D(測試慎入)", "icon": "🌌", "path": "views/spatial/universe_sim.html", "category": "空間資訊" },
+      { "id": "universe_simulator", "name": "3D(框架測試)", "icon": "🌌", "path": "views/spatial/universe_sim.html", "category": "空間資訊" },
       { "id": "CalcEngine", "name": "工程換算引擎", "icon": "📐", "path": "views/productivity/calc.html", "category": "生產力" },
       { "id": "DocAssistant", "name": "公文智能助手", "icon": "📝", "path": "views/productivity/doc.html", "category": "生產力" },
       { "id": "GreenTool", "name": "115南港綠化開口工具", "icon": "🌿", "path": "views/productivity/green.html", "category": "生產力" },
